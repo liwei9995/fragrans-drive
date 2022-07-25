@@ -6,7 +6,6 @@ test
 docs
 Dockerfile
 coverage
-deploy
 LICENSE
 .gitignore
 yarn.lock
