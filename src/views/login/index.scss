@@ -1,0 +1,55 @@
+.login-wrapper {
+	position: relative;
+	z-index: 3;
+	max-width: 400px;
+	margin: auto;
+	color: #616870;
+	text-align: left;
+	.logo-wrapper {
+		display: flex;
+		align-items: center;
+		.logo {
+			width: 30px;
+			height: 30px;
+			margin-right: 12px;
+			background: url('@/assets/logo.svg') no-repeat;
+			background-size: 100% 100%;
+		}
+		.name {
+			font-size: 24px;
+			font-weight: bold;
+			color: #515559;
+		}
+	}
+}
+
+@media (max-width: 767px) {
+	.login-wrapper {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		min-height: 100%;
+		padding: 24px 20px;
+		.logo-wrapper {
+			display: flex;
+			align-items: center;
+			margin: 0 auto 24px;
+		}
+	}
+}
+
+@media (min-width: 768px) {
+	.login-wrapper {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		width: 92%;
+		transform: translate(-50%, -50%);
+		.logo-wrapper {
+			position: absolute;
+			bottom: 100%;
+			left: 50%;
+			transform: translate(-50%, -48px);
+		}
+	}
+}
