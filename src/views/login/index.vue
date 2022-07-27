@@ -1,4 +1,6 @@
-<script setup lang="ts" name="login"></script>
+<script setup lang="ts" name="login">
+import LoginForm from './components/LoginForm.vue'
+</script>
 
 <template>
 	<div class="login-wrapper">
@@ -6,6 +8,7 @@
 			<div class="logo"></div>
 			<div class="name">fragrans</div>
 		</div>
+		<LoginForm></LoginForm>
 	</div>
 </template>
 

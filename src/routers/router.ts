@@ -3,7 +3,17 @@ import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
 	{
 		path: '/',
-		redirect: { name: 'login' }
+		redirect: { name: 'home' }
+	},
+	{
+		path: '/home',
+		name: 'home',
+		component: () => import('@/views/home/index.vue'),
+		meta: {
+			requiresAuth: true,
+			title: '首页',
+			key: 'home'
+		}
 	},
 	{
 		path: '/login',

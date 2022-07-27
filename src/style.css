@@ -54,7 +54,6 @@ button:focus-visible {
 }
 #app {
 	max-width: 1280px;
-	padding: 2rem;
 	margin: 0 auto;
 	text-align: center;
 }

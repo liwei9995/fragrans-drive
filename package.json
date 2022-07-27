@@ -15,7 +15,11 @@
 		"commit": "git pull && git add -A && git-cz && git push"
 	},
 	"dependencies": {
+		"axios": "^0.27.2",
 		"element-plus": "^2.2.10",
+		"pinia": "^2.0.17",
+		"pinia-plugin-persistedstate": "^1.6.3",
+		"qs": "^6.11.0",
 		"vue": "^3.2.37",
 		"vue-router": "^4.1.2"
 	},

@@ -13,6 +13,8 @@ import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 // vue Router
 import router from '@/routers/index'
+// pinia store
+import pinia from '@/store/index'
 
 const app = createApp(App)
 
@@ -21,4 +23,4 @@ Object.keys(Icons).forEach(key => {
 	app.component(key, Icons[key as keyof typeof Icons])
 })
 
-app.use(router).use(ElementPlus).mount('#app')
+app.use(router).use(pinia).use(ElementPlus).mount('#app')
