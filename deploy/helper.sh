@@ -8,7 +8,7 @@ CONTAINER_INNER_PORT=80
 COMMIT_SHA=$(git rev-parse --short HEAD)
 
 # 构建 yi-drive 镜像
-docker build --pull -t $REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA .
+docker build --pull --no-cache -t $REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA .
 
 # 登录 Docker Registry
 echo $DOCKER_REGISTRY_PASSWORD | docker login $REGISTRY_NAME -u $DOCKER_REGISTRY_USER --password-stdin
