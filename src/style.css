@@ -11,6 +11,9 @@
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	text-size-adjust: 100%;
+
+	--c-primary: #008ffd;
+	--global-category-color: #008ffd;
 }
 
 a {
@@ -69,6 +72,52 @@ button:focus-visible {
 	max-width: 1280px;
 	margin: 0 auto;
 	text-align: center;
+}
+
+#app::after, #app::before {
+	position: fixed;
+	top: 0;
+	content: "";
+}
+
+#app::before {
+	left: var(--blur-left,340px);
+	z-index: 4;
+	width: var(--blur-width,70%);
+	height: 250px;
+	border-radius: 0 0 100px 20px;
+	box-shadow: 25px 240px 96px var(--global-category-color,var(--c-primary));
+	opacity: .11;
+	transition: box-shadow .25s linear;
+	transform: rotate(-8deg) translateY(-185%) translateZ(0);
+	animation: fade-in .5s cubic-bezier(.46,0,0,1);
+	will-change: auto
+}
+
+@media (max-width: 1199px) {
+	#app::before {
+			--blur-left: 300px
+	}
+}
+
+@media (max-width: 991px) {
+	#app::before {
+			--blur-left: 260px
+	}
+}
+
+@media (max-width: 767px) {
+	#app::before {
+			--blur-left: -10%;
+			--blur-width: 100%
+	}
+}
+
+#app::after {
+	right: 0;
+	left: 0;
+	height: 32px;
+	-webkit-app-region: drag
 }
 
 @media (prefers-color-scheme: light) {	
