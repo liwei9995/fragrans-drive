@@ -1,13 +1,16 @@
 .login-wrapper {
 	position: relative;
 	z-index: 3;
+	box-sizing: border-box;
 	max-width: 400px;
 	margin: auto;
 	color: #616870;
 	text-align: left;
+
 	.logo-wrapper {
 		display: flex;
 		align-items: center;
+
 		.logo {
 			width: 30px;
 			height: 30px;
@@ -15,6 +18,7 @@
 			background: url('@/assets/logo.svg') no-repeat;
 			background-size: 100% 100%;
 		}
+
 		.name {
 			font-size: 24px;
 			font-weight: bold;
@@ -30,6 +34,7 @@
 		justify-content: center;
 		min-height: 100%;
 		padding: 24px 20px;
+
 		.logo-wrapper {
 			display: flex;
 			align-items: center;
@@ -45,6 +50,7 @@
 		left: 50%;
 		width: 92%;
 		transform: translate(-50%, -50%);
+
 		.logo-wrapper {
 			position: absolute;
 			bottom: 100%;
