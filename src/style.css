@@ -32,6 +32,7 @@ body {
 	min-width: 320px;
 	min-height: 100vh;
 	margin: 0;
+	overflow: hidden;
 	overscroll-behavior-y: none;
 	background: #ebedf0;
 	scroll-behavior: smooth;
