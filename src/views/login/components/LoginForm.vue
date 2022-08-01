@@ -118,19 +118,23 @@ onMounted(() => {
 	border-radius: 21px;
 	box-shadow: inset 0 0 0 var(--border-width, 0) var(--border-color, transparent),
 		0 var(--shadow-y, 30px) var(--shadow-blur, 130px) 0 var(--shadow, var(--c-shadow));
+
 	.login-form {
 		overflow: hidden;
+
 		h1 {
 			margin: 0 0 8px;
 			font-weight: 500;
 			color: #27272b;
 			text-align: left;
 		}
+
 		small {
 			display: block;
 			margin-bottom: 24px;
 			font-size: 14px;
 		}
+
 		.login-btn {
 			.login {
 				width: 100%;
@@ -142,13 +146,26 @@ onMounted(() => {
 @media (max-width: 767px) {
 	.login-form-wrapper {
 		padding: 24px;
+
 		.login-form {
 			h1 {
 				font-size: 18px;
 				line-height: 28px;
 			}
+
 			small {
 				margin-bottom: 16px;
+			}
+		}
+	}
+}
+
+@media (min-width: 768px) {
+	.login-form-wrapper {
+		.login-form {
+			h1 {
+				font-size: 28px;
+				line-height: 28px;
 			}
 		}
 	}
