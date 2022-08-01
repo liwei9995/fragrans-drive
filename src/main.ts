@@ -1,8 +1,9 @@
 import { createApp } from 'vue'
-import './style.css'
 import App from './App.vue'
 // reset style sheet
 import '@/styles/reset.scss'
+// app style sheet
+import './style.css'
 // element plus
 import ElementPlus from 'element-plus'
 // element icons
