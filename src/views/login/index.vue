@@ -13,5 +13,5 @@ import LoginForm from './components/LoginForm.vue'
 </template>
 
 <style scoped lang="scss">
-@import "./index.scss";
+@import './index.scss';
 </style>
