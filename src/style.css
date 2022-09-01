@@ -17,7 +17,9 @@
 	--min: 812px;
 }
 
-*, ::after, ::before {
+*,
+::after,
+::before {
 	box-sizing: border-box;
 }
 
@@ -81,42 +83,43 @@ button:focus-visible {
 	text-align: center;
 }
 
-#app::after, #app::before {
+#app::after,
+#app::before {
 	position: fixed;
 	top: 0;
-	content: "";
+	content: '';
 }
 
 #app::before {
-	left: var(--blur-left,340px);
+	left: var(--blur-left, 340px);
 	z-index: 4;
-	width: var(--blur-width,70%);
+	width: var(--blur-width, 70%);
 	height: 250px;
 	border-radius: 0 0 100px 20px;
-	box-shadow: 25px 240px 96px var(--global-category-color,var(--c-primary));
-	opacity: .11;
-	transition: box-shadow .25s linear;
+	box-shadow: 25px 240px 96px var(--global-category-color, var(--c-primary));
+	opacity: 0.11;
+	transition: box-shadow 0.25s linear;
 	transform: rotate(-8deg) translateY(-185%) translateZ(0);
-	animation: fade-in .5s cubic-bezier(.46,0,0,1);
-	will-change: auto
+	animation: fade-in 0.5s cubic-bezier(0.46, 0, 0, 1);
+	will-change: auto;
 }
 
 @media (max-width: 1199px) {
 	#app::before {
-			--blur-left: 300px
+		--blur-left: 300px;
 	}
 }
 
 @media (max-width: 991px) {
 	#app::before {
-			--blur-left: 260px
+		--blur-left: 260px;
 	}
 }
 
 @media (max-width: 767px) {
 	#app::before {
-			--blur-left: -10%;
-			--blur-width: 100%
+		--blur-left: -10%;
+		--blur-width: 100%;
 	}
 }
 
@@ -124,10 +127,10 @@ button:focus-visible {
 	right: 0;
 	left: 0;
 	height: 32px;
-	-webkit-app-region: drag
+	-webkit-app-region: drag;
 }
 
-@media (prefers-color-scheme: light) {	
+@media (prefers-color-scheme: light) {
 	:root {
 		color: #213547;
 		background-color: #ffffff;
