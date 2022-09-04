@@ -9,10 +9,17 @@
 		padding-top: 28px;
 		overflow: hidden;
 
-		// .file-drag-zone {
-		// 	.page-content {
+		.file-drag-zone {
+			.page-content {
+				.icon-folder {
+					margin-bottom: 36px;
+					color: var(--c-primary);
+				}
 
-		//   }
-		// }
+				.dialog-footer {
+					margin-top: 20px;
+				}
+			}
+		}
 	}
 }

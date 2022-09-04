@@ -23,7 +23,7 @@
 					<Search />
 				</el-icon>
 			</div>
-			<el-dropdown>
+			<el-dropdown trigger="click" @command="handleCommand">
 				<div class="action">
 					<el-icon :size="32">
 						<CirclePlusFilled />
@@ -31,7 +31,7 @@
 				</div>
 				<template #dropdown>
 					<el-dropdown-menu>
-						<el-dropdown-item v-for="item in actionItems" :key="item.id">
+						<el-dropdown-item v-for="item in actionItems" :key="item.id" :command="item.id">
 							{{ item.name }}
 						</el-dropdown-item>
 					</el-dropdown-menu>
@@ -58,36 +58,15 @@ type ActionItem = {
 interface HeaderProps {
 	breadcrumbItems?: Partial<BreadcrumbItem>[]
 	actionItems?: Partial<ActionItem>[]
+	tapActionItem?: (command: string | number | object) => void
 }
 
-withDefaults(defineProps<HeaderProps>(), {
-	breadcrumbItems: () => [
-		{
-			id: '1',
-			text: '文件'
-		},
-		{
-			id: '2',
-			isOmit: true
-		},
-		{
-			id: '3',
-			isHighlight: true,
-			text: 'NBA录像'
-		}
-	],
-	actionItems: () => [
-		{
-			id: '1',
-			name: '新建文件夹'
-		},
-		{
-			id: '2',
-			name: '上传文件',
-			isUpload: true
-		}
-	]
+const props = withDefaults(defineProps<HeaderProps>(), {
+	breadcrumbItems: () => [],
+	actionItems: () => []
 })
+
+const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
 </script>
 
 <style scoped lang="scss">

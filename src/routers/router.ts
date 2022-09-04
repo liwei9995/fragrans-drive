@@ -6,7 +6,7 @@ const routes: RouteRecordRaw[] = [
 		redirect: { name: 'home' }
 	},
 	{
-		path: '/home',
+		path: '/home/:id?',
 		name: 'home',
 		component: () => import('@/views/home/index.vue'),
 		meta: {
