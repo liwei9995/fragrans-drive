@@ -31,8 +31,9 @@ import { useRoute } from 'vue-router'
 import Header from './widgets/Header/index.vue'
 import { createFolder } from '@/api/modules/storage'
 
+const defaultFolderName = '新建文件夹'
 const dialogFormVisible = ref(false)
-const folderName = ref('新建文件夹')
+const folderName = ref(defaultFolderName)
 
 const route = useRoute()
 
@@ -74,6 +75,8 @@ const handleCreateFolder = () => {
 		type: 'folder',
 		parentId
 	})
+
+	folderName.value = defaultFolderName
 }
 
 const handleTapActionItem = (command: string | number | object) => {
