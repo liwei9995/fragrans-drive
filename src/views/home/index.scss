@@ -1,0 +1,25 @@
+.home {
+	height: 100%;
+
+	.content {
+		position: relative;
+		box-sizing: border-box;
+		flex: 1 1;
+		height: 100%;
+		padding-top: 28px;
+		overflow: hidden;
+
+		.file-drag-zone {
+			.page-content {
+				.icon-folder {
+					margin-bottom: 36px;
+					color: var(--c-primary);
+				}
+
+				.dialog-footer {
+					margin-top: 20px;
+				}
+			}
+		}
+	}
+}

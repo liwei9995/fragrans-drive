@@ -121,6 +121,10 @@ button:focus-visible {
 		--blur-left: -10%;
 		--blur-width: 100%;
 	}
+
+	.dialog-folder {
+		max-width: calc(100vw - 16px);
+	}
 }
 
 #app::after {

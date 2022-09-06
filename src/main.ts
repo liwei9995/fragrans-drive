@@ -12,6 +12,8 @@ import * as Icons from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 // element dark(内置暗黑模式)
 import 'element-plus/theme-chalk/dark/css-vars.css'
+// element 基于断点的隐藏类
+import 'element-plus/theme-chalk/display.css'
 // vue Router
 import router from '@/routers/index'
 // pinia store

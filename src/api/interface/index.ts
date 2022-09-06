@@ -18,6 +18,15 @@ export namespace Login {
 	}
 }
 
+// 文件存储
+export namespace Storage {
+	export interface ReqStorageFolder {
+		name: string
+		type: string
+		parentId: string
+	}
+}
+
 // * 用户管理模块
 export namespace User {
 	export interface ResUserList {
