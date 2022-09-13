@@ -28,13 +28,13 @@
 <script setup lang="ts" name="home">
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import Header from './widgets/Header/index.vue'
 import { createFolder } from '@/api/modules/storage'
 
 const defaultFolderName = '新建文件夹'
 const dialogFormVisible = ref(false)
 const folderName = ref(defaultFolderName)
-
 const route = useRoute()
 
 const breadcrumbItems = [
@@ -69,12 +69,26 @@ const handleCreateFolder = () => {
 	const parentId = (route.params.id || 'root') as string
 
 	dialogFormVisible.value = false
+	ElMessage.info({
+		message: '正在创建文件夹...',
+		duration: 0
+	})
 
 	createFolder({
 		name: folderName.value,
 		type: 'folder',
 		parentId
 	})
+		.then(({ exist }) => {
+			ElMessage.closeAll()
+
+			if (exist) {
+				ElMessage.error('此目录下已存在同名文件，请修改名称')
+			} else {
+				ElMessage.success('创建成功')
+			}
+		})
+		.catch(() => ElMessage.error('创建失败，请重试'))
 
 	folderName.value = defaultFolderName
 }

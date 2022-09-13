@@ -10,6 +10,9 @@
 		overflow: hidden;
 
 		.file-drag-zone {
+			position: relative;
+			height: 100%;
+
 			.page-content {
 				.icon-folder {
 					margin-bottom: 36px;
