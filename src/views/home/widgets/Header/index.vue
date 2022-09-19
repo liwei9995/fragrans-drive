@@ -41,6 +41,7 @@
 									:headers="uploadHeaders"
 									:show-file-list="false"
 									:limit="10"
+									:on-change="handleUploadChange"
 								>
 									<template #trigger>{{ item.name }}</template>
 								</el-upload>
@@ -56,7 +57,7 @@
 
 <script setup lang="ts" name="header">
 import { ref, computed } from 'vue'
-import { UploadInstance } from 'element-plus'
+import { UploadInstance, UploadProps } from 'element-plus'
 import { GlobalStore } from '@/store'
 
 const uploadRef = ref<UploadInstance>()
@@ -83,6 +84,7 @@ interface HeaderProps {
 	breadcrumbItems?: Partial<BreadcrumbItem>[]
 	actionItems?: Partial<ActionItem>[]
 	tapActionItem?: (command: string | number | object) => void
+	onUploadChange?: UploadProps['onChange']
 }
 
 const props = withDefaults(defineProps<HeaderProps>(), {
@@ -91,6 +93,9 @@ const props = withDefaults(defineProps<HeaderProps>(), {
 })
 
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
+
+const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
+	props.onUploadChange && props.onUploadChange(uploadFile, uploadFiles)
 </script>
 
 <style scoped lang="scss">
