@@ -9,6 +9,17 @@
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
 					/>
+					<div class="items-wrapper">
+						<Card
+							v-for="item in listData?.docs"
+							:key="item.id"
+							:id="item.id"
+							:title="item.name"
+							:desc="item.desc"
+							:type="item.mimeType"
+							:tap-action-item="handleTapCardActionItem"
+						/>
+					</div>
 					<el-dialog class="dialog-folder" width="340px" v-model="dialogFormVisible" title="新建文件夹">
 						<el-row justify="center">
 							<el-icon :size="100" class="icon-folder">
@@ -33,16 +44,46 @@
 <script setup lang="ts" name="home">
 import { ref, onBeforeMount } from 'vue'
 import { useRoute } from 'vue-router'
+import { format } from 'date-fns'
 import { ElMessage, UploadProps, ElNotification } from 'element-plus'
+import Card from '@/components/Card/index.vue'
 import Header from './widgets/Header/index.vue'
-import { createFolder, getFiles } from '@/api/modules/storage'
+import { createFolder, getFile, getFiles } from '@/api/modules/storage'
 
 const defaultFolderName = '新建文件夹'
 const dialogFormVisible = ref(false)
 const folderName = ref(defaultFolderName)
+const listData = ref<{ [key: string]: any }>()
 const route = useRoute()
 
-onBeforeMount(() => getFiles())
+interface Storage {
+	id: string
+	name: string
+	baseName?: string
+	extName?: string
+	mimeType?: string
+	encoding?: string
+	size?: string
+	parentId: string
+	type: string
+	createdAt: string
+	updatedAt: string
+}
+
+onBeforeMount(async () => {
+	const data = await getFiles()
+
+	if (Array.isArray(data?.docs)) {
+		data.docs = data.docs.map((item: Storage) => ({
+			...item,
+			desc: format(new Date(item.updatedAt), 'MM/dd HH:mm')
+		}))
+	}
+
+	listData.value = data
+
+	console.log(`data: ${JSON.stringify(data, null, 2)}`)
+})
 
 const breadcrumbItems = [
 	{
@@ -103,6 +144,25 @@ const handleCreateFolder = () => {
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
 		dialogFormVisible.value = true
+	}
+}
+
+const download = async (id: string, name: string, type?: string) => {
+	const response = await getFile(id)
+	console.log(response)
+	const blob = new Blob([response], { type })
+	const url = window.URL.createObjectURL(blob)
+	const a = document.createElement('a')
+	a.href = url
+	a.download = name
+	a.click()
+	window.URL.revokeObjectURL(url)
+}
+
+const handleTapCardActionItem = (command: string | number | object, id: string, name: string, type?: string) => {
+	if (command === 'download') {
+		console.log(`id: ${id}`)
+		download(id, name, type)
 	}
 }
 
