@@ -10,7 +10,18 @@
 		overflow: hidden;
 
 		.file-drag-zone {
+			position: relative;
+			height: 100%;
+
 			.page-content {
+				overflow: hidden;
+
+				.items-wrapper {
+					display: flex;
+					flex-wrap: wrap;
+					padding: 0 10px;
+				}
+
 				.icon-folder {
 					margin-bottom: 36px;
 					color: var(--c-primary);

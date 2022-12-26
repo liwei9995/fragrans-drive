@@ -25,6 +25,11 @@ export namespace Storage {
 		type: string
 		parentId: string
 	}
+
+	export interface ReqStorageList {
+		query?: Record<string, string>
+		pagination?: Record<string, string>
+	}
 }
 
 // * 用户管理模块

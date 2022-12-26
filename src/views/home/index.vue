@@ -3,7 +3,23 @@
 		<div class="content">
 			<div class="file-drag-zone">
 				<div class="page-content">
-					<Header :breadcrumb-items="breadcrumbItems" :action-items="actionItems" :tapActionItem="handleTapActionItem" />
+					<Header
+						:breadcrumb-items="breadcrumbItems"
+						:action-items="actionItems"
+						:tap-action-item="handleTapActionItem"
+						:on-upload-change="handleUploadChange"
+					/>
+					<div class="items-wrapper">
+						<Card
+							v-for="item in listData?.docs"
+							:key="item.id"
+							:id="item.id"
+							:title="item.name"
+							:desc="item.desc"
+							:type="item.mimeType"
+							:tap-action-item="handleTapCardActionItem"
+						/>
+					</div>
 					<el-dialog class="dialog-folder" width="340px" v-model="dialogFormVisible" title="新建文件夹">
 						<el-row justify="center">
 							<el-icon :size="100" class="icon-folder">
@@ -26,16 +42,48 @@
 </template>
 
 <script setup lang="ts" name="home">
-import { ref } from 'vue'
+import { ref, onBeforeMount } from 'vue'
 import { useRoute } from 'vue-router'
+import { format } from 'date-fns'
+import { ElMessage, UploadProps, ElNotification } from 'element-plus'
+import Card from '@/components/Card/index.vue'
 import Header from './widgets/Header/index.vue'
-import { createFolder } from '@/api/modules/storage'
+import { createFolder, getFile, getFiles } from '@/api/modules/storage'
 
 const defaultFolderName = '新建文件夹'
 const dialogFormVisible = ref(false)
 const folderName = ref(defaultFolderName)
-
+const listData = ref<{ [key: string]: any }>()
 const route = useRoute()
+
+interface Storage {
+	id: string
+	name: string
+	baseName?: string
+	extName?: string
+	mimeType?: string
+	encoding?: string
+	size?: string
+	parentId: string
+	type: string
+	createdAt: string
+	updatedAt: string
+}
+
+onBeforeMount(async () => {
+	const data = await getFiles()
+
+	if (Array.isArray(data?.docs)) {
+		data.docs = data.docs.map((item: Storage) => ({
+			...item,
+			desc: format(new Date(item.updatedAt), 'MM/dd HH:mm')
+		}))
+	}
+
+	listData.value = data
+
+	console.log(`data: ${JSON.stringify(data, null, 2)}`)
+})
 
 const breadcrumbItems = [
 	{
@@ -69,12 +117,26 @@ const handleCreateFolder = () => {
 	const parentId = (route.params.id || 'root') as string
 
 	dialogFormVisible.value = false
+	ElMessage.info({
+		message: '正在创建文件夹...',
+		duration: 0
+	})
 
 	createFolder({
 		name: folderName.value,
 		type: 'folder',
 		parentId
 	})
+		.then(({ exist }) => {
+			ElMessage.closeAll()
+
+			if (exist) {
+				ElMessage.error('此目录下已存在同名文件，请修改名称')
+			} else {
+				ElMessage.success('创建成功')
+			}
+		})
+		.catch(() => ElMessage.error('创建失败，请重试'))
 
 	folderName.value = defaultFolderName
 }
@@ -83,6 +145,46 @@ const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
 		dialogFormVisible.value = true
 	}
+}
+
+const download = async (id: string, name: string, type?: string) => {
+	const response = await getFile(id)
+	console.log(response)
+	const blob = new Blob([response], { type })
+	const url = window.URL.createObjectURL(blob)
+	const a = document.createElement('a')
+	a.href = url
+	a.download = name
+	a.click()
+	window.URL.revokeObjectURL(url)
+}
+
+const handleTapCardActionItem = (command: string | number | object, id: string, name: string, type?: string) => {
+	if (command === 'download') {
+		console.log(`id: ${id}`)
+		download(id, name, type)
+	}
+}
+
+const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {
+	const isUploadingFiles = uploadFiles.filter(file => file.status === 'uploading')
+	const isSuccessFiles = uploadFiles.filter(file => file.status === 'success')
+	const isFailFiles = uploadFiles.filter(file => file.status === 'fail')
+	const title =
+		isUploadingFiles.length > 0
+			? `正在上传 ∙ 共${isUploadingFiles.length}项`
+			: isFailFiles.length > 0
+			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项目`
+			: `上传完成 ∙ 共${isSuccessFiles.length}项`
+	const type = isUploadingFiles.length > 0 ? 'info' : 'success'
+
+	ElNotification.closeAll()
+	ElNotification({
+		title,
+		type,
+		position: 'bottom-right',
+		duration: 0
+	})
 }
 </script>
 

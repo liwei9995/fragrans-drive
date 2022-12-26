@@ -32,7 +32,21 @@
 				<template #dropdown>
 					<el-dropdown-menu>
 						<el-dropdown-item v-for="item in actionItems" :key="item.id" :command="item.id">
-							{{ item.name }}
+							<template v-if="item.isUpload">
+								<el-upload
+									ref="uploadRef"
+									class="upload-zone"
+									multiple
+									:action="storageAction"
+									:headers="uploadHeaders"
+									:show-file-list="false"
+									:limit="10"
+									:on-change="handleUploadChange"
+								>
+									<template #trigger>{{ item.name }}</template>
+								</el-upload>
+							</template>
+							<template v-else>{{ item.name }}</template>
 						</el-dropdown-item>
 					</el-dropdown-menu>
 				</template>
@@ -42,6 +56,17 @@
 </template>
 
 <script setup lang="ts" name="header">
+import { ref, computed } from 'vue'
+import { UploadInstance, UploadProps } from 'element-plus'
+import { GlobalStore } from '@/store'
+
+const uploadRef = ref<UploadInstance>()
+const storageAction = computed(() => `${import.meta.env.VITE_API_URL}/v1/storage/upload`)
+const globalStore = GlobalStore()
+const uploadHeaders = {
+	Authorization: `Bearer ${globalStore.token}`
+}
+
 type BreadcrumbItem = {
 	id?: string
 	text?: string
@@ -59,6 +84,7 @@ interface HeaderProps {
 	breadcrumbItems?: Partial<BreadcrumbItem>[]
 	actionItems?: Partial<ActionItem>[]
 	tapActionItem?: (command: string | number | object) => void
+	onUploadChange?: UploadProps['onChange']
 }
 
 const props = withDefaults(defineProps<HeaderProps>(), {
@@ -67,6 +93,9 @@ const props = withDefaults(defineProps<HeaderProps>(), {
 })
 
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
+
+const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
+	props.onUploadChange && props.onUploadChange(uploadFile, uploadFiles)
 </script>
 
 <style scoped lang="scss">
