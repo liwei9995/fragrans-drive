@@ -46,7 +46,7 @@ import { ref, onBeforeMount } from 'vue'
 import { useRoute } from 'vue-router'
 import { format } from 'date-fns'
 import { ElMessage, UploadProps, ElNotification } from 'element-plus'
-import Card from '@/components/Card/index.vue'
+import Card from '@/components/StorageCard/index.vue'
 import Header from './widgets/Header/index.vue'
 import { createFolder, getFile, getFiles } from '@/api/modules/storage'
 
