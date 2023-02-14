@@ -5,7 +5,6 @@
 		position: relative;
 		box-sizing: border-box;
 		flex: 1 1;
-		height: 100%;
 		padding-top: 28px;
 		overflow: hidden;
 
@@ -19,7 +18,9 @@
 				.items-wrapper {
 					display: flex;
 					flex-wrap: wrap;
+					max-height: calc(100vh - 92px);
 					padding: 0 10px;
+					overflow-y: auto;
 				}
 
 				.icon-folder {

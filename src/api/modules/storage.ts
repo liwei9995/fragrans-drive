@@ -16,7 +16,12 @@ export const getFiles = (params?: Storage.ReqStorageList) => {
 	return http.post(`${PORT}/storage/list`, params) // 正常 post json 请求  ==>  application/json
 }
 
+// 删除文件/文件夹接口
+export const deleteFile = (id: string) => {
+	return http.delete(`${PORT}/storage/${id}`) // 正常 post json 请求  ==>  application/json
+}
+
 // 获取文件接口
 export const getFile = (id: string) => {
-	return http.get(`${PORT}/storage/${id}`)
+	return http.download(`${PORT}/storage/${id}`)
 }

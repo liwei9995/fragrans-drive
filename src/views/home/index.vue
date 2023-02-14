@@ -48,7 +48,7 @@ import { format } from 'date-fns'
 import { ElMessage, UploadProps, ElNotification } from 'element-plus'
 import Card from '@/components/StorageCard/index.vue'
 import Header from './widgets/Header/index.vue'
-import { createFolder, getFile, getFiles } from '@/api/modules/storage'
+import { createFolder, getFile, getFiles, deleteFile } from '@/api/modules/storage'
 
 const defaultFolderName = '新建文件夹'
 const dialogFormVisible = ref(false)
@@ -70,7 +70,7 @@ interface Storage {
 	updatedAt: string
 }
 
-onBeforeMount(async () => {
+const fetchFiles = async () => {
 	const data = await getFiles()
 
 	if (Array.isArray(data?.docs)) {
@@ -81,9 +81,9 @@ onBeforeMount(async () => {
 	}
 
 	listData.value = data
+}
 
-	console.log(`data: ${JSON.stringify(data, null, 2)}`)
-})
+onBeforeMount(async () => fetchFiles())
 
 const breadcrumbItems = [
 	{
@@ -149,20 +149,25 @@ const handleTapActionItem = (command: string | number | object) => {
 
 const download = async (id: string, name: string, type?: string) => {
 	const response = await getFile(id)
-	console.log(response)
 	const blob = new Blob([response], { type })
 	const url = window.URL.createObjectURL(blob)
 	const a = document.createElement('a')
+
 	a.href = url
 	a.download = name
+	a.style.display = 'none'
+	document.body.appendChild(a)
 	a.click()
 	window.URL.revokeObjectURL(url)
+	document.body.removeChild(a)
 }
 
-const handleTapCardActionItem = (command: string | number | object, id: string, name: string, type?: string) => {
+const handleTapCardActionItem = async (command: string | number | object, id: string, name: string, type?: string) => {
 	if (command === 'download') {
-		console.log(`id: ${id}`)
 		download(id, name, type)
+	} else if (command === 'delete') {
+		await deleteFile(id)
+		fetchFiles()
 	}
 }
 
@@ -185,6 +190,11 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 		position: 'bottom-right',
 		duration: 0
 	})
+
+	// refetch the file list
+	if (isUploadingFiles.length === 0) {
+		fetchFiles()
+	}
 }
 </script>
 
