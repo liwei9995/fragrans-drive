@@ -25,3 +25,8 @@ export const deleteFile = (id: string) => {
 export const getFile = (id: string) => {
 	return http.download(`${PORT}/storage/${id}`)
 }
+
+// 修改文件/文件夹信息接口
+export const updateFile = (id: string, params: Storage.ReqStorageUpdateFileName) => {
+	return http.put(`${PORT}/storage/${id}`, params)
+}

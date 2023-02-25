@@ -30,6 +30,12 @@ export namespace Storage {
 		query?: Record<string, string>
 		pagination?: Record<string, string>
 	}
+
+	export interface ReqStorageUpdateFileName {
+		name: string
+		parentId: string
+		type: string
+	}
 }
 
 // * 用户管理模块

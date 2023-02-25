@@ -1,10 +1,10 @@
 <template>
-	<div class="card-wrapper">
+	<div class="card-wrapper" @click="handleClickCard">
 		<div class="drop-wrapper">
 			<div class="card-container">
-				<div class="outer-wrapper">
+				<div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
 					<div class="action-btn"></div>
-					<el-dropdown class="action-btn-more" trigger="click" @command="handleCommand">
+					<el-dropdown class="action-btn-more" :class="{ show: showMoreAction }" trigger="click" @command="handleCommand">
 						<el-icon :size="18">
 							<More />
 						</el-icon>
@@ -34,6 +34,13 @@
 </template>
 
 <script setup lang="ts" name="storage-card">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { HOME_URL } from '@/config/config'
+
+const router = useRouter()
+const showMoreAction = ref(false)
+
 type ActionItem = {
 	id?: string
 	name: string
@@ -43,11 +50,12 @@ type ActionItem = {
 interface StorageCardProps {
 	id: string
 	title: string
+	mimeType?: string
 	type?: string
 	desc: string
 	thumbUrl?: string
 	actionItems?: Partial<ActionItem>[]
-	tapActionItem?: (command: string | number | object, id: string, title: string, type?: string) => void
+	tapActionItem?: (command: string | number | object, id: string, title: string, mimeType?: string, thumbUrl?: string) => void
 }
 
 const props = withDefaults(defineProps<StorageCardProps>(), {
@@ -74,7 +82,13 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 })
 
 const handleCommand = (command: string | number | object) =>
-	props.tapActionItem && props.tapActionItem(command, props.id, props.title, props.type)
+	props.tapActionItem && props.tapActionItem(command, props.id, props.title, props.mimeType, props.thumbUrl)
+
+const handleClickCard = () => {
+	if (props.type === 'folder') {
+		router.push(`${HOME_URL}/${props.id}`)
+	}
+}
 </script>
 
 <style scoped lang="scss">
