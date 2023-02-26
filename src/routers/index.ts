@@ -1,5 +1,5 @@
 import router from '@/routers/router'
-import { ADMIN_URL, HOME_URL } from '@/api/config/config'
+import { ADMIN_URL, HOME_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { AxiosCanceler } from '@/api/helper/axiosCancel'
 import { authProfile } from '@/api/modules/user'
@@ -33,7 +33,7 @@ router.beforeEach(async (to, from, next) => {
 				const roleList = [].concat(roles) as string[]
 				const routerList = roleList.includes('admin') ? staticRouter.concat(ADMIN_URL) : staticRouter
 
-				if (routerList.indexOf(to.path) !== -1) return next()
+				if (routerList.indexOf(to.path) !== -1 || to.matched.length > 0) return next()
 
 				next({ path: '/403' })
 			} catch (error) {

@@ -16,25 +16,27 @@
 							:id="item.id"
 							:title="item.name"
 							:desc="item.desc"
-							:type="item.mimeType"
+							:mimeType="item.mimeType"
+							:type="item.type"
+							:thumbUrl="item.thumb"
 							:tap-action-item="handleTapCardActionItem"
 						/>
 					</div>
-					<el-dialog class="dialog-folder" width="340px" v-model="dialogFormVisible" title="新建文件夹">
-						<el-row justify="center">
-							<el-icon :size="100" class="icon-folder">
-								<Folder />
-							</el-icon>
-						</el-row>
-						<el-row justify="center">
-							<el-input v-model="folderName" autofocus="true" maxlength="30" />
-						</el-row>
-						<el-row justify="end">
-							<div class="dialog-footer">
-								<el-button type="primary" @click="handleCreateFolder" :disabled="!folderName.trim()">确定</el-button>
-							</div>
-						</el-row>
-					</el-dialog>
+					<Dialog
+						v-if="folderDialogFormVisible"
+						title="新建文件夹"
+						:name="folderName"
+						:on-close="handleCloseFolderDialog"
+						:on-confirm="handleCreateFolder"
+					/>
+					<Dialog
+						v-if="renameDialogFormVisible"
+						title="重命名"
+						:thumbUrl="needToRenameThumb"
+						:name="needToRenameFileName"
+						:on-close="handleCloseRenameDialog"
+						:on-confirm="handleRenameFile"
+					/>
 				</div>
 			</div>
 		</div>
@@ -42,19 +44,26 @@
 </template>
 
 <script setup lang="ts" name="home">
-import { ref, onBeforeMount } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onBeforeMount, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { ElMessage, UploadProps, ElNotification } from 'element-plus'
 import Card from '@/components/StorageCard/index.vue'
+import Dialog from './widgets/Dialog/index.vue'
+import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
-import { createFolder, getFile, getFiles } from '@/api/modules/storage'
+import { createFolder, getFile, getFiles, deleteFile, updateFile } from '@/api/modules/storage'
 
 const defaultFolderName = '新建文件夹'
-const dialogFormVisible = ref(false)
+const folderDialogFormVisible = ref(false)
+const renameDialogFormVisible = ref(false)
 const folderName = ref(defaultFolderName)
+const needToRenameThumb = ref('')
+const needToRenameFileId = ref('')
+const needToRenameFileName = ref('')
 const listData = ref<{ [key: string]: any }>()
 const route = useRoute()
+const router = useRouter()
 
 interface Storage {
 	id: string
@@ -70,20 +79,43 @@ interface Storage {
 	updatedAt: string
 }
 
-onBeforeMount(async () => {
-	const data = await getFiles()
+const fetchFiles = async () => {
+	const parentId = (route.params.id as string) || 'root'
+	const data = await getFiles({
+		query: { parentId }
+	})
 
 	if (Array.isArray(data?.docs)) {
 		data.docs = data.docs.map((item: Storage) => ({
 			...item,
-			desc: format(new Date(item.updatedAt), 'MM/dd HH:mm')
+			desc: format(new Date(item.updatedAt), 'MM/dd HH:mm'),
+			thumb: getThumb(item.extName, item.type)
 		}))
+		const folderItems: Storage[] = []
+		const fileItems: Storage[] = []
+
+		data.docs.forEach((doc: Storage) => {
+			if (doc.type === 'folder') {
+				folderItems.push(doc)
+			} else {
+				fileItems.push(doc)
+			}
+		})
+		data.docs = [
+			...folderItems.sort((a, b) => new Date(b.updatedAt).valueOf() - new Date(a.updatedAt).valueOf()),
+			...fileItems.sort((a, b) => new Date(b.updatedAt).valueOf() - new Date(a.updatedAt).valueOf())
+		]
 	}
 
 	listData.value = data
+}
 
-	console.log(`data: ${JSON.stringify(data, null, 2)}`)
-})
+onBeforeMount(() => fetchFiles())
+
+watch(
+	() => router.currentRoute.value,
+	() => fetchFiles()
+)
 
 const breadcrumbItems = [
 	{
@@ -113,17 +145,21 @@ const actionItems = [
 	}
 ]
 
-const handleCreateFolder = () => {
+const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
+
+const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
+
+const handleCreateFolder = (name: string) => {
 	const parentId = (route.params.id || 'root') as string
 
-	dialogFormVisible.value = false
+	folderDialogFormVisible.value = false
 	ElMessage.info({
 		message: '正在创建文件夹...',
 		duration: 0
 	})
 
 	createFolder({
-		name: folderName.value,
+		name,
 		type: 'folder',
 		parentId
 	})
@@ -134,6 +170,7 @@ const handleCreateFolder = () => {
 				ElMessage.error('此目录下已存在同名文件，请修改名称')
 			} else {
 				ElMessage.success('创建成功')
+				fetchFiles()
 			}
 		})
 		.catch(() => ElMessage.error('创建失败，请重试'))
@@ -141,28 +178,64 @@ const handleCreateFolder = () => {
 	folderName.value = defaultFolderName
 }
 
+const handleRenameFile = (name: string) => {
+	const fileId = needToRenameFileId.value
+	const doc = (listData?.value?.docs as Storage[])?.find(item => item.id === fileId)
+
+	if (!doc) return
+
+	updateFile(fileId, {
+		name,
+		parentId: doc?.parentId || 'root',
+		type: doc?.type
+	}).then(({ exist }) => {
+		if (exist) {
+			ElMessage.error('已存在同名文件，请修改名称')
+		} else {
+			renameDialogFormVisible.value = false
+		}
+		fetchFiles()
+	})
+}
+
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
-		dialogFormVisible.value = true
+		folderDialogFormVisible.value = true
 	}
 }
 
 const download = async (id: string, name: string, type?: string) => {
 	const response = await getFile(id)
-	console.log(response)
 	const blob = new Blob([response], { type })
 	const url = window.URL.createObjectURL(blob)
 	const a = document.createElement('a')
+
 	a.href = url
 	a.download = name
+	a.style.display = 'none'
+	document.body.appendChild(a)
 	a.click()
 	window.URL.revokeObjectURL(url)
+	document.body.removeChild(a)
 }
 
-const handleTapCardActionItem = (command: string | number | object, id: string, name: string, type?: string) => {
+const handleTapCardActionItem = async (
+	command: string | number | object,
+	id: string,
+	name: string,
+	type?: string,
+	thumb?: string
+) => {
 	if (command === 'download') {
-		console.log(`id: ${id}`)
 		download(id, name, type)
+	} else if (command === 'delete') {
+		await deleteFile(id)
+		fetchFiles()
+	} else if (command === 'rename') {
+		renameDialogFormVisible.value = true
+		needToRenameThumb.value = thumb || ''
+		needToRenameFileId.value = id
+		needToRenameFileName.value = name
 	}
 }
 
@@ -185,6 +258,11 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 		position: 'bottom-right',
 		duration: 0
 	})
+
+	// refetch the file list
+	if (isUploadingFiles.length === 0) {
+		fetchFiles()
+	}
 }
 </script>
 

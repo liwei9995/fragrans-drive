@@ -1,0 +1,18 @@
+.dialog-wrapper {
+	.thumb-wrapper {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 126px;
+		height: 120px;
+		margin-bottom: 36px;
+
+		.thumb {
+			color: var(--c-primary);
+		}
+	}
+
+	.dialog-footer {
+		margin-top: 20px;
+	}
+}
