@@ -6,11 +6,11 @@
 			</div>
 		</el-row>
 		<el-row justify="center">
-			<el-input v-model="name" autofocus maxlength="30" />
+			<el-input v-model="inputValue" autofocus maxlength="30" />
 		</el-row>
 		<el-row justify="end">
 			<div class="dialog-footer">
-				<el-button type="primary" @click="handleClick" :disabled="!name.trim()">确定</el-button>
+				<el-button type="primary" @click="handleClick" :disabled="!inputValue.trim()">确定</el-button>
 			</div>
 		</el-row>
 	</el-dialog>
@@ -34,8 +34,9 @@ const props = withDefaults(defineProps<DialogProps>(), {
 })
 
 const dialogFormVisible = ref(true)
+const inputValue = ref(props.name)
 
-const handleClick = () => props.onConfirm && props.onConfirm(props.name)
+const handleClick = () => props.onConfirm && props.onConfirm(inputValue.value)
 
 const handleClose = () => props.onClose && props.onClose()
 </script>

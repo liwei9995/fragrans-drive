@@ -4,18 +4,20 @@
 			<div class="card-container">
 				<div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
 					<div class="action-btn"></div>
-					<el-dropdown class="action-btn-more" :class="{ show: showMoreAction }" trigger="click" @command="handleCommand">
-						<el-icon :size="18">
-							<More />
-						</el-icon>
-						<template #dropdown>
-							<el-dropdown-menu>
-								<el-dropdown-item v-for="item in actionItems" :key="item.id" :divided="item.divided" :command="item.id">
-									{{ item.name }}
-								</el-dropdown-item>
-							</el-dropdown-menu>
-						</template>
-					</el-dropdown>
+					<div class="action-btn-more-wrapper" @click.stop>
+						<el-dropdown class="action-btn-more" :class="{ show: showMoreAction }" trigger="click" @command="handleCommand">
+							<el-icon :size="18">
+								<More />
+							</el-icon>
+							<template #dropdown>
+								<el-dropdown-menu>
+									<el-dropdown-item v-for="item in actionItems" :key="item.id" :divided="item.divided" :command="item.id">
+										{{ item.name }}
+									</el-dropdown-item>
+								</el-dropdown-menu>
+							</template>
+						</el-dropdown>
+					</div>
 					<div class="node-card">
 						<div class="cover">
 							<div class="folder-cover">
