@@ -30,3 +30,8 @@ export const getFile = (id: string) => {
 export const updateFile = (id: string, params: Storage.ReqStorageUpdateFileName) => {
 	return http.put(`${PORT}/storage/${id}`, params)
 }
+
+// 获取文件/文件夹所在路径
+export const getPath = (fileId: string) => {
+	return http.post(`${PORT}/storage/path`, { fileId })
+}

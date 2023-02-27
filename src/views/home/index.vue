@@ -19,6 +19,7 @@
 							:mimeType="item.mimeType"
 							:type="item.type"
 							:thumbUrl="item.thumb"
+							:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 							:tap-action-item="handleTapCardActionItem"
 						/>
 					</div>
@@ -38,6 +39,7 @@
 						:on-confirm="handleRenameFile"
 					/>
 				</div>
+				<el-empty v-if="listData?.docs.length === 0" description="No Data" />
 			</div>
 		</div>
 	</div>
@@ -52,18 +54,55 @@ import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
-import { createFolder, getFile, getFiles, deleteFile, updateFile } from '@/api/modules/storage'
+import { createFolder, getFile, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
 const defaultFolderName = '新建文件夹'
+const defaultBreadcrumbItem = {
+	id: 'root',
+	text: '文件'
+}
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const folderName = ref(defaultFolderName)
 const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
 const needToRenameFileName = ref('')
+const breadcrumbItems = ref([defaultBreadcrumbItem])
 const listData = ref<{ [key: string]: any }>()
 const route = useRoute()
 const router = useRouter()
+const basicActionItems = [
+	{
+		id: 'rename',
+		name: '重命名',
+		divided: false
+	},
+	{
+		id: 'delete',
+		name: '删除',
+		divided: true
+	}
+]
+const fullActionItems = [
+	{
+		id: 'download',
+		name: '下载',
+		divided: false
+	},
+	...basicActionItems
+]
+
+const actionItems = [
+	{
+		id: 'folder',
+		name: '新建文件夹'
+	},
+	{
+		id: 'file',
+		name: '上传文件',
+		isUpload: true
+	}
+]
 
 interface Storage {
 	id: string
@@ -110,40 +149,50 @@ const fetchFiles = async () => {
 	listData.value = data
 }
 
-onBeforeMount(() => fetchFiles())
+const fetchPath = async () => {
+	const fileId = route.params.id as string
+
+	if (fileId) {
+		const pathItems = await getPath(fileId)
+
+		breadcrumbItems.value = [
+			defaultBreadcrumbItem,
+			...pathItems.map((path: { id: string; name: string }) => ({
+				id: path.id,
+				text: path.name
+			}))
+		]
+	}
+}
+
+onBeforeMount(() => {
+	fetchFiles()
+	fetchPath()
+})
 
 watch(
 	() => router.currentRoute.value,
-	() => fetchFiles()
+	() => {
+		fetchFiles()
+		fetchPath()
+	}
 )
 
-const breadcrumbItems = [
-	{
-		id: '1',
-		text: '文件'
-	},
-	{
-		id: '2',
-		isOmit: true
-	},
-	{
-		id: '3',
-		isHighlight: true,
-		text: 'NBA录像'
-	}
-]
-
-const actionItems = [
-	{
-		id: 'folder',
-		name: '新建文件夹'
-	},
-	{
-		id: 'file',
-		name: '上传文件',
-		isUpload: true
-	}
-]
+// const breadcrumbItems = [
+// 	{
+// 		id: 'root',
+// 		text: '文件'
+// 	},
+// 	{
+// 		id: '2',
+// 		isOmit: true
+// 	},
+// 	{
+// 		id: '3',
+// 		isHighlight: true,
+// 		text: 'NBA录像'
+// 	}
+// ]
 
 const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
 
