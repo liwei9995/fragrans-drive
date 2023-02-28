@@ -10,18 +10,21 @@
 						:on-upload-change="handleUploadChange"
 					/>
 					<div class="items-wrapper">
-						<Card
-							v-for="item in listData?.docs"
-							:key="item.id"
-							:id="item.id"
-							:title="item.name"
-							:desc="item.desc"
-							:mimeType="item.mimeType"
-							:type="item.type"
-							:thumbUrl="item.thumb"
-							:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
-							:tap-action-item="handleTapCardActionItem"
-						/>
+						<div class="items">
+							<Card
+								v-for="item in listData?.docs"
+								:key="item.id"
+								:id="item.id"
+								:title="item.name"
+								:desc="item.desc"
+								:mimeType="item.mimeType"
+								:type="item.type"
+								:thumbUrl="item.thumb"
+								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
+								:tap-action-item="handleTapCardActionItem"
+							/>
+						</div>
+						<el-empty v-if="listData?.docs.length === 0" description="No Data" />
 					</div>
 					<Dialog
 						v-if="folderDialogFormVisible"
@@ -39,7 +42,6 @@
 						:on-confirm="handleRenameFile"
 					/>
 				</div>
-				<el-empty v-if="listData?.docs.length === 0" description="No Data" />
 			</div>
 		</div>
 	</div>
@@ -58,7 +60,7 @@ import { createFolder, getFile, getFiles, deleteFile, updateFile, getPath } from
 
 const defaultFolderName = '新建文件夹'
 const defaultBreadcrumbItem = {
-	id: 'root',
+	id: '',
 	text: '文件'
 }
 const folderDialogFormVisible = ref(false)
@@ -162,6 +164,8 @@ const fetchPath = async () => {
 				text: path.name
 			}))
 		]
+	} else {
+		breadcrumbItems.value = [defaultBreadcrumbItem]
 	}
 }
 

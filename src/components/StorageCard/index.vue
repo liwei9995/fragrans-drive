@@ -1,7 +1,7 @@
 <template>
-	<div class="card-wrapper" @click="handleClickCard">
+	<div class="card-wrapper">
 		<div class="drop-wrapper">
-			<div class="card-container">
+			<div class="card-container" @click="handleClickCard">
 				<div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
 					<div class="action-btn"></div>
 					<div class="action-btn-more-wrapper" @click.stop>
@@ -21,7 +21,7 @@
 					<div class="node-card">
 						<div class="cover">
 							<div class="folder-cover">
-								<el-image class="file-icon" alt="folder" :src="thumbUrl" fit="cover" />
+								<el-image class="file-icon" alt="folder" :src="thumbUrl" fit="contain" />
 							</div>
 						</div>
 						<div class="info">

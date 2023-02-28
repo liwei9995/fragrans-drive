@@ -14,14 +14,19 @@
 			height: 100%;
 
 			.page-content {
+				height: 100%;
 				overflow: hidden;
 
 				.items-wrapper {
-					display: flex;
-					flex-wrap: wrap;
-					max-height: calc(100vh - 92px);
-					padding: 0 10px;
+					position: relative;
+					height: calc(100vh - 92px);
+					padding: 0 10px 48px;
 					overflow-y: auto;
+
+					.items {
+						display: flex;
+						flex-wrap: wrap;
+					}
 				}
 			}
 

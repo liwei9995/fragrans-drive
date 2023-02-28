@@ -3,7 +3,7 @@
 		<div class="page-title">
 			<el-breadcrumb separator="›">
 				<template v-for="item in breadcrumbItems" :key="item.id">
-					<el-breadcrumb-item v-if="!item.isOmit && !item.isHighlight">
+					<el-breadcrumb-item v-if="!item.isOmit && !item.isHighlight" :to="{ path: '/home/' + item.id }">
 						<div class="breadcrumb-item-content">{{ item.text }}</div>
 					</el-breadcrumb-item>
 					<el-breadcrumb-item v-else-if="item.isOmit">
@@ -11,7 +11,7 @@
 							<MoreFilled />
 						</el-icon>
 					</el-breadcrumb-item>
-					<div class="breadcrumb-item-content highlight" v-else-if="item.isHighlight">
+					<div class="breadcrumb-item-content highlight" v-else-if="item.isHighlight" :to="{ path: '/home/' + item.id }">
 						{{ item.text }}
 					</div>
 				</template>
