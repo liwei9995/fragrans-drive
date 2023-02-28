@@ -182,22 +182,6 @@ watch(
 	}
 )
 
-// const breadcrumbItems = [
-// 	{
-// 		id: 'root',
-// 		text: '文件'
-// 	},
-// 	{
-// 		id: '2',
-// 		isOmit: true
-// 	},
-// 	{
-// 		id: '3',
-// 		isHighlight: true,
-// 		text: 'NBA录像'
-// 	}
-// ]
-
 const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
 
 const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
