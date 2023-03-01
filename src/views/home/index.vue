@@ -120,6 +120,14 @@ interface Storage {
 	updatedAt: string
 }
 
+const getDesc = (dateTime: string) => {
+	const dt = new Date(dateTime)
+	const dtDay = format(dt, 'MM/dd')
+	const today = format(new Date(), 'MM/dd')
+
+	return dtDay === today ? `今天 ${format(dt, 'HH:mm')}` : format(dt, 'MM/dd HH:mm')
+}
+
 const fetchFiles = async () => {
 	const parentId = (route.params.id as string) || 'root'
 	const data = await getFiles({
@@ -129,7 +137,7 @@ const fetchFiles = async () => {
 	if (Array.isArray(data?.docs)) {
 		data.docs = data.docs.map((item: Storage) => ({
 			...item,
-			desc: format(new Date(item.updatedAt), 'MM/dd HH:mm'),
+			desc: getDesc(item.updatedAt),
 			thumb: getThumb(item.extName, item.type)
 		}))
 		const folderItems: Storage[] = []
@@ -181,22 +189,6 @@ watch(
 		fetchPath()
 	}
 )
-
-// const breadcrumbItems = [
-// 	{
-// 		id: 'root',
-// 		text: '文件'
-// 	},
-// 	{
-// 		id: '2',
-// 		isOmit: true
-// 	},
-// 	{
-// 		id: '3',
-// 		isHighlight: true,
-// 		text: 'NBA录像'
-// 	}
-// ]
 
 const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
 
@@ -296,11 +288,14 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 	const isUploadingFiles = uploadFiles.filter(file => file.status === 'uploading')
 	const isSuccessFiles = uploadFiles.filter(file => file.status === 'success')
 	const isFailFiles = uploadFiles.filter(file => file.status === 'fail')
+
+	if (isUploadingFiles.length === 0 && isSuccessFiles.length === 0 && isFailFiles.length === 0) return
+
 	const title =
 		isUploadingFiles.length > 0
-			? `正在上传 ∙ 共${isUploadingFiles.length}项`
+			? `正在上传 ∙ 剩余${isUploadingFiles.length}项`
 			: isFailFiles.length > 0
-			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项目`
+			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
 			: `上传完成 ∙ 共${isSuccessFiles.length}项`
 	const type = isUploadingFiles.length > 0 ? 'info' : 'success'
 
