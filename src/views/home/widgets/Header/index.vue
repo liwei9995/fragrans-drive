@@ -38,6 +38,7 @@
 									class="upload-zone"
 									multiple
 									:action="storageAction"
+									:data="data"
 									:headers="uploadHeaders"
 									:show-file-list="false"
 									:limit="10"
@@ -57,15 +58,19 @@
 
 <script setup lang="ts" name="header">
 import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { UploadInstance, UploadProps } from 'element-plus'
 import { GlobalStore } from '@/store'
 
+const route = useRoute()
 const uploadRef = ref<UploadInstance>()
 const storageAction = computed(() => `${import.meta.env.VITE_API_URL}/v1/storage/upload`)
 const globalStore = GlobalStore()
 const uploadHeaders = {
 	Authorization: `Bearer ${globalStore.token}`
 }
+const parentId = (route.params.id as string) || 'root'
+const data = { parentId }
 
 type BreadcrumbItem = {
 	id?: string
