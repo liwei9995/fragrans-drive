@@ -20,12 +20,18 @@
 				.items-wrapper {
 					position: relative;
 					height: calc(100vh - 92px);
-					padding: 0 10px 48px;
+					padding: 0 10px 96px;
 					overflow-y: auto;
 
 					.items {
 						display: flex;
 						flex-wrap: wrap;
+						justify-content: space-between;
+
+						.empty-card {
+							width: 160px;
+							height: 0;
+						}
 					}
 				}
 			}

@@ -25,8 +25,9 @@
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
 							/>
+							<div v-for="item in 10" class="empty-card" :key="item" />
 						</div>
-						<el-empty v-if="listData?.docs.length === 0" description="No Data" />
+						<el-empty v-if="!isFetching && listData?.docs.length === 0" description="No Data" />
 					</div>
 					<Dialog
 						v-if="folderDialogFormVisible"
@@ -139,10 +140,14 @@ const getDesc = (dateTime: string) => {
 	return dtDay === today ? `今天 ${format(dt, 'HH:mm')}` : format(dt, 'MM/dd HH:mm')
 }
 
-const fetchFiles = async () => {
+const fetchFiles = async (init = true) => {
 	const parentId = (route.params.id as string) || 'root'
 
 	isFetching.value = true
+
+	if (init) {
+		listData.value = initialData
+	}
 
 	const data = await getFiles({
 		query: { parentId },
@@ -188,7 +193,7 @@ const fetchFiles = async () => {
 const load = () => {
 	if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
 
-	fetchFiles()
+	fetchFiles(false)
 }
 
 const fetchPath = async () => {
