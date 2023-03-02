@@ -9,6 +9,7 @@ export enum ResultEnum {
 	ERROR = 500,
 	OVERDUE = 599,
 	TIMEOUT = 10000,
+	TIMEOUT_DOWNLOAD = 1200000, // 20 minutes
 	TYPE = 'success'
 }
 

@@ -6,8 +6,10 @@
 					<Header
 						:breadcrumb-items="breadcrumbItems"
 						:action-items="actionItems"
+						:upload-file-limit="uploadFileLimit"
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
+						:on-upload-exceed="handleUploadExceed"
 					/>
 					<div class="items-wrapper">
 						<div v-infinite-scroll="load" class="items">
@@ -58,11 +60,12 @@ import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
 import { createFolder, getFile, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
-const defaultFolderName = '新建文件夹'
-const defaultBreadcrumbItem = {
-	id: '',
-	text: '文件'
+type BreadcrumbItem = {
+	id: string
+	name: string
 }
+
+const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const isFetching = ref(false)
@@ -70,7 +73,7 @@ const folderName = ref(defaultFolderName)
 const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
 const needToRenameFileName = ref('')
-const breadcrumbItems = ref([defaultBreadcrumbItem])
+const breadcrumbItems = ref([] as BreadcrumbItem[])
 const initialData = {
 	docs: [],
 	limit: 100,
@@ -78,6 +81,7 @@ const initialData = {
 	pages: 1
 }
 const listData = ref<{ [key: string]: any }>(initialData)
+const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
 const basicActionItems = [
@@ -194,14 +198,13 @@ const fetchPath = async () => {
 		const pathItems = await getPath(fileId)
 
 		breadcrumbItems.value = [
-			defaultBreadcrumbItem,
 			...pathItems.map((path: { id: string; name: string }) => ({
 				id: path.id,
 				text: path.name
 			}))
 		]
 	} else {
-		breadcrumbItems.value = [defaultBreadcrumbItem]
+		breadcrumbItems.value = []
 	}
 }
 
@@ -337,6 +340,10 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 	if (isUploadingFiles.length === 0) {
 		fetchFiles()
 	}
+}
+
+const handleUploadExceed: UploadProps['onExceed'] = files => {
+	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个。`)
 }
 </script>
 
