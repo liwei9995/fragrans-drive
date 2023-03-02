@@ -6,11 +6,13 @@
 					<Header
 						:breadcrumb-items="breadcrumbItems"
 						:action-items="actionItems"
+						:upload-file-limit="uploadFileLimit"
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
+						:on-upload-exceed="handleUploadExceed"
 					/>
 					<div class="items-wrapper">
-						<div class="items">
+						<div v-infinite-scroll="load" class="items">
 							<Card
 								v-for="item in listData?.docs"
 								:key="item.id"
@@ -58,19 +60,28 @@ import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
 import { createFolder, getFile, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
-const defaultFolderName = '新建文件夹'
-const defaultBreadcrumbItem = {
-	id: '',
-	text: '文件'
+type BreadcrumbItem = {
+	id: string
+	name: string
 }
+
+const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
+const isFetching = ref(false)
 const folderName = ref(defaultFolderName)
 const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
 const needToRenameFileName = ref('')
-const breadcrumbItems = ref([defaultBreadcrumbItem])
-const listData = ref<{ [key: string]: any }>()
+const breadcrumbItems = ref([] as BreadcrumbItem[])
+const initialData = {
+	docs: [],
+	limit: 100,
+	page: 0,
+	pages: 1
+}
+const listData = ref<{ [key: string]: any }>(initialData)
+const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
 const basicActionItems = [
@@ -130,9 +141,21 @@ const getDesc = (dateTime: string) => {
 
 const fetchFiles = async () => {
 	const parentId = (route.params.id as string) || 'root'
+
+	isFetching.value = true
+
 	const data = await getFiles({
-		query: { parentId }
+		query: { parentId },
+		pagination: {
+			page: listData.value.page + 1,
+			limit: listData.value.limit,
+			sort: {
+				updatedAt: -1
+			}
+		}
 	})
+
+	isFetching.value = false
 
 	if (Array.isArray(data?.docs)) {
 		data.docs = data.docs.map((item: Storage) => ({
@@ -140,23 +163,32 @@ const fetchFiles = async () => {
 			desc: getDesc(item.updatedAt),
 			thumb: getThumb(item.extName, item.type)
 		}))
-		const folderItems: Storage[] = []
-		const fileItems: Storage[] = []
-
-		data.docs.forEach((doc: Storage) => {
-			if (doc.type === 'folder') {
-				folderItems.push(doc)
-			} else {
-				fileItems.push(doc)
-			}
-		})
-		data.docs = [
-			...folderItems.sort((a, b) => new Date(b.updatedAt).valueOf() - new Date(a.updatedAt).valueOf()),
-			...fileItems.sort((a, b) => new Date(b.updatedAt).valueOf() - new Date(a.updatedAt).valueOf())
-		]
 	}
 
-	listData.value = data
+	const docs = [...listData.value.docs, ...data.docs]
+	const folderItems: Storage[] = []
+	const fileItems: Storage[] = []
+
+	docs.forEach((doc: Storage) => {
+		if (doc.type === 'folder') {
+			folderItems.push(doc)
+		} else {
+			fileItems.push(doc)
+		}
+	})
+
+	const sortedDocs = [...folderItems, ...fileItems]
+
+	listData.value = {
+		...data,
+		docs: sortedDocs
+	}
+}
+
+const load = () => {
+	if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
+
+	fetchFiles()
 }
 
 const fetchPath = async () => {
@@ -166,25 +198,22 @@ const fetchPath = async () => {
 		const pathItems = await getPath(fileId)
 
 		breadcrumbItems.value = [
-			defaultBreadcrumbItem,
 			...pathItems.map((path: { id: string; name: string }) => ({
 				id: path.id,
 				text: path.name
 			}))
 		]
 	} else {
-		breadcrumbItems.value = [defaultBreadcrumbItem]
+		breadcrumbItems.value = []
 	}
 }
 
-onBeforeMount(() => {
-	fetchFiles()
-	fetchPath()
-})
+onBeforeMount(() => fetchPath())
 
 watch(
 	() => router.currentRoute.value,
 	() => {
+		listData.value = initialData
 		fetchFiles()
 		fetchPath()
 	}
@@ -311,6 +340,10 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 	if (isUploadingFiles.length === 0) {
 		fetchFiles()
 	}
+}
+
+const handleUploadExceed: UploadProps['onExceed'] = files => {
+	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个。`)
 }
 </script>
 

@@ -25,18 +25,53 @@
 			font-size: 18px;
 			line-height: 1.4;
 
+			&.breadcrumb-items-wrapper {
+				overflow-x: auto;
+
+				&::-webkit-scrollbar {
+					display: none;
+				}
+			}
+
 			&__item {
 				white-space: nowrap;
 				cursor: pointer;
 
+				&.current {
+					.el-breadcrumb__inner {
+						.breadcrumb-item-content {
+							font-weight: 600;
+							color: rgb(37 38 43);
+						}
+					}
+				}
+
+				.el-breadcrumb__inner {
+					width: 100%;
+					min-width: 0;
+
+					.breadcrumb-item-content {
+						font-weight: 400;
+						color: rgb(37 38 43 / 36%);
+
+						&:hover {
+							color: var(--el-color-primary);
+						}
+					}
+				}
+
 				&:last-child {
 					width: 100%;
 					min-width: 0;
-					font-weight: 700;
 
 					.el-breadcrumb__inner {
 						width: 100%;
 						min-width: 0;
+
+						.breadcrumb-item-content {
+							font-weight: 600;
+							color: rgb(37 38 43);
+						}
 					}
 				}
 			}

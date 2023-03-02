@@ -28,7 +28,7 @@ export namespace Storage {
 
 	export interface ReqStorageList {
 		query?: Record<string, string>
-		pagination?: Record<string, string>
+		pagination?: Record<string, any>
 	}
 
 	export interface ReqStorageUpdateFileName {

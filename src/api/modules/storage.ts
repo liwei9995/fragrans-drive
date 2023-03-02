@@ -1,5 +1,6 @@
 import { Storage } from '@/api/interface/index'
 import { PORT } from '@/api/config/servicePort'
+import { ResultEnum } from '@/enums/httpEnum'
 
 import http from '@/api'
 
@@ -23,7 +24,7 @@ export const deleteFile = (id: string) => {
 
 // 获取文件接口
 export const getFile = (id: string) => {
-	return http.download(`${PORT}/storage/${id}`)
+	return http.download(`${PORT}/storage/${id}`, { timeout: ResultEnum.TIMEOUT_DOWNLOAD as number })
 }
 
 // 修改文件/文件夹信息接口
