@@ -54,7 +54,7 @@
 import { ref, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
-import { ElMessage, UploadProps, ElNotification } from 'element-plus'
+import { ElMessage, ElMessageBox, UploadProps, ElNotification } from 'element-plus'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import { getThumb } from '@/utils/thumb/index'
@@ -134,10 +134,17 @@ interface Storage {
 
 const getDesc = (dateTime: string) => {
 	const dt = new Date(dateTime)
-	const dtDay = format(dt, 'MM/dd')
-	const today = format(new Date(), 'MM/dd')
+	const now = new Date()
+	const dtYear = format(dt, 'yyyy')
+	const year = format(now, 'yyyy')
+	const dtDay = format(dt, 'yyyy/MM/dd')
+	const today = format(now, 'yyyy/MM/dd')
 
-	return dtDay === today ? `今天 ${format(dt, 'HH:mm')}` : format(dt, 'MM/dd HH:mm')
+	return dtDay === today
+		? `今天 ${format(dt, 'HH:mm')}`
+		: dtYear === year
+		? format(dt, 'MM/dd HH:mm')
+		: format(dt, 'yyyy/MM/dd HH:mm')
 }
 
 const fetchFiles = async (init = true) => {
@@ -308,8 +315,17 @@ const handleTapCardActionItem = async (
 	if (command === 'download') {
 		download(id, name, type)
 	} else if (command === 'delete') {
-		await deleteFile(id)
-		fetchFiles()
+		ElMessageBox.confirm('文件删除后将无法恢复，确定要删除么？', '删除文件', {
+			confirmButtonText: '确定删除',
+			cancelButtonText: '取消',
+			type: 'warning'
+		})
+			.then(async () => {
+				await deleteFile(id)
+				fetchFiles()
+				ElMessage.success('文件删除成功')
+			})
+			.catch(() => {})
 	} else if (command === 'rename') {
 		renameDialogFormVisible.value = true
 		needToRenameThumb.value = thumb || ''
@@ -348,7 +364,7 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 }
 
 const handleUploadExceed: UploadProps['onExceed'] = files => {
-	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个。`)
+	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`)
 }
 </script>
 
