@@ -25,7 +25,7 @@
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
 							/>
-							<div v-for="item in 10" class="empty-card" :key="item" />
+							<div v-for="item in 10" class="empty-card card-wrapper" :key="item" />
 						</div>
 						<el-empty v-if="!isFetching && listData?.docs.length === 0" description="No Data" />
 					</div>
