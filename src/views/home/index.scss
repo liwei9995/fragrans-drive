@@ -50,8 +50,15 @@
 @media (max-width: 576px) {
 	.home {
 		.content {
+			padding-top: 12px;
+
 			.file-drag-zone {
 				.page-content {
+					.header {
+						padding: 0 12px 0 24px;
+						margin-bottom: 12px;
+					}
+
 					.items-wrapper {
 						padding: 0 12px 96px;
 					}
