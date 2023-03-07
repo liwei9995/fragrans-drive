@@ -47,70 +47,16 @@
 	}
 }
 
-@media (max-width: 960px) {
-	.card-wrapper {
-		width: 140px;
-		height: 180px;
-	}
-}
-
-@media (max-width: 768px) {
-	.card-wrapper {
-		width: 140px;
-		height: 180px;
-	}
-}
-
 @media (max-width: 576px) {
 	.home {
 		.content {
 			.file-drag-zone {
 				.page-content {
 					.items-wrapper {
-						.items {
-							.card-wrapper {
-								width: 120px;
-								height: 160px;
-
-								&.empty-card {
-									width: 120px;
-									height: 0;
-								}
-
-								.drop-wrapper {
-									.card-container {
-										.outer-wrapper {
-											.node-card {
-												width: 120px;
-
-												.cover {
-													.folder-cover {
-														width: 95px;
-														height: 90px;
-													}
-												}
-
-												.info {
-													.title {
-														-webkit-line-clamp: 1;
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
+						padding: 0 12px 96px;
 					}
 				}
 			}
 		}
-	}
-}
-
-@media (max-width: 370px) {
-	.card-wrapper {
-		width: 110px;
-		height: 180px;
 	}
 }

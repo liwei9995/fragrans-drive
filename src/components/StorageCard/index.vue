@@ -1,6 +1,6 @@
 <template>
-	<div class="card-wrapper">
-		<div class="drop-wrapper">
+	<div class="card-wrapper" :class="{ empty: isEmpty }">
+		<div v-if="!isEmpty" class="drop-wrapper">
 			<div class="card-container" @click="handleClickCard">
 				<div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
 					<div class="action-btn"></div>
@@ -20,7 +20,7 @@
 					</div>
 					<div class="node-card">
 						<div class="cover">
-							<div class="folder-cover">
+							<div :class="type + '-cover'">
 								<el-image class="file-icon" alt="folder" :src="thumbUrl" fit="contain" />
 							</div>
 						</div>
@@ -51,11 +51,12 @@ type ActionItem = {
 
 interface StorageCardProps {
 	id: string
-	title: string
+	title?: string
 	mimeType?: string
 	type?: string
-	desc: string
+	desc?: string
 	thumbUrl?: string
+	isEmpty?: boolean
 	actionItems?: Partial<ActionItem>[]
 	tapActionItem?: (command: string | number | object, id: string, title: string, mimeType?: string, thumbUrl?: string) => void
 }
@@ -80,7 +81,8 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 			divided: true
 		}
 	],
-	thumbUrl: 'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png'
+	thumbUrl: 'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
+	isEmpty: false
 })
 
 const handleCommand = (command: string | number | object) =>
