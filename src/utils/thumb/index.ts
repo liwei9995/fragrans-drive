@@ -68,6 +68,8 @@ export const getThumb = (extName = '', type = 'file') => {
 	if (type === 'folder') {
 		return FOLDER_THUMB
 	} else {
-		return FILE_TYPE_THUMBS[extName as keyof typeof FILE_TYPE_THUMBS] || FILE_TYPE_THUMBS[FILE_TYPE_UNKNOWN]
+		const lowerCaseExtName = extName?.toLowerCase()
+
+		return FILE_TYPE_THUMBS[lowerCaseExtName as keyof typeof FILE_TYPE_THUMBS] || FILE_TYPE_THUMBS[FILE_TYPE_UNKNOWN]
 	}
 }
