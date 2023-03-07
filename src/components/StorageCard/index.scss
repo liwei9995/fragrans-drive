@@ -2,6 +2,10 @@
 	width: 160px;
 	height: 207px;
 
+	&.empty {
+		height: 0;
+	}
+
 	.drop-wrapper {
 		display: flex;
 		justify-content: center;
@@ -74,6 +78,20 @@
 								height: 90px;
 							}
 						}
+
+						.file-cover {
+							position: relative;
+							display: flex;
+							align-items: center;
+							justify-content: center;
+							width: 115px;
+							height: 90px;
+
+							.file-icon {
+								width: 70px;
+								height: 70px;
+							}
+						}
 					}
 
 					.info {
@@ -88,6 +106,7 @@
 							overflow: hidden;
 							font-size: 14px;
 							line-height: 1.5;
+							color: #222222;
 							text-align: center;
 							text-overflow: ellipsis;
 							overflow-wrap: break-word;
@@ -111,5 +130,66 @@
 				}
 			}
 		}
+	}
+}
+
+@media (max-width: 960px) {
+	.card-wrapper {
+		width: 140px;
+		height: 180px;
+	}
+}
+
+@media (max-width: 767px) {
+	.card-wrapper {
+		width: 140px;
+		height: 180px;
+	}
+}
+
+@media (max-width: 576px) {
+	.card-wrapper {
+		width: 100px;
+		height: 180px;
+
+		.drop-wrapper {
+			.card-container {
+				.outer-wrapper {
+					.node-card {
+						width: 100px;
+
+						.cover {
+							margin-bottom: 4px;
+
+							.folder-cover {
+								width: 84px;
+								height: 84px;
+
+								.file-icon {
+									height: 84px;
+								}
+							}
+						}
+
+						.info {
+							.title {
+								font-size: 12px;
+							}
+
+							.desc {
+								font-size: 10px;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+@media (max-width: 370px) {
+	.card-wrapper {
+		width: 100px;
+		height: 180px;
 	}
 }
