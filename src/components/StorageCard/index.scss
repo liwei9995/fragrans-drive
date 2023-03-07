@@ -155,6 +155,18 @@
 		.drop-wrapper {
 			.card-container {
 				.outer-wrapper {
+					border-radius: 0;
+
+					&:hover {
+						background-color: unset;
+					}
+
+					.action-btn-more-wrapper {
+						.action-btn-more {
+							opacity: 1;
+						}
+					}
+
 					.node-card {
 						width: 100px;
 
@@ -173,7 +185,7 @@
 
 						.info {
 							.title {
-								font-size: 12px;
+								font-size: 13px;
 							}
 
 							.desc {
