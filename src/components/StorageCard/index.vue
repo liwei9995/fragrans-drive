@@ -23,6 +23,7 @@
 							<div :class="type + '-cover'">
 								<el-image
 									class="file-icon"
+									:class="{ thumb: previewSrcList.length > 0 }"
 									alt="folder"
 									:src="thumbUrl"
 									:preview-src-list="previewSrcList"
