@@ -10,6 +10,7 @@
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
 						:on-upload-exceed="handleUploadExceed"
+						:before-upload="handelBeforeUpload"
 					/>
 					<div class="items-wrapper">
 						<div v-infinite-scroll="load" class="items">
@@ -22,12 +23,13 @@
 								:mimeType="item.mimeType"
 								:type="item.type"
 								:thumbUrl="item.thumb"
+								:preview-src-list="item.previewSrcList"
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
 							/>
 							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" isEmpty />
 						</div>
-						<el-empty v-if="!isFetching && listData?.docs.length === 0" description="No Data" />
+						<el-empty v-if="!isFetching && listData?.docs.length === 0" description="该目录下没有文件" />
 					</div>
 					<Dialog
 						v-if="folderDialogFormVisible"
@@ -59,7 +61,7 @@ import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
-import { createFolder, getFile, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
+import { createFolder, getDownloadUrl, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
 type BreadcrumbItem = {
 	id: string
@@ -128,6 +130,8 @@ interface Storage {
 	size?: string
 	parentId: string
 	type: string
+	thumbnail?: string
+	url?: string
 	createdAt: string
 	updatedAt: string
 }
@@ -173,7 +177,8 @@ const fetchFiles = async (init = true) => {
 		data.docs = data.docs.map((item: Storage) => ({
 			...item,
 			desc: getDesc(item.updatedAt),
-			thumb: getThumb(item.extName, item.type)
+			thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
+			previewSrcList: item.url ? [item.url] : []
 		}))
 	}
 
@@ -290,19 +295,11 @@ const handleTapActionItem = (command: string | number | object) => {
 	}
 }
 
-const download = async (id: string, name: string, type?: string) => {
-	const response = await getFile(id)
-	const blob = new Blob([response], { type })
-	const url = window.URL.createObjectURL(blob)
-	const a = document.createElement('a')
+const download = async (id: string) => {
+	ElMessage.info('文件下载准备中...')
+	const { url } = await getDownloadUrl(id)
 
-	a.href = url
-	a.download = name
-	a.style.display = 'none'
-	document.body.appendChild(a)
-	a.click()
-	window.URL.revokeObjectURL(url)
-	document.body.removeChild(a)
+	window.open(url)
 }
 
 const handleTapCardActionItem = async (
@@ -313,7 +310,7 @@ const handleTapCardActionItem = async (
 	thumb?: string
 ) => {
 	if (command === 'download') {
-		download(id, name, type)
+		download(id)
 	} else if (command === 'delete') {
 		ElMessageBox.confirm('文件删除后将无法恢复，确定要删除么？', '删除文件', {
 			confirmButtonText: '确定删除',
@@ -365,6 +362,16 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 const handleUploadExceed: UploadProps['onExceed'] = files => {
 	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`)
+}
+
+const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
+	if (rawFile.size / 1024 / 1024 > 512) {
+		ElMessage.error('上传文件的大小不能超过512MB')
+
+		return false
+	}
+
+	return true
 }
 </script>
 

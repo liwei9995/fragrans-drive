@@ -36,3 +36,8 @@ export const updateFile = (id: string, params: Storage.ReqStorageUpdateFileName)
 export const getPath = (fileId: string) => {
 	return http.post(`${PORT}/storage/path`, { fileId })
 }
+
+// 获取文件下载地址接口
+export const getDownloadUrl = (fileId: string) => {
+	return http.post(`${PORT}/storage/download/url`, { fileId })
+}
