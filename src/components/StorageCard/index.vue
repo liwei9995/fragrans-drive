@@ -21,7 +21,14 @@
 					<div class="node-card">
 						<div class="cover">
 							<div :class="type + '-cover'">
-								<el-image class="file-icon" alt="folder" :src="thumbUrl" fit="contain" />
+								<el-image
+									class="file-icon"
+									alt="folder"
+									:src="thumbUrl"
+									:preview-src-list="previewSrcList"
+									fit="contain"
+									@close="handleClosePreview"
+								/>
 							</div>
 						</div>
 						<div class="info">
@@ -55,6 +62,7 @@ interface StorageCardProps {
 	mimeType?: string
 	type?: string
 	desc?: string
+	previewSrcList?: string[]
 	thumbUrl?: string
 	isEmpty?: boolean
 	actionItems?: Partial<ActionItem>[]
@@ -81,6 +89,7 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 			divided: true
 		}
 	],
+	previewSrcList: () => [],
 	thumbUrl: 'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
 	isEmpty: false
 })
@@ -93,6 +102,8 @@ const handleClickCard = () => {
 		router.push(`${HOME_URL}/${props.id}`)
 	}
 }
+
+const handleClosePreview = () => (showMoreAction.value = false)
 </script>
 
 <style scoped lang="scss">
