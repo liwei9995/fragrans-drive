@@ -29,7 +29,11 @@
 									:preview-src-list="previewSrcList"
 									fit="contain"
 									@close="handleClosePreview"
-								/>
+								>
+									<template #placeholder>
+										<el-image :src="thumbPlaceholder" />
+									</template>
+								</el-image>
 							</div>
 						</div>
 						<div class="info">
@@ -65,6 +69,7 @@ interface StorageCardProps {
 	desc?: string
 	previewSrcList?: string[]
 	thumbUrl?: string
+	thumbPlaceholder?: string
 	isEmpty?: boolean
 	actionItems?: Partial<ActionItem>[]
 	tapActionItem?: (command: string | number | object, id: string, title: string, mimeType?: string, thumbUrl?: string) => void
@@ -92,6 +97,7 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 	],
 	previewSrcList: () => [],
 	thumbUrl: 'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
+	thumbPlaceholder: '',
 	isEmpty: false
 })
 

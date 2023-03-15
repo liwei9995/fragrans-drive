@@ -23,6 +23,7 @@
 								:mimeType="item.mimeType"
 								:type="item.type"
 								:thumbUrl="item.thumb"
+								:thumbPlaceholder="item.thumbPlaceholder"
 								:preview-src-list="item.previewSrcList"
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
@@ -178,6 +179,7 @@ const fetchFiles = async (init = true) => {
 			...item,
 			desc: getDesc(item.updatedAt),
 			thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
+			thumbPlaceholder: getThumb(item.extName, item.type),
 			previewSrcList: item.url ? [item.url] : []
 		}))
 	}
