@@ -46,7 +46,7 @@
 									class="upload-zone"
 									multiple
 									:action="storageAction"
-									:data="data"
+									:data="uploadPayload"
 									:headers="uploadHeaders"
 									:show-file-list="false"
 									:limit="uploadFileLimit"
@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts" name="header">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UploadInstance, UploadProps } from 'element-plus'
 import { GlobalStore } from '@/store'
@@ -80,7 +80,7 @@ const uploadHeaders = {
 	Authorization: `Bearer ${globalStore.token}`
 }
 const parentId = (route.params.id as string) || 'root'
-const data = { parentId }
+const uploadPayload = ref({ parentId })
 
 type BreadcrumbItem = {
 	id?: string
@@ -109,6 +109,15 @@ const props = withDefaults(defineProps<HeaderProps>(), {
 	breadcrumbItems: () => [],
 	actionItems: () => []
 })
+
+watch(
+	() => router.currentRoute.value,
+	() => {
+		const parentId = (route.params.id as string) || 'root'
+
+		uploadPayload.value = { parentId }
+	}
+)
 
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
 
