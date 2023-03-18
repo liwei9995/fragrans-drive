@@ -6,12 +6,16 @@
 					<Header
 						:breadcrumb-items="breadcrumbItems"
 						:action-items="actionItems"
+						:avatar-action-items="avatarActionItems"
 						:upload-file-limit="uploadFileLimit"
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
 						:on-upload-exceed="handleUploadExceed"
 						:before-upload="handelBeforeUpload"
 					/>
+					<div class="sub-nav-wrapper">
+						<Breadcrumb :breadcrumb-items="breadcrumbItems" />
+					</div>
 					<div class="items-wrapper">
 						<div v-infinite-scroll="load" class="items">
 							<Card
@@ -60,8 +64,11 @@ import { format } from 'date-fns'
 import { ElMessage, ElMessageBox, UploadProps, ElNotification } from 'element-plus'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
+import { LOGIN_URL } from '@/config/config'
+import { GlobalStore } from '@/store'
 import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
+import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import { createFolder, getDownloadUrl, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
 type BreadcrumbItem = {
@@ -69,6 +76,7 @@ type BreadcrumbItem = {
 	name: string
 }
 
+const globalStore = GlobalStore()
 const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
@@ -118,6 +126,13 @@ const actionItems = [
 		id: 'file',
 		name: '上传文件',
 		isUpload: true
+	}
+]
+
+const avatarActionItems = [
+	{
+		id: 'logout',
+		name: '退出登录'
 	}
 ]
 
@@ -294,6 +309,11 @@ const handleRenameFile = (name: string) => {
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
 		folderDialogFormVisible.value = true
+	} else if (command === 'logout') {
+		// * 清空 token
+		globalStore.setToken('')
+		// * 跳转到登录页面
+		router.push(LOGIN_URL)
 	}
 }
 

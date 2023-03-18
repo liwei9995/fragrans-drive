@@ -42,6 +42,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { Login } from '@/api/interface'
 import type { ElForm } from 'element-plus'
 import { authLogin } from '@/api/modules/user'
+import { HOME_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 
 const globalStore = GlobalStore()
@@ -88,7 +89,7 @@ const login = (formEl: FormInstance | undefined) => {
 			}
 			const res = await authLogin(requestLoginForm)
 			const { redirect } = route.query
-			const path = (redirect || '/home') as string
+			const path = (redirect || HOME_URL) as string
 
 			// * 存储 token
 			globalStore.setToken(res?.access_token)

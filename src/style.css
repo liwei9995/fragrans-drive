@@ -128,13 +128,6 @@ button:focus-visible {
 	}
 }
 
-#app::after {
-	right: 0;
-	left: 0;
-	height: 32px;
-	-webkit-app-region: drag;
-}
-
 @media (prefers-color-scheme: light) {
 	:root {
 		color: #213547;
