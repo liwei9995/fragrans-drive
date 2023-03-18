@@ -21,19 +21,20 @@
 					<div class="node-card">
 						<div class="cover">
 							<div :class="type + '-cover'">
-								<el-image
-									class="file-icon"
-									:class="{ thumb: previewSrcList.length > 0 }"
-									alt="folder"
-									:src="thumbUrl"
-									:preview-src-list="previewSrcList"
-									fit="contain"
-									@close="handleClosePreview"
-								>
-									<template #placeholder>
-										<el-image :src="thumbPlaceholder" />
-									</template>
-								</el-image>
+								<div class="file-icon" :class="{ thumb: previewSrcList.length > 0 }">
+									<el-image
+										class="icon"
+										alt="folder"
+										:src="thumbUrl"
+										:preview-src-list="previewSrcList"
+										fit="contain"
+										@close="handleClosePreview"
+									>
+										<template #placeholder>
+											<el-image :src="thumbPlaceholder" />
+										</template>
+									</el-image>
+								</div>
 							</div>
 						</div>
 						<div class="info">
