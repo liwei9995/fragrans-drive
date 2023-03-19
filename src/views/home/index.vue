@@ -247,6 +247,7 @@ onBeforeMount(() => fetchPath())
 watch(
 	() => router.currentRoute.value,
 	() => {
+		console.log('watch')
 		listData.value = initialData
 		fetchFiles()
 		fetchPath()
@@ -388,6 +389,7 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
+	console.log(`rawFile :>> ${JSON.stringify(rawFile, null, 2)}`)
 	if (rawFile.size / 1024 / 1024 > 512) {
 		ElMessage.error('上传文件的大小不能超过512MB')
 

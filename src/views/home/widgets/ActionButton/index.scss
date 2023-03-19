@@ -1,0 +1,10 @@
+.action-button-wrapper {
+	box-sizing: border-box;
+
+	.el-dropdown {
+		.action {
+			color: var(--c-primary);
+			cursor: pointer;
+		}
+	}
+}
