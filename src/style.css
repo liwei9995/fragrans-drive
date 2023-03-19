@@ -4,7 +4,7 @@
 	font-weight: 400;
 	line-height: 24px;
 	color: rgb(255 255 255 / 87%);
-	background-color: #ebedf0;
+	background-color: #ffffff;
 	color-scheme: light dark;
 	font-synthesis: none;
 	text-rendering: optimizelegibility;
@@ -42,7 +42,7 @@ body {
 	margin: 0;
 	overflow: hidden;
 	overscroll-behavior-y: none;
-	background: #ebedf0;
+	background-color: #ffffff;
 	scroll-behavior: smooth;
 	text-rendering: optimizespeed;
 }

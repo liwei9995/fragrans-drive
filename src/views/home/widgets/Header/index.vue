@@ -15,36 +15,16 @@
 							<Search />
 						</el-icon>
 					</div>
-					<el-dropdown trigger="click" @command="handleCommand">
-						<div class="action">
-							<el-icon :size="32">
-								<CirclePlusFilled />
-							</el-icon>
-						</div>
-						<template #dropdown>
-							<el-dropdown-menu>
-								<el-dropdown-item v-for="item in actionItems" :key="item.id" :command="item.id">
-									<template v-if="item.isUpload">
-										<el-upload
-											ref="uploadRef"
-											class="upload-zone"
-											multiple
-											:action="storageAction"
-											:data="uploadPayload"
-											:headers="uploadHeaders"
-											:show-file-list="false"
-											:limit="uploadFileLimit"
-											:on-change="handleUploadChange"
-											:on-exceed="handleUploadExceed"
-										>
-											<template #trigger>{{ item.name }}</template>
-										</el-upload>
-									</template>
-									<template v-else>{{ item.name }}</template>
-								</el-dropdown-item>
-							</el-dropdown-menu>
-						</template>
-					</el-dropdown>
+					<div class="action">
+						<ActionButton
+							:action-items="actionItems"
+							:upload-file-limit="uploadFileLimit"
+							:tap-action-item="handleCommand"
+							:on-upload-change="handleUploadChange"
+							:on-upload-exceed="handleUploadExceed"
+							:before-upload="handleBeforeUpload"
+						/>
+					</div>
 					<el-dropdown trigger="click" @command="handleCommand">
 						<div class="avatar">
 							<el-avatar :src="avatar" :size="32" @error="errorHandler">
@@ -63,27 +43,29 @@
 			</div>
 		</div>
 	</header>
+	<div class="float-action">
+		<ActionButton
+			:action-items="actionItems"
+			:upload-file-limit="uploadFileLimit"
+			:icon-size="48"
+			:tap-action-item="handleCommand"
+			:on-upload-change="handleUploadChange"
+			:on-upload-exceed="handleUploadExceed"
+			:before-upload="handleBeforeUpload"
+		/>
+	</div>
 </template>
 
 <script setup lang="ts" name="header">
-import { ref, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { UploadInstance, UploadProps } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { UploadProps } from 'element-plus'
 import { UserFilled } from '@element-plus/icons-vue'
-import { GlobalStore } from '@/store'
+import { HOME_URL } from '@/config/config'
+import ActionButton from '../ActionButton/index.vue'
 import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
 import logo from '@/assets/logo.svg'
 
-const route = useRoute()
 const router = useRouter()
-const uploadRef = ref<UploadInstance>()
-const storageAction = computed(() => `${import.meta.env.VITE_API_URL}/v1/storage/upload`)
-const globalStore = GlobalStore()
-const uploadHeaders = {
-	Authorization: `Bearer ${globalStore.token}`
-}
-const parentId = (route.params.id as string) || 'root'
-const uploadPayload = ref({ parentId })
 
 type ActionItem = {
 	id?: string
@@ -100,6 +82,7 @@ interface HeaderProps {
 	tapActionItem?: (command: string | number | object) => void
 	onUploadChange?: UploadProps['onChange']
 	onUploadExceed?: UploadProps['onExceed']
+	beforeUpload?: UploadProps['beforeUpload']
 }
 
 const props = withDefaults(defineProps<HeaderProps>(), {
@@ -110,15 +93,6 @@ const props = withDefaults(defineProps<HeaderProps>(), {
 	avatarActionItems: () => []
 })
 
-watch(
-	() => router.currentRoute.value,
-	() => {
-		const parentId = (route.params.id as string) || 'root'
-
-		uploadPayload.value = { parentId }
-	}
-)
-
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
 
 const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
@@ -127,7 +101,9 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
 	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
 
-const handleClickGoHome = () => router.push('/home')
+const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => props.beforeUpload && props.beforeUpload(rawFile)
+
+const handleClickGoHome = () => router.push(HOME_URL)
 
 const errorHandler = () => true
 </script>

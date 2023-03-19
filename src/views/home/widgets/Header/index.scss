@@ -2,12 +2,14 @@
 	position: sticky;
 	top: 0;
 	left: 0;
+	z-index: 20;
 
 	.navbar-wrapper {
 		box-sizing: border-box;
 		height: 55px;
 		padding: 0 12px 0 24px;
 		white-space: nowrap;
+		background-color: #ffffff;
 		border-bottom: 1px solid rgb(60 60 60 / 12%);
 
 		.header-container {
@@ -62,10 +64,7 @@
 				}
 
 				.action {
-					height: 32px;
 					margin-left: 20px;
-					color: var(--c-primary);
-					cursor: pointer;
 				}
 
 				.avatar {
@@ -78,6 +77,12 @@
 	}
 }
 
+.float-action {
+	box-sizing: border-box;
+	display: none;
+	overflow: hidden;
+}
+
 @media (max-width: 767px) {
 	.header {
 		position: relative;
@@ -85,10 +90,30 @@
 
 	.navbar-wrapper {
 		position: relative;
+
+		.header-container {
+			.content {
+				.action {
+					display: none;
+				}
+			}
+		}
 	}
 
 	.breadcrumb-wrapper {
 		display: none;
+	}
+
+	.float-action {
+		position: fixed;
+		right: 24px;
+		bottom: 24px;
+		z-index: 30;
+		display: block;
+		width: 48px;
+		height: 48px;
+		background-color: #ffffff;
+		border-radius: 50%;
 	}
 }
 
