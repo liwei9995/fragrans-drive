@@ -93,7 +93,6 @@ const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
 	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
 
 const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	console.log(`rawFile - handleBeforeUpload :>> ${JSON.stringify(rawFile, null, 2)}`)
 	props.beforeUpload && props.beforeUpload(rawFile)
 }
 </script>

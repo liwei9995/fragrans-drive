@@ -4,6 +4,23 @@
 	left: 0;
 	z-index: 20;
 
+	&::before {
+		position: fixed;
+		top: 0;
+		left: var(--blur-left, 340px);
+		z-index: 4;
+		width: var(--blur-width, 70%);
+		height: 250px;
+		content: '';
+		border-radius: 0 0 100px 20px;
+		box-shadow: 25px 240px 96px var(--global-category-color, var(--c-primary));
+		opacity: 0.11;
+		transition: box-shadow 0.25s linear;
+		transform: rotate(-8deg) translateY(-185%) translateZ(0);
+		animation: fade-in 0.5s cubic-bezier(0.46, 0, 0, 1);
+		will-change: auto;
+	}
+
 	.navbar-wrapper {
 		box-sizing: border-box;
 		height: 55px;
@@ -107,7 +124,7 @@
 	.float-action {
 		position: fixed;
 		right: 24px;
-		bottom: 48px;
+		bottom: 72px;
 		z-index: 30;
 		display: block;
 		width: 64px;

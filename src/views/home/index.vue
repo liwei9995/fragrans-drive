@@ -321,7 +321,8 @@ const download = async (id: string) => {
 	ElMessage.info('文件下载准备中...')
 	const { url } = await getDownloadUrl(id)
 
-	window.open(url)
+	// * 在当前页面弹出下载窗口
+	window.open(url, '_self')
 }
 
 const handleTapCardActionItem = async (
@@ -354,8 +355,7 @@ const handleTapCardActionItem = async (
 }
 
 const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {
-	const isReadyFIles = uploadFiles.filter(file => file.status === 'ready')
-	const isUploadingFiles = uploadFiles.filter(file => file.status === 'uploading')
+	const isUploadingFiles = uploadFiles.filter(file => ['uploading', 'ready'].includes(file.status))
 	const isSuccessFiles = uploadFiles.filter(file => file.status === 'success')
 	const isFailFiles = uploadFiles.filter(file => file.status === 'fail')
 
@@ -378,7 +378,7 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 	})
 
 	// refetch the file list
-	if (isUploadingFiles.length === 0 && isReadyFIles.length === 0) {
+	if (isUploadingFiles.length === 0) {
 		fetchFiles()
 	}
 }
@@ -388,7 +388,6 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	console.log(`rawFile :>> ${JSON.stringify(rawFile, null, 2)}`)
 	if (rawFile.size / 1024 / 1024 > 512) {
 		ElMessage.error('上传文件的大小不能超过512MB')
 
