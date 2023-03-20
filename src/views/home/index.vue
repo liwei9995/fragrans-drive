@@ -247,7 +247,6 @@ onBeforeMount(() => fetchPath())
 watch(
 	() => router.currentRoute.value,
 	() => {
-		console.log('watch')
 		listData.value = initialData
 		fetchFiles()
 		fetchPath()
