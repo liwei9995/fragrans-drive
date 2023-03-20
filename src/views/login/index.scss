@@ -1,62 +1,77 @@
-.login-wrapper {
+.login {
 	position: relative;
-	z-index: 3;
-	box-sizing: border-box;
-	max-width: 400px;
-	margin: auto;
-	color: #616870;
-	text-align: left;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 100vh;
 	background-color: #ebedf0;
 
-	.logo-wrapper {
-		display: flex;
-		align-items: center;
+	.login-wrapper {
+		position: relative;
+		z-index: 3;
+		box-sizing: border-box;
+		max-width: 400px;
+		margin: auto;
+		color: #616870;
+		text-align: left;
+		background-color: #ebedf0;
 
-		.logo {
-			width: 30px;
-			height: 30px;
-			margin-right: 12px;
-			background: url('@/assets/logo.svg') no-repeat;
-			background-size: 100% 100%;
-		}
+		.logo-wrapper {
+			display: flex;
+			align-items: center;
 
-		.name {
-			font-size: 24px;
-			font-weight: bold;
-			color: #515559;
+			.logo {
+				width: 30px;
+				height: 30px;
+				margin-right: 12px;
+				background: url('@/assets/logo.svg') no-repeat;
+				background-size: 100% 100%;
+			}
+
+			.name {
+				font-size: 24px;
+				font-weight: bold;
+				color: #515559;
+			}
 		}
 	}
 }
 
 @media (max-width: 767px) {
-	.login-wrapper {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		min-height: 100%;
-		padding: 24px 20px;
-
-		.logo-wrapper {
+	.login {
+		.login-wrapper {
 			display: flex;
-			align-items: center;
-			margin: 0 auto 24px;
+			flex-direction: column;
+			justify-content: center;
+			min-height: 100%;
+			padding: 24px 20px;
+			background-color: #ebedf0;
+
+			.logo-wrapper {
+				display: flex;
+				align-items: center;
+				margin: 0 auto 24px;
+			}
 		}
 	}
 }
 
 @media (min-width: 768px) {
-	.login-wrapper {
-		position: fixed;
-		top: 50%;
-		left: 50%;
-		width: 92%;
-		transform: translate(-50%, -50%);
-
-		.logo-wrapper {
-			position: absolute;
-			bottom: 100%;
+	.login {
+		.login-wrapper {
+			position: fixed;
+			top: 50%;
 			left: 50%;
-			transform: translate(-50%, -48px);
+			width: 92%;
+			transform: translate(-50%, -50%);
+
+			.logo-wrapper {
+				position: absolute;
+				bottom: 100%;
+				left: 50%;
+				transform: translate(-50%, -48px);
+			}
 		}
 	}
 }
