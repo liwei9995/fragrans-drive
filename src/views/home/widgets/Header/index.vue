@@ -47,7 +47,7 @@
 		<ActionButton
 			:action-items="actionItems"
 			:upload-file-limit="uploadFileLimit"
-			:icon-size="48"
+			:icon-size="64"
 			:tap-action-item="handleCommand"
 			:on-upload-change="handleUploadChange"
 			:on-upload-exceed="handleUploadExceed"
