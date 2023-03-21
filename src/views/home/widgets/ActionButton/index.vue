@@ -21,6 +21,7 @@
 								:limit="uploadFileLimit"
 								:on-change="handleUploadChange"
 								:on-exceed="handleUploadExceed"
+								:on-progress="handleUploadProgress"
 								:before-upload="handleBeforeUpload"
 							>
 								<template #trigger>{{ item.name }}</template>
@@ -66,6 +67,7 @@ interface ActionButtonProps {
 	tapActionItem?: (command: string | number | object) => void
 	onUploadChange?: UploadProps['onChange']
 	onUploadExceed?: UploadProps['onExceed']
+	onUploadProgress?: UploadProps['onProgress']
 	beforeUpload?: UploadProps['beforeUpload']
 }
 
@@ -91,6 +93,9 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
 	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
+
+const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) =>
+	props.onUploadProgress && props.onUploadProgress(event, uploadFile, uploadFiles)
 
 const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
 	props.beforeUpload && props.beforeUpload(rawFile)

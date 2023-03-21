@@ -11,6 +11,7 @@
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
 						:on-upload-exceed="handleUploadExceed"
+						:on-upload-progress="handleUploadProgress"
 						:before-upload="handelBeforeUpload"
 					/>
 					<div class="sub-nav-wrapper">
@@ -51,6 +52,7 @@
 						:on-close="handleCloseRenameDialog"
 						:on-confirm="handleRenameFile"
 					/>
+					<UploadStatus></UploadStatus>
 				</div>
 			</div>
 		</div>
@@ -64,6 +66,7 @@ import { format } from 'date-fns'
 import { ElMessage, ElMessageBox, UploadProps, ElNotification } from 'element-plus'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
+import UploadStatus from './widgets/UploadStatus/index.vue'
 import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { getThumb } from '@/utils/thumb/index'
@@ -385,6 +388,10 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 const handleUploadExceed: UploadProps['onExceed'] = files => {
 	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`)
+}
+
+const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
+	console.log(`uploadFiles :>> ${JSON.stringify(uploadFiles, null, 2)}`)
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
