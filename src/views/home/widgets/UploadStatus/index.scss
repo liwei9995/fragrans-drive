@@ -19,8 +19,24 @@
 		overflow-wrap: anywhere;
 	}
 
-	.upload-icon {
+	.el-icon {
 		color: var(--c-primary);
+
+		&.error {
+			color: var(--el-color-error);
+		}
+
+		&.success {
+			color: var(--el-color-success);
+		}
+
+		&.info {
+			color: var(--el-color-info);
+		}
+
+		&.warning {
+			color: var(--el-color-warning);
+		}
 	}
 
 	.title {

@@ -52,7 +52,12 @@
 						:on-close="handleCloseRenameDialog"
 						:on-confirm="handleRenameFile"
 					/>
-					<UploadStatus></UploadStatus>
+					<UploadStatus
+						ref="uploadStatusRef"
+						:percentage="uploadPercentage"
+						:title="notificationTitle"
+						:type="notificationType"
+					/>
 				</div>
 			</div>
 		</div>
@@ -84,6 +89,10 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const isFetching = ref(false)
+const uploadStatusRef = ref()
+const uploadPercentage = ref(0)
+const notificationTitle = ref('')
+const notificationType = ref('info')
 const folderName = ref(defaultFolderName)
 const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
@@ -370,15 +379,16 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 			: isFailFiles.length > 0
 			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
 			: `上传完成 ∙ 共${isSuccessFiles.length}项`
-	const type = isUploadingFiles.length > 0 ? 'info' : 'success'
+	const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
 
 	ElNotification.closeAll()
-	ElNotification({
-		title,
-		type,
-		position: 'bottom-right',
-		duration: 0
-	})
+	uploadStatusRef.value.show()
+	notificationTitle.value = title
+	notificationType.value = type
+
+	if (type === 'success') {
+		uploadPercentage.value = 0
+	}
 
 	// refetch the file list
 	if (isUploadingFiles.length === 0) {
@@ -391,7 +401,16 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 }
 
 const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
-	console.log(`uploadFiles :>> ${JSON.stringify(uploadFiles, null, 2)}`)
+	const totalSize = uploadFiles.reduce((accumulator, current) => accumulator + (current?.size || 0), 0)
+	const uploadedSize = uploadFiles.reduce((accumulator, current) => {
+		const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
+
+		return accumulator + cur
+	}, 0)
+
+	const percentage = uploadedSize / totalSize
+
+	uploadPercentage.value = percentage
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
