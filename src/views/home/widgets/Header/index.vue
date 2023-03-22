@@ -22,6 +22,7 @@
 							:tap-action-item="handleCommand"
 							:on-upload-change="handleUploadChange"
 							:on-upload-exceed="handleUploadExceed"
+							:on-upload-progress="handleUploadProgress"
 							:before-upload="handleBeforeUpload"
 						/>
 					</div>
@@ -47,10 +48,11 @@
 		<ActionButton
 			:action-items="actionItems"
 			:upload-file-limit="uploadFileLimit"
-			:icon-size="48"
+			:icon-size="64"
 			:tap-action-item="handleCommand"
 			:on-upload-change="handleUploadChange"
 			:on-upload-exceed="handleUploadExceed"
+			:on-upload-progress="handleUploadProgress"
 			:before-upload="handleBeforeUpload"
 		/>
 	</div>
@@ -82,6 +84,7 @@ interface HeaderProps {
 	tapActionItem?: (command: string | number | object) => void
 	onUploadChange?: UploadProps['onChange']
 	onUploadExceed?: UploadProps['onExceed']
+	onUploadProgress?: UploadProps['onProgress']
 	beforeUpload?: UploadProps['beforeUpload']
 }
 
@@ -100,6 +103,9 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
 	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
+
+const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) =>
+	props.onUploadProgress && props.onUploadProgress(event, uploadFile, uploadFiles)
 
 const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => props.beforeUpload && props.beforeUpload(rawFile)
 

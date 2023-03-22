@@ -11,6 +11,7 @@
 						:tap-action-item="handleTapActionItem"
 						:on-upload-change="handleUploadChange"
 						:on-upload-exceed="handleUploadExceed"
+						:on-upload-progress="handleUploadProgress"
 						:before-upload="handelBeforeUpload"
 					/>
 					<div class="sub-nav-wrapper">
@@ -51,6 +52,12 @@
 						:on-close="handleCloseRenameDialog"
 						:on-confirm="handleRenameFile"
 					/>
+					<UploadStatus
+						ref="uploadStatusRef"
+						:percentage="uploadPercentage"
+						:title="notificationTitle"
+						:type="notificationType"
+					/>
 				</div>
 			</div>
 		</div>
@@ -64,6 +71,7 @@ import { format } from 'date-fns'
 import { ElMessage, ElMessageBox, UploadProps, ElNotification } from 'element-plus'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
+import UploadStatus from './widgets/UploadStatus/index.vue'
 import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { getThumb } from '@/utils/thumb/index'
@@ -81,6 +89,10 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const isFetching = ref(false)
+const uploadStatusRef = ref()
+const uploadPercentage = ref(0)
+const notificationTitle = ref('')
+const notificationType = ref('info')
 const folderName = ref(defaultFolderName)
 const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
@@ -247,7 +259,6 @@ onBeforeMount(() => fetchPath())
 watch(
 	() => router.currentRoute.value,
 	() => {
-		console.log('watch')
 		listData.value = initialData
 		fetchFiles()
 		fetchPath()
@@ -322,7 +333,8 @@ const download = async (id: string) => {
 	ElMessage.info('文件下载准备中...')
 	const { url } = await getDownloadUrl(id)
 
-	window.open(url)
+	// * 在当前页面弹出下载窗口
+	window.open(url, '_self')
 }
 
 const handleTapCardActionItem = async (
@@ -355,8 +367,7 @@ const handleTapCardActionItem = async (
 }
 
 const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {
-	const isReadyFIles = uploadFiles.filter(file => file.status === 'ready')
-	const isUploadingFiles = uploadFiles.filter(file => file.status === 'uploading')
+	const isUploadingFiles = uploadFiles.filter(file => ['uploading', 'ready'].includes(file.status))
 	const isSuccessFiles = uploadFiles.filter(file => file.status === 'success')
 	const isFailFiles = uploadFiles.filter(file => file.status === 'fail')
 
@@ -368,18 +379,19 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 			: isFailFiles.length > 0
 			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
 			: `上传完成 ∙ 共${isSuccessFiles.length}项`
-	const type = isUploadingFiles.length > 0 ? 'info' : 'success'
+	const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
 
 	ElNotification.closeAll()
-	ElNotification({
-		title,
-		type,
-		position: 'bottom-right',
-		duration: 0
-	})
+	uploadStatusRef.value.show()
+	notificationTitle.value = title
+	notificationType.value = type
+
+	if (type === 'success') {
+		uploadPercentage.value = 0
+	}
 
 	// refetch the file list
-	if (isUploadingFiles.length === 0 && isReadyFIles.length === 0) {
+	if (isUploadingFiles.length === 0) {
 		fetchFiles()
 	}
 }
@@ -388,8 +400,20 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`)
 }
 
+const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
+	const totalSize = uploadFiles.reduce((accumulator, current) => accumulator + (current?.size || 0), 0)
+	const uploadedSize = uploadFiles.reduce((accumulator, current) => {
+		const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
+
+		return accumulator + cur
+	}, 0)
+
+	const percentage = uploadedSize / totalSize
+
+	uploadPercentage.value = percentage
+}
+
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	console.log(`rawFile :>> ${JSON.stringify(rawFile, null, 2)}`)
 	if (rawFile.size / 1024 / 1024 > 512) {
 		ElMessage.error('上传文件的大小不能超过512MB')
 
