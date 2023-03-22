@@ -19,5 +19,5 @@ RUN npm run build:prod
 # production stage
 FROM nginx as production-stage
 RUN mkdir /app
-COPY --chown=oyiyio:oyiyio --from=build-stage /app/dist /app
-COPY --chown=oyiyio:oyiyio deploy/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY --from=build-stage /app/dist /app
+COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf
