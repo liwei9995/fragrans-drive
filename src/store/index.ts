@@ -14,7 +14,9 @@ export const GlobalStore = defineStore({
 		// userInfo
 		userInfo: '',
 		// element组件大小
-		assemblySize: 'default'
+		assemblySize: 'default',
+		// 是否是移动端
+		isMobile: false
 	}),
 	getters: {},
 	actions: {
@@ -25,6 +27,10 @@ export const GlobalStore = defineStore({
 		// setUserInfo
 		setUserInfo(userInfo: any) {
 			this.userInfo = userInfo
+		},
+		// setIsMobile
+		setIsMobile(isMobile: boolean) {
+			this.isMobile = isMobile
 		}
 	},
 	persist: piniaPersistConfig('GlobalState')
