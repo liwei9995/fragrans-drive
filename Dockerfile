@@ -1,9 +1,9 @@
 # build stage
 FROM node:18-alpine as build-stage
 
-LABEL web.maintainer="alex.li@oyiyio.com" \
-  web.name="fragrans-storage" \
-  web.version="0.0.5"
+LABEL web.maintainer=alex.li@oyiyio.com \
+  web.name=fragrans-storage \
+  web.version=0.0.5
 
 # Run as an unprivileged user.
 RUN addgroup -S oyiyio && adduser -S -G oyiyio oyiyio
