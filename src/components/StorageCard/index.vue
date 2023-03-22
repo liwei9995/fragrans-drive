@@ -5,7 +5,12 @@
 				<div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
 					<div class="action-btn"></div>
 					<div class="action-btn-more-wrapper" @click.stop>
-						<el-dropdown class="action-btn-more" :class="{ show: showMoreAction }" trigger="click" @command="handleCommand">
+						<el-dropdown
+							class="action-btn-more"
+							:class="{ show: showMoreAction || isMobile }"
+							trigger="click"
+							@command="handleCommand"
+						>
 							<el-icon :size="18">
 								<More />
 							</el-icon>
@@ -52,9 +57,12 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
+import { GlobalStore } from '@/store'
 
 const router = useRouter()
 const showMoreAction = ref(false)
+const globalStore = GlobalStore()
+const isMobile = globalStore.isMobile
 
 type ActionItem = {
 	id?: string
