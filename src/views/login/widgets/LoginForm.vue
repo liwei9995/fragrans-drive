@@ -27,7 +27,15 @@
 					</el-form-item>
 				</el-form>
 				<div class="login-btn">
-					<el-button class="login" round @click="login(loginFormRef)" size="large" type="primary" :loading="loading">
+					<el-button
+						class="login"
+						round
+						@click="login(loginFormRef)"
+						size="large"
+						type="primary"
+						:disabled="loading"
+						:loading="loading"
+					>
 						Sign in
 					</el-button>
 				</div>

@@ -13,6 +13,10 @@
 	border-radius: 10px;
 	transition: all 0.3s ease;
 
+	&:hover {
+		background: rgb(0 0 0 / 8%);
+	}
+
 	.icon {
 		position: absolute;
 		top: 69px;

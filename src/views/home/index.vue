@@ -12,6 +12,8 @@
 						:on-upload-change="handleUploadChange"
 						:on-upload-exceed="handleUploadExceed"
 						:on-upload-progress="handleUploadProgress"
+						:on-upload-success="handleUploadSuccess"
+						:on-upload-error="handleUploadError"
 						:before-upload="handelBeforeUpload"
 					/>
 					<div class="sub-nav-wrapper">
@@ -35,8 +37,16 @@
 							/>
 							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" isEmpty />
 						</div>
-
-						<Empty v-if="!isFetching && listData?.docs.length === 0" />
+						<Empty
+							v-if="!isFetching && listData?.docs.length === 0"
+							:on-upload-change="handleUploadChange"
+							:on-upload-exceed="handleUploadExceed"
+							:on-upload-progress="handleUploadProgress"
+							:on-upload-success="handleUploadSuccess"
+							:on-upload-error="handleUploadError"
+							:before-upload="handelBeforeUpload"
+							:tap-item="handleTapActionItem"
+						/>
 					</div>
 					<Dialog
 						v-if="folderDialogFormVisible"
@@ -93,6 +103,7 @@ const renameDialogFormVisible = ref(false)
 const isFetching = ref(false)
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
+const uploadedFileIds = ref([] as number[])
 const notificationTitle = ref('')
 const notificationType = ref('info')
 const folderName = ref(defaultFolderName)
@@ -404,15 +415,28 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 
 const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
 	const totalSize = uploadFiles.reduce((accumulator, current) => accumulator + (current?.size || 0), 0)
-	const uploadedSize = uploadFiles.reduce((accumulator, current) => {
-		const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
+	const uploadedSize = uploadFiles
+		.filter(file => !uploadedFileIds.value.includes(file.uid))
+		.reduce((accumulator, current) => {
+			const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
 
-		return accumulator + cur
-	}, 0)
+			return accumulator + cur
+		}, 0)
 
 	const percentage = uploadedSize / totalSize
 
 	uploadPercentage.value = percentage
+}
+
+const handleUploadSuccess: UploadProps['onSuccess'] = (response, uploadFile, uploadFiles) => {
+	const fileIds = uploadFiles.filter(file => file.status === 'success').map(file => file.uid)
+	const ids = [...uploadedFileIds.value, ...fileIds]
+
+	uploadedFileIds.value = [...new Set(ids)]
+}
+
+const handleUploadError: UploadProps['onError'] = (error, uploadFile, uploadFiles) => {
+	console.log(`handleUploadError - uploadFiles: ${JSON.stringify(uploadFiles, null, 2)}`)
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {

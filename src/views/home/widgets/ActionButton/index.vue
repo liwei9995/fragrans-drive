@@ -16,10 +16,12 @@
 								multiple
 								:show-file-list="false"
 								:limit="uploadFileLimit"
-								:on-change="handleUploadChange"
-								:on-exceed="handleUploadExceed"
-								:on-progress="handleUploadProgress"
-								:before-upload="handleBeforeUpload"
+								:on-change="onUploadChange"
+								:on-exceed="onUploadExceed"
+								:on-progress="onUploadProgress"
+								:on-success="onUploadSuccess"
+								:on-error="onUploadError"
+								:before-upload="beforeUpload"
 							>
 								<template #trigger>{{ item.name }}</template>
 							</Upload>
@@ -50,6 +52,8 @@ interface ActionButtonProps {
 	onUploadChange?: UploadProps['onChange']
 	onUploadExceed?: UploadProps['onExceed']
 	onUploadProgress?: UploadProps['onProgress']
+	onUploadSuccess?: UploadProps['onSuccess']
+	onUploadError?: UploadProps['onError']
 	beforeUpload?: UploadProps['beforeUpload']
 }
 
@@ -60,19 +64,6 @@ const props = withDefaults(defineProps<ActionButtonProps>(), {
 })
 
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
-
-const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
-	props.onUploadChange && props.onUploadChange(uploadFile, uploadFiles)
-
-const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
-	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
-
-const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) =>
-	props.onUploadProgress && props.onUploadProgress(event, uploadFile, uploadFiles)
-
-const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	props.beforeUpload && props.beforeUpload(rawFile)
-}
 </script>
 
 <style scoped lang="scss">
