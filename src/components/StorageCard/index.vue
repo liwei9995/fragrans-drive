@@ -36,7 +36,7 @@
 										@close="handleClosePreview"
 									>
 										<template #placeholder>
-											<el-image :src="thumbPlaceholder" />
+											<div class="icon-placeholder" :style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }"></div>
 										</template>
 									</el-image>
 								</div>

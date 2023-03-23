@@ -35,7 +35,8 @@
 							/>
 							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" isEmpty />
 						</div>
-						<el-empty v-if="!isFetching && listData?.docs.length === 0" description="该目录下没有文件" />
+
+						<Empty v-if="!isFetching && listData?.docs.length === 0" />
 					</div>
 					<Dialog
 						v-if="folderDialogFormVisible"
@@ -77,6 +78,7 @@ import { GlobalStore } from '@/store'
 import { getThumb } from '@/utils/thumb/index'
 import Header from './widgets/Header/index.vue'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
+import Empty from './widgets/Empty/index.vue'
 import { createFolder, getDownloadUrl, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
 type BreadcrumbItem = {

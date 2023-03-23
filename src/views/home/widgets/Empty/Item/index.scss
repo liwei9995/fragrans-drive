@@ -1,0 +1,23 @@
+.empty-item-wrapper {
+	position: relative;
+	width: 106px;
+	height: 120px;
+	padding-top: 20px;
+	overflow: hidden;
+	font-size: 14px;
+	line-height: 1.5;
+	color: rgb(37 38 43 / 72%);
+	text-align: center;
+	cursor: pointer;
+	background: rgb(132 133 141 / 8%);
+	border-radius: 10px;
+	transition: all 0.3s ease;
+
+	.icon {
+		position: absolute;
+		top: 69px;
+		left: 34px;
+		width: 72px;
+		height: 72px;
+	}
+}

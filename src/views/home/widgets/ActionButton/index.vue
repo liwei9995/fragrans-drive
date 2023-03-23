@@ -10,13 +10,10 @@
 				<el-dropdown-menu>
 					<el-dropdown-item v-for="item in actionItems" :key="item.id" :command="item.id">
 						<template v-if="item.isUpload">
-							<el-upload
+							<Upload
 								ref="uploadRef"
 								class="upload-zone"
 								multiple
-								:action="storageAction"
-								:data="uploadPayload"
-								:headers="uploadHeaders"
 								:show-file-list="false"
 								:limit="uploadFileLimit"
 								:on-change="handleUploadChange"
@@ -25,7 +22,7 @@
 								:before-upload="handleBeforeUpload"
 							>
 								<template #trigger>{{ item.name }}</template>
-							</el-upload>
+							</Upload>
 						</template>
 						<template v-else>{{ item.name }}</template>
 					</el-dropdown-item>
@@ -36,23 +33,8 @@
 </template>
 
 <script setup lang="ts" name="action-button">
-import { ref, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { UploadInstance, UploadProps } from 'element-plus'
-import { GlobalStore } from '@/store'
-
-const route = useRoute()
-const router = useRouter()
-
-const parentId = (route.params.id as string) || 'root'
-const uploadPayload = ref({ parentId })
-
-const uploadRef = ref<UploadInstance>()
-const storageAction = computed(() => `${import.meta.env.VITE_API_URL}/v1/storage/upload`)
-const globalStore = GlobalStore()
-const uploadHeaders = {
-	Authorization: `Bearer ${globalStore.token}`
-}
+import { UploadProps } from 'element-plus'
+import Upload from '../Upload/index.vue'
 
 type ActionItem = {
 	id?: string
@@ -76,15 +58,6 @@ const props = withDefaults(defineProps<ActionButtonProps>(), {
 	actionItems: () => [],
 	iconSize: () => 32
 })
-
-watch(
-	() => router.currentRoute.value,
-	() => {
-		const parentId = (route.params.id as string) || 'root'
-
-		uploadPayload.value = { parentId }
-	}
-)
 
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
 

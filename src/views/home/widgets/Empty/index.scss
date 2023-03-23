@@ -1,0 +1,14 @@
+.empty-placeholder {
+	display: flex;
+	flex: 1 1;
+	flex-direction: column;
+	align-items: center;
+	width: 100%;
+
+	.items {
+		display: flex;
+		justify-content: space-between;
+		width: 232px;
+		margin-top: 276px;
+	}
+}
