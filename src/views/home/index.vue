@@ -79,7 +79,8 @@
 import { ref, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
-import { ElMessage, ElMessageBox, UploadProps, ElNotification } from 'element-plus'
+import { ElMessage, ElMessageBox, UploadProps, UploadFiles, ElNotification } from 'element-plus'
+import emitter from '@/utils/emitter'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
@@ -103,7 +104,7 @@ const renameDialogFormVisible = ref(false)
 const isFetching = ref(false)
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
-const uploadedFileIds = ref([] as number[])
+const uploadedFiles = ref([] as UploadFiles)
 const notificationTitle = ref('')
 const notificationType = ref('info')
 const folderName = ref(defaultFolderName)
@@ -386,16 +387,17 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 	if (isUploadingFiles.length === 0 && isSuccessFiles.length === 0 && isFailFiles.length === 0) return
 
+	const totalFiles = [...uploadedFiles.value, ...isSuccessFiles]
 	const title =
 		isUploadingFiles.length > 0
 			? `正在上传 ∙ 剩余${isUploadingFiles.length}项`
-			: isFailFiles.length > 0
+			: isFailFiles.length > 0 || uploadedFiles.value.filter(file => file.status === 'fail').length > 0
 			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
-			: `上传完成 ∙ 共${isSuccessFiles.length}项`
+			: `上传完成 ∙ 共${totalFiles.length}项`
 	const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
 
 	ElNotification.closeAll()
-	uploadStatusRef.value.show()
+	uploadStatusRef.value!.show()
 	notificationTitle.value = title
 	notificationType.value = type
 
@@ -405,6 +407,8 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 	// refetch the file list
 	if (isUploadingFiles.length === 0) {
+		uploadedFiles.value = totalFiles
+		emitter.emit('clearFiles')
 		fetchFiles()
 	}
 }
@@ -415,13 +419,11 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 
 const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
 	const totalSize = uploadFiles.reduce((accumulator, current) => accumulator + (current?.size || 0), 0)
-	const uploadedSize = uploadFiles
-		.filter(file => !uploadedFileIds.value.includes(file.uid))
-		.reduce((accumulator, current) => {
-			const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
+	const uploadedSize = uploadFiles.reduce((accumulator, current) => {
+		const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
 
-			return accumulator + cur
-		}, 0)
+		return accumulator + cur
+	}, 0)
 
 	const percentage = uploadedSize / totalSize
 
@@ -429,10 +431,7 @@ const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uplo
 }
 
 const handleUploadSuccess: UploadProps['onSuccess'] = (response, uploadFile, uploadFiles) => {
-	const fileIds = uploadFiles.filter(file => file.status === 'success').map(file => file.uid)
-	const ids = [...uploadedFileIds.value, ...fileIds]
-
-	uploadedFileIds.value = [...new Set(ids)]
+	console.log(`handleUploadSuccess - uploadFiles :>> ${JSON.stringify(uploadFiles, null, 2)}`)
 }
 
 const handleUploadError: UploadProps['onError'] = (error, uploadFile, uploadFiles) => {

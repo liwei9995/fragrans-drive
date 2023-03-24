@@ -17,6 +17,7 @@
 					</div>
 					<div class="action">
 						<ActionButton
+							ref="uploadRef"
 							:action-items="actionItems"
 							:upload-file-limit="uploadFileLimit"
 							:tap-action-item="handleCommand"
@@ -63,8 +64,9 @@
 </template>
 
 <script setup lang="ts" name="header">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { UploadProps } from 'element-plus'
+import { UploadProps, UploadInstance } from 'element-plus'
 import { UserFilled } from '@element-plus/icons-vue'
 import { HOME_URL } from '@/config/config'
 import ActionButton from '../ActionButton/index.vue'
@@ -72,6 +74,7 @@ import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
 import logo from '@/assets/logo.svg'
 
 const router = useRouter()
+const uploadRef = ref<UploadInstance>()
 
 type ActionItem = {
 	id?: string

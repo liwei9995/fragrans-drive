@@ -8,10 +8,12 @@
 		:headers="uploadHeaders"
 		:show-file-list="showFileList"
 		:limit="limit"
-		:on-change="handleUploadChange"
-		:on-exceed="handleUploadExceed"
-		:on-progress="handleUploadProgress"
-		:before-upload="handleBeforeUpload"
+		:on-change="onUploadChange"
+		:on-exceed="onUploadExceed"
+		:on-progress="onUploadProgress"
+		:on-success="onUploadSuccess"
+		:on-error="onUploadError"
+		:before-upload="beforeUpload"
 	>
 		<template #trigger>
 			<slot name="trigger" />
@@ -20,10 +22,11 @@
 </template>
 
 <script setup lang="ts" name="upload">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UploadInstance, UploadProps } from 'element-plus'
 import { GlobalStore } from '@/store'
+import emitter from '@/utils/emitter'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,17 +45,23 @@ interface UploaderProps {
 	multiple?: boolean
 	showFileList?: boolean
 	limit?: number
-	onChange?: UploadProps['onChange']
-	onExceed?: UploadProps['onExceed']
-	onProgress?: UploadProps['onProgress']
+	onUploadChange?: UploadProps['onChange']
+	onUploadExceed?: UploadProps['onExceed']
+	onUploadProgress?: UploadProps['onProgress']
+	onUploadSuccess?: UploadProps['onSuccess']
+	onUploadError?: UploadProps['onError']
 	beforeUpload?: UploadProps['beforeUpload']
 }
 
-const props = withDefaults(defineProps<UploaderProps>(), {
+withDefaults(defineProps<UploaderProps>(), {
 	multiple: () => true,
 	showFileList: () => false,
 	limit: () => 10
 })
+
+const clearFiles = (status?: Array<'ready' | 'uploading' | 'success' | 'fail'>) => uploadRef.value!.clearFiles(status)
+
+emitter.on('clearFiles', clearFiles)
 
 watch(
 	() => router.currentRoute.value,
@@ -63,15 +72,7 @@ watch(
 	}
 )
 
-const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
-	props.onChange && props.onChange(uploadFile, uploadFiles)
-
-const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) => props.onExceed && props.onExceed(files, uploadFiles)
-
-const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) =>
-	props.onProgress && props.onProgress(event, uploadFile, uploadFiles)
-
-const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	props.beforeUpload && props.beforeUpload(rawFile)
-}
+onBeforeUnmount(() => {
+	emitter.off('clearFiles')
+})
 </script>

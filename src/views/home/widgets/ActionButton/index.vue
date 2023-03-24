@@ -35,8 +35,11 @@
 </template>
 
 <script setup lang="ts" name="action-button">
-import { UploadProps } from 'element-plus'
+import { ref } from 'vue'
+import { UploadProps, UploadInstance } from 'element-plus'
 import Upload from '../Upload/index.vue'
+
+const uploadRef = ref<UploadInstance>()
 
 type ActionItem = {
 	id?: string
