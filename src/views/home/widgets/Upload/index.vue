@@ -27,6 +27,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { UploadInstance, UploadProps } from 'element-plus'
 import { GlobalStore } from '@/store'
 import emitter from '@/utils/emitter'
+import { UploadEventEnum } from '@/enums/events'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,9 +60,11 @@ withDefaults(defineProps<UploaderProps>(), {
 	limit: () => 10
 })
 
-const clearFiles = (status?: Array<'ready' | 'uploading' | 'success' | 'fail'>) => uploadRef.value!.clearFiles(status)
+const clearFiles = (status?: Array<'ready' | 'uploading' | 'success' | 'fail'>) => {
+	uploadRef.value?.clearFiles(status)
+}
 
-emitter.on('clearFiles', clearFiles)
+emitter.on(UploadEventEnum.CLEAR_FILES, clearFiles)
 
 watch(
 	() => router.currentRoute.value,
@@ -72,7 +75,5 @@ watch(
 	}
 )
 
-onBeforeUnmount(() => {
-	emitter.off('clearFiles')
-})
+onBeforeUnmount(() => clearFiles())
 </script>

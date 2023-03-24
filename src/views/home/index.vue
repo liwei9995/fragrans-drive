@@ -12,8 +12,6 @@
 						:on-upload-change="handleUploadChange"
 						:on-upload-exceed="handleUploadExceed"
 						:on-upload-progress="handleUploadProgress"
-						:on-upload-success="handleUploadSuccess"
-						:on-upload-error="handleUploadError"
 						:before-upload="handelBeforeUpload"
 					/>
 					<div class="sub-nav-wrapper">
@@ -42,8 +40,6 @@
 							:on-upload-change="handleUploadChange"
 							:on-upload-exceed="handleUploadExceed"
 							:on-upload-progress="handleUploadProgress"
-							:on-upload-success="handleUploadSuccess"
-							:on-upload-error="handleUploadError"
 							:before-upload="handelBeforeUpload"
 							:tap-item="handleTapActionItem"
 						/>
@@ -68,6 +64,7 @@
 						:percentage="uploadPercentage"
 						:title="notificationTitle"
 						:type="notificationType"
+						:on-close="handleCloseUploadStatus"
 					/>
 				</div>
 			</div>
@@ -87,6 +84,7 @@ import UploadStatus from './widgets/UploadStatus/index.vue'
 import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { getThumb } from '@/utils/thumb/index'
+import { UploadEventEnum } from '@/enums/events'
 import Header from './widgets/Header/index.vue'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Empty from './widgets/Empty/index.vue'
@@ -332,6 +330,8 @@ const handleRenameFile = (name: string) => {
 	})
 }
 
+const handleCloseUploadStatus = () => (uploadedFiles.value = [])
+
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
 		folderDialogFormVisible.value = true
@@ -408,7 +408,7 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 	// refetch the file list
 	if (isUploadingFiles.length === 0) {
 		uploadedFiles.value = totalFiles
-		emitter.emit('clearFiles')
+		emitter.emit(UploadEventEnum.CLEAR_FILES)
 		fetchFiles()
 	}
 }
@@ -428,14 +428,6 @@ const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uplo
 	const percentage = uploadedSize / totalSize
 
 	uploadPercentage.value = percentage
-}
-
-const handleUploadSuccess: UploadProps['onSuccess'] = (response, uploadFile, uploadFiles) => {
-	console.log(`handleUploadSuccess - uploadFiles :>> ${JSON.stringify(uploadFiles, null, 2)}`)
-}
-
-const handleUploadError: UploadProps['onError'] = (error, uploadFile, uploadFiles) => {
-	console.log(`handleUploadError - uploadFiles: ${JSON.stringify(uploadFiles, null, 2)}`)
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
