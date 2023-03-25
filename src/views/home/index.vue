@@ -420,12 +420,11 @@ const handleUploadExceed: UploadProps['onExceed'] = files => {
 const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
 	const totalSize = uploadFiles.reduce((accumulator, current) => accumulator + (current?.size || 0), 0)
 	const uploadedSize = uploadFiles.reduce((accumulator, current) => {
-		const cur = ['uploading', 'success'].includes(current?.status) ? (current?.size || 0) * (current?.percentage || 0) : 0
+		const cur = ['uploading', 'success'].includes(current?.status) ? ((current?.size || 0) * (current?.percentage || 0)) / 100 : 0
 
 		return accumulator + cur
 	}, 0)
-
-	const percentage = uploadedSize / totalSize
+	const percentage = (uploadedSize / totalSize) * 100
 
 	uploadPercentage.value = percentage
 }
