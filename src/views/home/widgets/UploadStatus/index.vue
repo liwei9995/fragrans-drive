@@ -29,6 +29,7 @@ interface UploadStatusProps {
 	title?: string
 	percentage?: number
 	zIndex?: number
+	onClose?: () => void
 }
 
 const visible = ref(false)
@@ -53,7 +54,10 @@ const uploadPercentage = computed(() => (props.type === 'uploading' ? props.perc
 
 const show = () => (visible.value = true)
 
-const close = () => (visible.value = false)
+const close = () => {
+	visible.value = false
+	props.onClose && props.onClose()
+}
 
 defineExpose({
 	show,

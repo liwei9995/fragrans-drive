@@ -17,13 +17,16 @@
 					</div>
 					<div class="action">
 						<ActionButton
+							ref="uploadRef"
 							:action-items="actionItems"
 							:upload-file-limit="uploadFileLimit"
 							:tap-action-item="handleCommand"
-							:on-upload-change="handleUploadChange"
-							:on-upload-exceed="handleUploadExceed"
-							:on-upload-progress="handleUploadProgress"
-							:before-upload="handleBeforeUpload"
+							:on-upload-change="onUploadChange"
+							:on-upload-exceed="onUploadExceed"
+							:on-upload-progress="onUploadProgress"
+							:on-upload-success="onUploadSuccess"
+							:on-upload-error="onUploadError"
+							:before-upload="beforeUpload"
 						/>
 					</div>
 					<el-dropdown trigger="click" @command="handleCommand">
@@ -50,17 +53,20 @@
 			:upload-file-limit="uploadFileLimit"
 			:icon-size="64"
 			:tap-action-item="handleCommand"
-			:on-upload-change="handleUploadChange"
-			:on-upload-exceed="handleUploadExceed"
-			:on-upload-progress="handleUploadProgress"
-			:before-upload="handleBeforeUpload"
+			:on-upload-change="onUploadChange"
+			:on-upload-exceed="onUploadExceed"
+			:on-upload-progress="onUploadProgress"
+			:on-upload-success="onUploadSuccess"
+			:on-upload-error="onUploadError"
+			:before-upload="beforeUpload"
 		/>
 	</div>
 </template>
 
 <script setup lang="ts" name="header">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { UploadProps } from 'element-plus'
+import { UploadProps, UploadInstance } from 'element-plus'
 import { UserFilled } from '@element-plus/icons-vue'
 import { HOME_URL } from '@/config/config'
 import ActionButton from '../ActionButton/index.vue'
@@ -68,6 +74,7 @@ import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
 import logo from '@/assets/logo.svg'
 
 const router = useRouter()
+const uploadRef = ref<UploadInstance>()
 
 type ActionItem = {
 	id?: string
@@ -85,6 +92,8 @@ interface HeaderProps {
 	onUploadChange?: UploadProps['onChange']
 	onUploadExceed?: UploadProps['onExceed']
 	onUploadProgress?: UploadProps['onProgress']
+	onUploadSuccess?: UploadProps['onSuccess']
+	onUploadError?: UploadProps['onError']
 	beforeUpload?: UploadProps['beforeUpload']
 }
 
@@ -97,17 +106,6 @@ const props = withDefaults(defineProps<HeaderProps>(), {
 })
 
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
-
-const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
-	props.onUploadChange && props.onUploadChange(uploadFile, uploadFiles)
-
-const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
-	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
-
-const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) =>
-	props.onUploadProgress && props.onUploadProgress(event, uploadFile, uploadFiles)
-
-const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => props.beforeUpload && props.beforeUpload(rawFile)
 
 const handleClickGoHome = () => router.push(HOME_URL)
 

@@ -10,22 +10,21 @@
 				<el-dropdown-menu>
 					<el-dropdown-item v-for="item in actionItems" :key="item.id" :command="item.id">
 						<template v-if="item.isUpload">
-							<el-upload
+							<Upload
 								ref="uploadRef"
 								class="upload-zone"
 								multiple
-								:action="storageAction"
-								:data="uploadPayload"
-								:headers="uploadHeaders"
 								:show-file-list="false"
 								:limit="uploadFileLimit"
-								:on-change="handleUploadChange"
-								:on-exceed="handleUploadExceed"
-								:on-progress="handleUploadProgress"
-								:before-upload="handleBeforeUpload"
+								:on-change="onUploadChange"
+								:on-exceed="onUploadExceed"
+								:on-progress="onUploadProgress"
+								:on-success="onUploadSuccess"
+								:on-error="onUploadError"
+								:before-upload="beforeUpload"
 							>
 								<template #trigger>{{ item.name }}</template>
-							</el-upload>
+							</Upload>
 						</template>
 						<template v-else>{{ item.name }}</template>
 					</el-dropdown-item>
@@ -36,23 +35,11 @@
 </template>
 
 <script setup lang="ts" name="action-button">
-import { ref, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { UploadInstance, UploadProps } from 'element-plus'
-import { GlobalStore } from '@/store'
-
-const route = useRoute()
-const router = useRouter()
-
-const parentId = (route.params.id as string) || 'root'
-const uploadPayload = ref({ parentId })
+import { ref } from 'vue'
+import { UploadProps, UploadInstance } from 'element-plus'
+import Upload from '../Upload/index.vue'
 
 const uploadRef = ref<UploadInstance>()
-const storageAction = computed(() => `${import.meta.env.VITE_API_URL}/v1/storage/upload`)
-const globalStore = GlobalStore()
-const uploadHeaders = {
-	Authorization: `Bearer ${globalStore.token}`
-}
 
 type ActionItem = {
 	id?: string
@@ -68,6 +55,8 @@ interface ActionButtonProps {
 	onUploadChange?: UploadProps['onChange']
 	onUploadExceed?: UploadProps['onExceed']
 	onUploadProgress?: UploadProps['onProgress']
+	onUploadSuccess?: UploadProps['onSuccess']
+	onUploadError?: UploadProps['onError']
 	beforeUpload?: UploadProps['beforeUpload']
 }
 
@@ -77,29 +66,7 @@ const props = withDefaults(defineProps<ActionButtonProps>(), {
 	iconSize: () => 32
 })
 
-watch(
-	() => router.currentRoute.value,
-	() => {
-		const parentId = (route.params.id as string) || 'root'
-
-		uploadPayload.value = { parentId }
-	}
-)
-
 const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
-
-const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
-	props.onUploadChange && props.onUploadChange(uploadFile, uploadFiles)
-
-const handleUploadExceed: UploadProps['onExceed'] = (files, uploadFiles) =>
-	props.onUploadExceed && props.onUploadExceed(files, uploadFiles)
-
-const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) =>
-	props.onUploadProgress && props.onUploadProgress(event, uploadFile, uploadFiles)
-
-const handleBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	props.beforeUpload && props.beforeUpload(rawFile)
-}
 </script>
 
 <style scoped lang="scss">

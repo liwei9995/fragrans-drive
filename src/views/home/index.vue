@@ -35,7 +35,14 @@
 							/>
 							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" isEmpty />
 						</div>
-						<el-empty v-if="!isFetching && listData?.docs.length === 0" description="该目录下没有文件" />
+						<Empty
+							v-if="!isFetching && listData?.docs.length === 0"
+							:on-upload-change="handleUploadChange"
+							:on-upload-exceed="handleUploadExceed"
+							:on-upload-progress="handleUploadProgress"
+							:before-upload="handelBeforeUpload"
+							:tap-item="handleTapActionItem"
+						/>
 					</div>
 					<Dialog
 						v-if="folderDialogFormVisible"
@@ -57,6 +64,7 @@
 						:percentage="uploadPercentage"
 						:title="notificationTitle"
 						:type="notificationType"
+						:on-close="handleCloseUploadStatus"
 					/>
 				</div>
 			</div>
@@ -68,15 +76,18 @@
 import { ref, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
-import { ElMessage, ElMessageBox, UploadProps, ElNotification } from 'element-plus'
+import { ElMessage, ElMessageBox, UploadProps, UploadFiles, ElNotification } from 'element-plus'
+import emitter from '@/utils/emitter'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
 import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { getThumb } from '@/utils/thumb/index'
+import { UploadEventEnum } from '@/enums/events'
 import Header from './widgets/Header/index.vue'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
+import Empty from './widgets/Empty/index.vue'
 import { createFolder, getDownloadUrl, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
 type BreadcrumbItem = {
@@ -91,6 +102,7 @@ const renameDialogFormVisible = ref(false)
 const isFetching = ref(false)
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
+const uploadedFiles = ref([] as UploadFiles)
 const notificationTitle = ref('')
 const notificationType = ref('info')
 const folderName = ref(defaultFolderName)
@@ -318,6 +330,8 @@ const handleRenameFile = (name: string) => {
 	})
 }
 
+const handleCloseUploadStatus = () => (uploadedFiles.value = [])
+
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
 		folderDialogFormVisible.value = true
@@ -373,16 +387,17 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 	if (isUploadingFiles.length === 0 && isSuccessFiles.length === 0 && isFailFiles.length === 0) return
 
+	const totalFiles = [...uploadedFiles.value, ...isSuccessFiles]
 	const title =
 		isUploadingFiles.length > 0
 			? `正在上传 ∙ 剩余${isUploadingFiles.length}项`
-			: isFailFiles.length > 0
+			: isFailFiles.length > 0 || uploadedFiles.value.filter(file => file.status === 'fail').length > 0
 			? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
-			: `上传完成 ∙ 共${isSuccessFiles.length}项`
+			: `上传完成 ∙ 共${totalFiles.length}项`
 	const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
 
 	ElNotification.closeAll()
-	uploadStatusRef.value.show()
+	uploadStatusRef.value!.show()
 	notificationTitle.value = title
 	notificationType.value = type
 
@@ -392,6 +407,8 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 
 	// refetch the file list
 	if (isUploadingFiles.length === 0) {
+		uploadedFiles.value = totalFiles
+		emitter.emit(UploadEventEnum.CLEAR_FILES)
 		fetchFiles()
 	}
 }
