@@ -1,11 +1,11 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+// element plus
+import ElementPlus from 'element-plus'
 // reset style sheet
 import '@/styles/reset.scss'
 // app style sheet
 import './style.css'
-// element plus
-import ElementPlus from 'element-plus'
 // element icons
 import * as Icons from '@element-plus/icons-vue'
 // element css
