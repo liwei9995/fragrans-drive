@@ -12,9 +12,10 @@ USER oyiyio
 
 WORKDIR /app
 COPY --chown=oyiyio:oyiyio package*.json ./
-RUN npm install --verbose
+RUN npm install -g pnpm
+RUN pnpm install --verbose
 COPY --chown=oyiyio:oyiyio . .
-RUN npm run build:prod
+RUN pnpm build:prod
 
 # production stage
 FROM nginx as production-stage
