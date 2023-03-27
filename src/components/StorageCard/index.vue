@@ -25,8 +25,8 @@
 					</div>
 					<div class="node-card">
 						<div class="cover">
-							<div :class="type + '-cover'">
-								<div class="file-icon" :class="{ thumb: previewSrcList.length > 0 }">
+							<div :class="coverCls">
+								<div class="file-icon" :class="{ thumb: !showPlaceholder && previewSrcList.length > 0 }">
 									<el-image
 										class="icon"
 										:class="{ show: !showPlaceholder }"
@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts" name="storage-card">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
@@ -113,6 +113,8 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 	thumbPlaceholder: '',
 	isEmpty: false
 })
+
+const coverCls = computed(() => (showPlaceholder.value ? 'file-cover' : `${props.type}-cover`))
 
 const handleCommand = (command: string | number | object) =>
 	props.tapActionItem && props.tapActionItem(command, props.id, props.title, props.mimeType, props.thumbUrl)
