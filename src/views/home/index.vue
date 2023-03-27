@@ -426,11 +426,6 @@ const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uplo
 	}, 0)
 	const percentage = (uploadedSize / totalSize) * 100
 
-	console.log(`uploadFiles :>> ${JSON.stringify(uploadFiles, null, 2)}`)
-	console.log(`totalSize :>> ${JSON.stringify(totalSize, null, 2)}`)
-	console.log(`uploadedSize :>> ${JSON.stringify(uploadedSize, null, 2)}`)
-	console.log(`percentage :>> ${JSON.stringify(percentage, null, 2)}`)
-
 	uploadPercentage.value = percentage
 }
 

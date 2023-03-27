@@ -29,16 +29,19 @@
 								<div class="file-icon" :class="{ thumb: previewSrcList.length > 0 }">
 									<el-image
 										class="icon"
+										:class="{ show: !showPlaceholder }"
 										alt="folder"
 										:src="thumbUrl"
 										:preview-src-list="previewSrcList"
 										fit="contain"
 										@close="handleClosePreview"
-									>
-										<template #placeholder>
-											<div class="icon-placeholder" :style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }"></div>
-										</template>
-									</el-image>
+										@load="handleLoad"
+									/>
+									<div
+										v-if="showPlaceholder"
+										class="icon-placeholder"
+										:style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }"
+									/>
 								</div>
 							</div>
 						</div>
@@ -61,6 +64,7 @@ import { GlobalStore } from '@/store'
 
 const router = useRouter()
 const showMoreAction = ref(false)
+const showPlaceholder = ref(true)
 const globalStore = GlobalStore()
 const isMobile = globalStore.isMobile
 
@@ -120,6 +124,8 @@ const handleClickCard = () => {
 }
 
 const handleClosePreview = () => (showMoreAction.value = false)
+
+const handleLoad = () => (showPlaceholder.value = false)
 </script>
 
 <style scoped lang="scss">
