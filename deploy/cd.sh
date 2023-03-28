@@ -5,12 +5,13 @@ REGISTRY_NAME="docker.oyiyio.com"
 CONTAINER_NAME="yi-drive"
 CONTAINER_PORT=8060
 CONTAINER_INNER_PORT=80
+TAG_RELEASE="release"
 
 # 登录 Docker Registry
 echo $DOCKER_REGISTRY_PASSWORD | docker login $REGISTRY_NAME -u $DOCKER_REGISTRY_USER --password-stdin
 
 # 从镜像仓库再次拉取 yi-drive 镜像
-docker pull $REGISTRY_NAME/$CONTAINER_NAME
+docker pull $REGISTRY_NAME/$CONTAINER_NAME:$TAG_RELEASE
 
 # 登出 Docker Registry
 docker logout
