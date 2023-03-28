@@ -29,7 +29,7 @@ if [ "$(uname)" == "Darwin" ]; then
     -d \
     -p $CONTAINER_PORT:$CONTAINER_INNER_PORT \
     --restart=always \
-    $REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA
+    $REGISTRY_NAME/$CONTAINER_NAME
 # GNU/Linux操作系统
 elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
   docker run --name $CONTAINER_NAME \
@@ -38,5 +38,5 @@ elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     --restart=always \
     -v /etc/localtime:/etc/localtime:ro \
     -v /etc/timezone:/etc/timezone \
-    $REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA
+    $REGISTRY_NAME/$CONTAINER_NAME
 fi
