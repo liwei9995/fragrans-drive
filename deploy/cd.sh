@@ -5,6 +5,13 @@ REGISTRY_NAME="docker.oyiyio.com"
 CONTAINER_NAME="yi-drive"
 CONTAINER_PORT=8060
 CONTAINER_INNER_PORT=80
+COMMIT_SHA=$(git rev-parse --short HEAD)
+
+if [ ! $BUILD_IMAGE_TAG ]; then
+  BUILD_IMAGE_TAG=$COMMIT_SHA
+fi
+
+echo 'The docker image being deployed is: ${REGISTRY_NAME}/${CONTAINER_NAME}:${BUILD_IMAGE_TAG}.'
 
 # 登录 Docker Registry
 echo $DOCKER_REGISTRY_PASSWORD | docker login $REGISTRY_NAME -u $DOCKER_REGISTRY_USER --password-stdin
