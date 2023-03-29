@@ -11,7 +11,7 @@ if [ ! $BUILD_IMAGE_TAG ]; then
   BUILD_IMAGE_TAG=$COMMIT_SHA
 fi
 
-echo 'The docker image being deployed is: ${REGISTRY_NAME}/${CONTAINER_NAME}:${BUILD_IMAGE_TAG}.'
+echo 'The docker image being deployed is: '$REGISTRY_NAME'/'$CONTAINER_NAME':'$BUILD_IMAGE_TAG''
 
 # 登录 Docker Registry
 echo $DOCKER_REGISTRY_PASSWORD | docker login $REGISTRY_NAME -u $DOCKER_REGISTRY_USER --password-stdin
