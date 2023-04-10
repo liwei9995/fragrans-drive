@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts" name="header">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 interface DialogProps {
 	title: string
@@ -39,6 +39,20 @@ const inputValue = ref(props.name)
 const handleClick = () => props.onConfirm && props.onConfirm(inputValue.value)
 
 const handleClose = () => props.onClose && props.onClose()
+
+onMounted(() => {
+	// 监听enter事件
+	document.onkeydown = (e: any) => {
+		e = window.event || e
+		if (e.code === 'Enter' || e.code === 'enter' || e.code === 'NumpadEnter') {
+			const inputVal = inputValue.value.trim()
+
+			if (!inputVal) return
+
+			props.onConfirm && props.onConfirm(inputVal)
+		}
+	}
+})
 </script>
 
 <style scoped lang="scss">
