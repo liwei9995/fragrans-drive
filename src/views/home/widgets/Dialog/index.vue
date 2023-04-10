@@ -45,9 +45,11 @@ onMounted(() => {
 	document.onkeydown = (e: any) => {
 		e = window.event || e
 		if (e.code === 'Enter' || e.code === 'enter' || e.code === 'NumpadEnter') {
-			if (inputValue.value) return
+			const inputVal = inputValue.value.trim()
 
-			props.onConfirm && props.onConfirm(inputValue.value)
+			if (!inputVal) return
+
+			props.onConfirm && props.onConfirm(inputVal)
 		}
 	}
 })
