@@ -16,7 +16,7 @@
 	</el-dialog>
 </template>
 
-<script setup lang="ts" name="header">
+<script setup lang="ts" name="form-dialog">
 import { ref, onMounted } from 'vue'
 
 interface DialogProps {

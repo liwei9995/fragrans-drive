@@ -59,6 +59,7 @@
 						:on-close="handleCloseRenameDialog"
 						:on-confirm="handleRenameFile"
 					/>
+					<Move v-if="moveDialogFormVisible" title="移动到" :on-close="handleCloseMoveDialog" />
 					<UploadStatus
 						ref="uploadStatusRef"
 						:percentage="uploadPercentage"
@@ -88,6 +89,7 @@ import { UploadEventEnum } from '@/enums/events'
 import Header from './widgets/Header/index.vue'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Empty from './widgets/Empty/index.vue'
+import Move from './widgets/Move/index.vue'
 import { createFolder, getDownloadUrl, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 
 type BreadcrumbItem = {
@@ -99,6 +101,7 @@ const globalStore = GlobalStore()
 const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
+const moveDialogFormVisible = ref(true)
 const isFetching = ref(false)
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
@@ -124,6 +127,11 @@ const basicActionItems = [
 	{
 		id: 'rename',
 		name: '重命名',
+		divided: false
+	},
+	{
+		id: 'move',
+		name: '移动',
 		divided: false
 	},
 	{
@@ -281,6 +289,8 @@ const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
 
 const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
 
+const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
+
 const handleCreateFolder = (name: string) => {
 	const parentId = (route.params.id || 'root') as string
 
@@ -377,6 +387,8 @@ const handleTapCardActionItem = async (
 		needToRenameThumb.value = thumb || ''
 		needToRenameFileId.value = id
 		needToRenameFileName.value = name
+	} else if (command === 'move') {
+		moveDialogFormVisible.value = true
 	}
 }
 

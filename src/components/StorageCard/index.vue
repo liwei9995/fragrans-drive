@@ -103,6 +103,11 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 			divided: false
 		},
 		{
+			id: 'move',
+			name: '移动',
+			divided: false
+		},
+		{
 			id: 'delete',
 			name: '删除',
 			divided: true
