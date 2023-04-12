@@ -6,6 +6,11 @@
 	cursor: pointer;
 	border-radius: 10px;
 
+	&.disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
 	.icon {
 		width: 28px;
 		min-height: 28px;

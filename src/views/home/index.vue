@@ -101,6 +101,7 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const moveDialogFormVisible = ref(false)
+const moveToFolderId = ref('root')
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
 const uploadedFiles = ref([] as UploadFiles)
@@ -316,6 +317,7 @@ const handleTapCardActionItem = async (
 		needToRenameFileName.value = name
 	} else if (command === 'move') {
 		moveDialogFormVisible.value = true
+		moveToFolderId.value = id
 	}
 }
 

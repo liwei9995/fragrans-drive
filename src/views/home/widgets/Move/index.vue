@@ -5,9 +5,12 @@
 			<StorageItem
 				v-for="item in listData?.docs"
 				:key="item.id"
+				:id="item.id"
+				:disabled="item.type !== 'folder'"
 				:name="item.name"
 				:thumbUrl="item.thumb"
 				:thumb-placeholder="item.thumbPlaceholder"
+				:tap="handleTapItem"
 			/>
 		</div>
 		<div class="action"></div>
@@ -35,7 +38,13 @@ const id = ref(props.id)
 const { fetchFiles, listData } = useFetchFiles()
 const breadcrumbItems = ref([] as BreadcrumbItem[])
 const fetchPath = async () => {
-	if (!id.value || id.value === 'root') return
+	if (!id.value) return
+
+	if (id.value === 'root') {
+		breadcrumbItems.value = []
+
+		return
+	}
 
 	const pathItems = await getPath(id.value)
 
@@ -64,8 +73,15 @@ const handleClose = () => props.onClose && props.onClose()
 const handleClickBreadcrumbItem = (item: BreadcrumbItem) => {
 	if (item?.id && item?.id !== id.value) {
 		id.value = item.id
+		fetchPath()
 		fetchFiles(id.value)
 	}
+}
+
+const handleTapItem = (itemId: string) => {
+	id.value = itemId
+	fetchPath()
+	fetchFiles(id.value)
 }
 </script>
 
