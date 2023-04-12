@@ -1,5 +1,13 @@
 .move-dialog-wrapper {
 	.breadcrumb-wrapper {
+		padding-bottom: 16px;
 		padding-left: 0;
+	}
+
+	.list {
+		position: relative;
+		box-sizing: border-box;
+		height: 358px;
+		overflow: hidden;
 	}
 }
