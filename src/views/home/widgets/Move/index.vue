@@ -1,7 +1,7 @@
 <template>
-	<el-dialog class="move-dialog-wrapper" width="340px" :title="title" v-model="dialogFormVisible" @close="handleClose">
+	<el-dialog class="move-dialog-wrapper" :title="title" v-model="dialogFormVisible" @close="handleClose">
 		<Breadcrumb :breadcrumb-items="breadcrumbItems" :autoNav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
-		<div class="list">
+		<div class="list" v-infinite-scroll="load">
 			<StorageItem
 				v-for="item in listData?.docs"
 				:key="item.id"
@@ -13,29 +13,39 @@
 				:tap="handleTapItem"
 			/>
 		</div>
-		<div class="action"></div>
+		<div class="action">
+			<el-button class="create" type="primary" text>新建文件夹</el-button>
+			<div class="buttons">
+				<el-button @click="handleCancel">取消</el-button>
+				<el-button type="primary" @click="handleMove">移动到此处</el-button>
+			</div>
+		</div>
 	</el-dialog>
 </template>
 
 <script setup lang="ts" name="move">
 import { ref, onBeforeMount, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import StorageItem from '@/components/StorageItem/index.vue'
 import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
-import { getPath } from '@/api/modules/storage'
+import { getPath, moveFile } from '@/api/modules/storage'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
 
 interface MoveProps {
 	id?: string
+	parentId?: string
 	title: string
 	onClose?: () => void
+	onMoved?: () => void
 }
 
 const props = withDefaults(defineProps<MoveProps>(), {
-	id: () => 'root',
+	id: () => '',
+	parentId: () => 'root',
 	title: () => ''
 })
-const id = ref(props.id)
-const { fetchFiles, listData } = useFetchFiles()
+const id = ref(props.parentId)
+const { fetchFiles, listData, isFetching } = useFetchFiles()
 const breadcrumbItems = ref([] as BreadcrumbItem[])
 const fetchPath = async () => {
 	if (!id.value) return
@@ -63,6 +73,12 @@ onBeforeMount(() => {
 	fetchFiles(id.value)
 })
 
+const load = () => {
+	if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
+
+	fetchFiles(props.parentId, false)
+}
+
 watch(
 	() => props.id,
 	() => (id.value = props.id)
@@ -83,8 +99,32 @@ const handleTapItem = (itemId: string) => {
 	fetchPath()
 	fetchFiles(id.value)
 }
+
+const handleCancel = () => (dialogFormVisible.value = false)
+
+const handleMove = () => {
+	ElMessage.info({
+		message: '正在移动文件...',
+		duration: 0
+	})
+
+	moveFile({
+		fileId: props.id,
+		parentId: id.value
+	})
+		.then(() => {
+			dialogFormVisible.value = false
+			ElMessage.closeAll()
+			ElMessage.success('移动成功')
+			props.onMoved && props.onMoved()
+		})
+		.catch(() => {
+			ElMessage.closeAll()
+			ElMessage.error('移动失败，请重试')
+		})
+}
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
 @import './index.scss';
 </style>

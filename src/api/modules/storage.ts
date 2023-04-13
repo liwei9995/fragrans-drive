@@ -22,6 +22,11 @@ export const deleteFile = (id: string) => {
 	return http.delete(`${PORT}/storage/${id}`) // 正常 post json 请求  ==>  application/json
 }
 
+// 移动文件/文件夹接口
+export const moveFile = (params: Storage.ReqStorageMove) => {
+	return http.post(`${PORT}/storage/move`, params) // 正常 post json 请求  ==>  application/json
+}
+
 // 获取文件接口
 export const getFile = (id: string) => {
 	return http.download(`${PORT}/storage/${id}`, { timeout: ResultEnum.TIMEOUT_DOWNLOAD as number })

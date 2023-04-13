@@ -26,6 +26,11 @@ export namespace Storage {
 		parentId: string
 	}
 
+	export interface ReqStorageMove {
+		fileId: string
+		parentId: string
+	}
+
 	export interface ReqStorageList {
 		query?: Record<string, string>
 		pagination?: Record<string, any>

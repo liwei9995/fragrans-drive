@@ -59,7 +59,14 @@
 						:on-close="handleCloseRenameDialog"
 						:on-confirm="handleRenameFile"
 					/>
-					<Move v-if="moveDialogFormVisible" title="移动到" :on-close="handleCloseMoveDialog" />
+					<Move
+						v-if="moveDialogFormVisible"
+						:id="needToMoveId"
+						:parentId="parentId"
+						title="移动到"
+						:on-close="handleCloseMoveDialog"
+						:on-moved="handleMoved"
+					/>
 					<UploadStatus
 						ref="uploadStatusRef"
 						:percentage="uploadPercentage"
@@ -101,7 +108,7 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const moveDialogFormVisible = ref(false)
-const moveToFolderId = ref('root')
+const needToMoveId = ref('root')
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
 const uploadedFiles = ref([] as UploadFiles)
@@ -219,6 +226,8 @@ const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
 
 const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
 
+const handleMoved = () => fetchFiles(parentId.value)
+
 const handleCreateFolder = (name: string) => {
 	const parentId = (route.params.id || 'root') as string
 
@@ -316,8 +325,8 @@ const handleTapCardActionItem = async (
 		needToRenameFileId.value = id
 		needToRenameFileName.value = name
 	} else if (command === 'move') {
+		needToMoveId.value = id
 		moveDialogFormVisible.value = true
-		moveToFolderId.value = id
 	}
 }
 

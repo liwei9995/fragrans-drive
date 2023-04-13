@@ -1,4 +1,10 @@
 .move-dialog-wrapper {
+	width: 440px;
+
+	.el-dialog__body {
+		padding: var(--el-dialog-padding-primary) var(--el-dialog-padding-primary) 0;
+	}
+
 	.breadcrumb-wrapper {
 		padding-bottom: 16px;
 		padding-left: 0;
@@ -9,5 +15,18 @@
 		box-sizing: border-box;
 		height: 358px;
 		overflow: hidden;
+	}
+
+	.action {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: 68px;
+	}
+}
+
+@media (max-width: 576px) {
+	.move-dialog-wrapper {
+		width: 340px;
 	}
 }
