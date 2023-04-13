@@ -12,9 +12,16 @@
 				:thumb-placeholder="item.thumbPlaceholder"
 				:tap="handleTapItem"
 			/>
+			<div class="empty" v-if="listData?.docs.length === 0 && !isFetching">
+				<el-image
+					class="icon"
+					src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"
+				/>
+				<div>文件夹为空</div>
+			</div>
 		</div>
 		<div class="action">
-			<el-button class="create" type="primary" text>新建文件夹</el-button>
+			<div class="create">新建文件夹</div>
 			<div class="buttons">
 				<el-button @click="handleCancel">取消</el-button>
 				<el-button type="primary" @click="handleMove">移动到此处</el-button>

@@ -2,19 +2,34 @@
 	width: 440px;
 
 	.el-dialog__body {
-		padding: var(--el-dialog-padding-primary) var(--el-dialog-padding-primary) 0;
+		padding: var(--el-dialog-padding-primary) 0 0;
 	}
 
 	.breadcrumb-wrapper {
-		padding-bottom: 16px;
-		padding-left: 0;
+		padding: 0 20px 16px;
 	}
 
 	.list {
 		position: relative;
 		box-sizing: border-box;
 		height: 358px;
-		overflow: hidden;
+		overflow: auto;
+
+		.empty {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			width: 100%;
+			height: 100%;
+			padding-top: 72px;
+			font-size: 14px;
+			color: rgb(37 38 43);
+
+			.icon {
+				width: 112px;
+				height: 112px;
+			}
+		}
 	}
 
 	.action {
@@ -22,6 +37,13 @@
 		align-items: center;
 		justify-content: space-between;
 		height: 68px;
+		padding: 0 20px;
+
+		.create {
+			font-size: 14px;
+			color: var(--el-color-primary);
+			cursor: pointer;
+		}
 	}
 }
 
