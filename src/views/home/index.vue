@@ -59,6 +59,14 @@
 						:on-close="handleCloseRenameDialog"
 						:on-confirm="handleRenameFile"
 					/>
+					<Move
+						v-if="moveDialogFormVisible"
+						:id="needToMoveId"
+						:parentId="parentId"
+						title="移动到"
+						:on-close="handleCloseMoveDialog"
+						:on-moved="handleMoved"
+					/>
 					<UploadStatus
 						ref="uploadStatusRef"
 						:percentage="uploadPercentage"
@@ -75,20 +83,20 @@
 <script setup lang="ts" name="home">
 import { ref, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { format } from 'date-fns'
 import { ElMessage, ElMessageBox, UploadProps, UploadFiles, ElNotification } from 'element-plus'
 import emitter from '@/utils/emitter'
 import Card from '@/components/StorageCard/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
-import { LOGIN_URL } from '@/config/config'
-import { GlobalStore } from '@/store'
-import { getThumb } from '@/utils/thumb/index'
-import { UploadEventEnum } from '@/enums/events'
 import Header from './widgets/Header/index.vue'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Empty from './widgets/Empty/index.vue'
-import { createFolder, getDownloadUrl, getFiles, deleteFile, updateFile, getPath } from '@/api/modules/storage'
+import Move from './widgets/Move/index.vue'
+import { LOGIN_URL } from '@/config/config'
+import { GlobalStore } from '@/store'
+import { UploadEventEnum } from '@/enums/events'
+import { createFolder, getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
+import { useFetchFiles } from '@/hooks/useFetchFiles'
 
 type BreadcrumbItem = {
 	id: string
@@ -99,7 +107,8 @@ const globalStore = GlobalStore()
 const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
-const isFetching = ref(false)
+const moveDialogFormVisible = ref(false)
+const needToMoveId = ref('root')
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
 const uploadedFiles = ref([] as UploadFiles)
@@ -110,20 +119,20 @@ const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
 const needToRenameFileName = ref('')
 const breadcrumbItems = ref([] as BreadcrumbItem[])
-const initialData = {
-	docs: [],
-	limit: 100,
-	page: 0,
-	pages: 1
-}
-const listData = ref<{ [key: string]: any }>(initialData)
 const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
+const { fetchFiles, listData, resetListData, isFetching } = useFetchFiles()
+const parentId = ref((route.params.id as string) || 'root')
 const basicActionItems = [
 	{
 		id: 'rename',
 		name: '重命名',
+		divided: false
+	},
+	{
+		id: 'move',
+		name: '移动',
 		divided: false
 	},
 	{
@@ -176,77 +185,10 @@ interface Storage {
 	updatedAt: string
 }
 
-const getDesc = (dateTime: string) => {
-	const dt = new Date(dateTime)
-	const now = new Date()
-	const dtYear = format(dt, 'yyyy')
-	const year = format(now, 'yyyy')
-	const dtDay = format(dt, 'yyyy/MM/dd')
-	const today = format(now, 'yyyy/MM/dd')
-
-	return dtDay === today
-		? `今天 ${format(dt, 'HH:mm')}`
-		: dtYear === year
-		? format(dt, 'MM/dd HH:mm')
-		: format(dt, 'yyyy/MM/dd HH:mm')
-}
-
-const fetchFiles = async (init = true) => {
-	const parentId = (route.params.id as string) || 'root'
-
-	isFetching.value = true
-
-	if (init) {
-		listData.value = initialData
-	}
-
-	const data = await getFiles({
-		query: { parentId },
-		pagination: {
-			page: listData.value.page + 1,
-			limit: listData.value.limit,
-			sort: {
-				updatedAt: -1
-			}
-		}
-	})
-
-	isFetching.value = false
-
-	if (Array.isArray(data?.docs)) {
-		data.docs = data.docs.map((item: Storage) => ({
-			...item,
-			desc: getDesc(item.updatedAt),
-			thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
-			thumbPlaceholder: getThumb(item.extName, item.type),
-			previewSrcList: item.url ? [item.url] : []
-		}))
-	}
-
-	const docs = [...listData.value.docs, ...data.docs]
-	const folderItems: Storage[] = []
-	const fileItems: Storage[] = []
-
-	docs.forEach((doc: Storage) => {
-		if (doc.type === 'folder') {
-			folderItems.push(doc)
-		} else {
-			fileItems.push(doc)
-		}
-	})
-
-	const sortedDocs = [...folderItems, ...fileItems]
-
-	listData.value = {
-		...data,
-		docs: sortedDocs
-	}
-}
-
 const load = () => {
 	if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
 
-	fetchFiles(false)
+	fetchFiles(parentId.value, false)
 }
 
 const fetchPath = async () => {
@@ -271,8 +213,9 @@ onBeforeMount(() => fetchPath())
 watch(
 	() => router.currentRoute.value,
 	() => {
-		listData.value = initialData
-		fetchFiles()
+		parentId.value = (route.params.id as string) || 'root'
+		resetListData()
+		fetchFiles(parentId.value)
 		fetchPath()
 	}
 )
@@ -280,6 +223,10 @@ watch(
 const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
 
 const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
+
+const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
+
+const handleMoved = () => fetchFiles(parentId.value)
 
 const handleCreateFolder = (name: string) => {
 	const parentId = (route.params.id || 'root') as string
@@ -302,7 +249,7 @@ const handleCreateFolder = (name: string) => {
 				ElMessage.error('此目录下已存在同名文件，请修改名称')
 			} else {
 				ElMessage.success('创建成功')
-				fetchFiles()
+				fetchFiles(parentId)
 			}
 		})
 		.catch(() => ElMessage.error('创建失败，请重试'))
@@ -326,7 +273,7 @@ const handleRenameFile = (name: string) => {
 		} else {
 			renameDialogFormVisible.value = false
 		}
-		fetchFiles()
+		fetchFiles(parentId.value)
 	})
 }
 
@@ -368,7 +315,7 @@ const handleTapCardActionItem = async (
 		})
 			.then(async () => {
 				await deleteFile(id)
-				fetchFiles()
+				fetchFiles(parentId.value)
 				ElMessage.success('文件删除成功')
 			})
 			.catch(() => {})
@@ -377,6 +324,9 @@ const handleTapCardActionItem = async (
 		needToRenameThumb.value = thumb || ''
 		needToRenameFileId.value = id
 		needToRenameFileName.value = name
+	} else if (command === 'move') {
+		needToMoveId.value = id
+		moveDialogFormVisible.value = true
 	}
 }
 
@@ -409,7 +359,7 @@ const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) =>
 	if (isUploadingFiles.length === 0) {
 		uploadedFiles.value = totalFiles
 		emitter.emit(UploadEventEnum.CLEAR_FILES)
-		fetchFiles()
+		fetchFiles(parentId.value)
 	}
 }
 

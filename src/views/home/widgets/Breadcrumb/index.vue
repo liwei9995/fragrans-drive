@@ -9,15 +9,24 @@
 			</span>
 			<span class="el-breadcrumb breadcrumb-items-wrapper">
 				<template v-for="item in breadcrumbItems" :key="item.id">
-					<el-breadcrumb-item v-if="!item.isOmit && !item.isHighlight" :to="{ path: '/home/' + item.id }">
+					<el-breadcrumb-item
+						v-if="!item.isOmit && !item.isHighlight"
+						:to="{ path: autoNav ? '/home/' + item.id : '' }"
+						@click="handleClickItem(item)"
+					>
 						<div class="breadcrumb-item-content">{{ item.text }}</div>
 					</el-breadcrumb-item>
-					<el-breadcrumb-item v-else-if="item.isOmit">
+					<el-breadcrumb-item v-else-if="item.isOmit" @click="handleClickItem(item)">
 						<el-icon :size="12">
 							<MoreFilled />
 						</el-icon>
 					</el-breadcrumb-item>
-					<div class="breadcrumb-item-content highlight" v-else-if="item.isHighlight" :to="{ path: '/home/' + item.id }">
+					<div
+						class="breadcrumb-item-content highlight"
+						v-else-if="item.isHighlight"
+						:to="{ path: autoNav ? '/home/' + item.id : '' }"
+						@click="handleClickItem(item)"
+					>
 						{{ item.text }}
 					</div>
 				</template>
@@ -38,16 +47,30 @@ export type BreadcrumbItem = {
 }
 
 interface BreadcrumbProps {
+	autoNav?: boolean
 	breadcrumbItems?: Partial<BreadcrumbItem>[]
+	onClickBreadcrumbItem?: (item: BreadcrumbItem) => void
 }
 
-withDefaults(defineProps<BreadcrumbProps>(), {
+const props = withDefaults(defineProps<BreadcrumbProps>(), {
+	autoNav: () => true,
 	breadcrumbItems: () => []
 })
 
 const router = useRouter()
 
-const handleClickGoHome = () => router.push(HOME_URL)
+const handleClickItem = (item: BreadcrumbItem) => props.onClickBreadcrumbItem && props.onClickBreadcrumbItem(item)
+
+const handleClickGoHome = () => {
+	if (props.autoNav) {
+		router.push(HOME_URL)
+	} else {
+		props.onClickBreadcrumbItem &&
+			props.onClickBreadcrumbItem({
+				id: 'root'
+			})
+	}
+}
 </script>
 
 <style scoped lang="scss">
