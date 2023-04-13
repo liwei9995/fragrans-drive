@@ -66,6 +66,7 @@
 						title="移动到"
 						:on-close="handleCloseMoveDialog"
 						:on-moved="handleMoved"
+						:on-folder-created="handleFolderCreated"
 					/>
 					<UploadStatus
 						ref="uploadStatusRef"
@@ -228,6 +229,12 @@ const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
 const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
 
 const handleMoved = () => fetchFiles(parentId.value)
+
+const handleFolderCreated = (parentId: string) => {
+	if (parentId === (route.params.id || 'root')) {
+		fetchFiles(parentId)
+	}
+}
 
 const handleCreateFolder = (name: string) => {
 	const parentId = (route.params.id || 'root') as string

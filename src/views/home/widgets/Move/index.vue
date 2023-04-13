@@ -2,7 +2,12 @@
 	<el-dialog class="move-dialog-wrapper" :title="title" v-model="dialogFormVisible" @close="handleClose">
 		<Breadcrumb :breadcrumb-items="breadcrumbItems" :autoNav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
 		<div class="list" v-infinite-scroll="load">
-			<FolderCreation v-if="createFolderItemVisible" :parentId="id" :close="handleCloseFolderCreationItem" />
+			<FolderCreation
+				v-if="createFolderItemVisible"
+				:parentId="id"
+				:close="handleCloseFolderCreationItem"
+				:success="handleCreateFolderSuccess"
+			/>
 			<StorageItem
 				v-for="item in listData?.docs"
 				:key="item.id"
@@ -39,6 +44,7 @@ import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
 import FolderCreation from '../FolderCreation/index.vue'
 import { getPath, moveFile } from '@/api/modules/storage'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
+import { Item } from '@/hooks/useCreateFolder'
 
 interface MoveProps {
 	id?: string
@@ -46,6 +52,7 @@ interface MoveProps {
 	title: string
 	onClose?: () => void
 	onMoved?: () => void
+	onFolderCreated?: (parentId: string) => void
 }
 
 const props = withDefaults(defineProps<MoveProps>(), {
@@ -106,6 +113,14 @@ const handleClickBreadcrumbItem = (item: BreadcrumbItem) => {
 }
 
 const handleCloseFolderCreationItem = () => (createFolderItemVisible.value = false)
+
+const handleCreateFolderSuccess = (item: Item) => {
+	createFolderItemVisible.value = false
+	id.value = item.id
+	fetchPath()
+	fetchFiles(id.value)
+	props.onFolderCreated && props.onFolderCreated(item.parentId)
+}
 
 const handleTapItem = (itemId: string) => {
 	createFolderItemVisible.value = false

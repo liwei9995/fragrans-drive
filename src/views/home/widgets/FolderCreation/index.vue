@@ -16,12 +16,12 @@
 <script setup lang="ts" name="storage-item">
 import { ref } from 'vue'
 import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue'
-import { useCreateFolder } from '@/hooks/useCreateFolder'
+import { useCreateFolder, Item } from '@/hooks/useCreateFolder'
 
 interface FolderCreationProps {
 	parentId?: string
 	thumbUrl?: string
-	success?: () => void
+	success?: (item: Item) => void
 	close?: () => void
 }
 
@@ -32,7 +32,8 @@ const props = withDefaults(defineProps<FolderCreationProps>(), {
 
 const folderName = ref('新建文件夹')
 
-const handleCreateFolder = () => useCreateFolder(folderName.value, props.parentId, () => props.success && props.success())
+const handleCreateFolder = () =>
+	useCreateFolder(folderName.value, props.parentId, (item: Item) => props.success && props.success(item))
 
 const handleClose = () => props.close && props.close()
 </script>
