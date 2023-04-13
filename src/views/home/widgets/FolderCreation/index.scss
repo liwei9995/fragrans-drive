@@ -1,0 +1,43 @@
+.folder-creation-wrapper {
+	display: flex;
+	align-items: center;
+	height: 44px;
+	padding: 0 10px;
+	margin: 0 10px;
+	font-size: 14px;
+	cursor: pointer;
+	border-radius: 10px;
+
+	&:hover {
+		background: rgb(132 133 141 / 8%);
+	}
+
+	.icon {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		width: 28px;
+		min-height: 28px;
+		max-height: 100%;
+		margin-right: 16px;
+	}
+
+	.actions {
+		display: flex;
+		align-items: center;
+		margin-left: 12px;
+
+		.primary {
+			color: var(--el-color-primary);
+		}
+
+		.info {
+			margin-left: 8px;
+			color: rgb(37 38 43 / 36%);
+
+			&:hover {
+				color: rgb(37 38 43 / 72%);
+			}
+		}
+	}
+}
