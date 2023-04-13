@@ -66,6 +66,7 @@
 						title="移动到"
 						:on-close="handleCloseMoveDialog"
 						:on-moved="handleMoved"
+						:on-folder-created="handleFolderCreated"
 					/>
 					<UploadStatus
 						ref="uploadStatusRef"
@@ -95,8 +96,9 @@ import Move from './widgets/Move/index.vue'
 import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { UploadEventEnum } from '@/enums/events'
-import { createFolder, getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
+import { getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
+import { useCreateFolder } from '@/hooks/useCreateFolder'
 
 type BreadcrumbItem = {
 	id: string
@@ -228,32 +230,17 @@ const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
 
 const handleMoved = () => fetchFiles(parentId.value)
 
+const handleFolderCreated = (parentId: string) => {
+	if (parentId === (route.params.id || 'root')) {
+		fetchFiles(parentId)
+	}
+}
+
 const handleCreateFolder = (name: string) => {
 	const parentId = (route.params.id || 'root') as string
 
 	folderDialogFormVisible.value = false
-	ElMessage.info({
-		message: '正在创建文件夹...',
-		duration: 0
-	})
-
-	createFolder({
-		name,
-		type: 'folder',
-		parentId
-	})
-		.then(({ exist }) => {
-			ElMessage.closeAll()
-
-			if (exist) {
-				ElMessage.error('此目录下已存在同名文件，请修改名称')
-			} else {
-				ElMessage.success('创建成功')
-				fetchFiles(parentId)
-			}
-		})
-		.catch(() => ElMessage.error('创建失败，请重试'))
-
+	useCreateFolder(name, parentId, () => fetchFiles(parentId))
 	folderName.value = defaultFolderName
 }
 
