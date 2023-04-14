@@ -18,17 +18,18 @@
 						<Breadcrumb :breadcrumb-items="breadcrumbItems" />
 					</div>
 					<div class="items-wrapper">
-						<div v-infinite-scroll="load" class="items">
+						<div v-infinite-scroll="load" infinite-scroll-delay="300" class="items">
 							<Card
 								v-for="item in listData?.docs"
 								:key="item.id"
 								:id="item.id"
 								:title="item.name"
 								:desc="item.desc"
-								:mimeType="item.mimeType"
+								:mine-type="item.mimeType"
 								:type="item.type"
-								:thumbUrl="item.thumb"
-								:thumbPlaceholder="item.thumbPlaceholder"
+								:ext-name="item.extName"
+								:thumb-url="item.thumb"
+								:thumb-placeholder="item.thumbPlaceholder"
 								:preview-src-list="item.previewSrcList"
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
@@ -97,7 +98,7 @@ import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { UploadEventEnum } from '@/enums/events'
 import { getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
-import { useFetchFiles } from '@/hooks/useFetchFiles'
+import { useFetchFiles, convertItem } from '@/hooks/useFetchFiles'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 
 type BreadcrumbItem = {
@@ -228,7 +229,19 @@ const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
 
 const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
 
-const handleMoved = () => fetchFiles(parentId.value)
+const handleMoved = (id: string, parentId: string) => {
+	const paramId = (route.params.id as string) || 'root'
+
+	if (parentId === paramId) return
+
+	const docs = listData.value.docs || []
+	const index = docs.findIndex((doc: Storage) => doc.id == id)
+
+	if (index !== -1) {
+		docs.splice(index, 1)
+		listData.value.docs = docs
+	}
+}
 
 const handleFolderCreated = (parentId: string) => {
 	if (parentId === (route.params.id || 'root')) {
@@ -250,17 +263,30 @@ const handleRenameFile = (name: string) => {
 
 	if (!doc) return
 
+	const fullName = `${name}${doc.extName}`
+
 	updateFile(fileId, {
-		name,
+		name: fullName,
 		parentId: doc?.parentId || 'root',
 		type: doc?.type
-	}).then(({ exist }) => {
+	}).then(({ exist, _id: id, ...rest }) => {
 		if (exist) {
 			ElMessage.error('已存在同名文件，请修改名称')
 		} else {
 			renameDialogFormVisible.value = false
+
+			const docs = listData.value.docs || []
+			const index = docs.findIndex((doc: Storage) => doc.id === id)
+
+			if (index !== -1) {
+				docs[index] = convertItem({
+					id,
+					...rest
+				})
+
+				listData.value.docs = docs
+			}
 		}
-		fetchFiles(parentId.value)
 	})
 }
 
@@ -290,7 +316,8 @@ const handleTapCardActionItem = async (
 	id: string,
 	name: string,
 	type?: string,
-	thumb?: string
+	thumb?: string,
+	extName = ''
 ) => {
 	if (command === 'download') {
 		download(id)
@@ -301,16 +328,26 @@ const handleTapCardActionItem = async (
 			type: 'warning'
 		})
 			.then(async () => {
-				await deleteFile(id)
-				fetchFiles(parentId.value)
-				ElMessage.success('文件删除成功')
+				try {
+					await deleteFile(id)
+					// fetchFiles(parentId.value)
+					const docs = listData.value.docs || []
+					const index = docs.findIndex((doc: Storage) => doc.id === id)
+
+					if (index !== -1) {
+						docs.splice(index, 1)
+					}
+					ElMessage.success('文件删除成功')
+				} catch {
+					ElMessage.error('文件删除失败，请重试')
+				}
 			})
 			.catch(() => {})
 	} else if (command === 'rename') {
 		renameDialogFormVisible.value = true
 		needToRenameThumb.value = thumb || ''
 		needToRenameFileId.value = id
-		needToRenameFileName.value = name
+		needToRenameFileName.value = name.replace(extName, '')
 	} else if (command === 'move') {
 		needToMoveId.value = id
 		moveDialogFormVisible.value = true
