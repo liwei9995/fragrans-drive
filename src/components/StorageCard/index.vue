@@ -79,18 +79,27 @@ interface StorageCardProps {
 	title?: string
 	mimeType?: string
 	type?: string
+	extName?: string
 	desc?: string
 	previewSrcList?: string[]
 	thumbUrl?: string
 	thumbPlaceholder?: string
 	isEmpty?: boolean
 	actionItems?: Partial<ActionItem>[]
-	tapActionItem?: (command: string | number | object, id: string, title: string, mimeType?: string, thumbUrl?: string) => void
+	tapActionItem?: (
+		command: string | number | object,
+		id: string,
+		title: string,
+		mimeType?: string,
+		thumbUrl?: string,
+		extName?: string
+	) => void
 }
 
 const props = withDefaults(defineProps<StorageCardProps>(), {
 	title: '',
 	desc: '',
+	extName: '',
 	actionItems: () => [
 		{
 			id: 'download',
@@ -122,7 +131,7 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 const coverCls = computed(() => (showPlaceholder.value ? 'file-cover' : `${props.type}-cover`))
 
 const handleCommand = (command: string | number | object) =>
-	props.tapActionItem && props.tapActionItem(command, props.id, props.title, props.mimeType, props.thumbUrl)
+	props.tapActionItem && props.tapActionItem(command, props.id, props.title, props.mimeType, props.thumbUrl, props.extName)
 
 const handleClickCard = () => {
 	if (props.type === 'folder') {

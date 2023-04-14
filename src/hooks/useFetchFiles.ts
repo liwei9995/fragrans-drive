@@ -18,6 +18,14 @@ const getDesc = (dateTime: string) => {
 		: format(dt, 'yyyy/MM/dd HH:mm')
 }
 
+export const convertItem = (item: Storage) => ({
+	...item,
+	desc: getDesc(item.updatedAt),
+	thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
+	thumbPlaceholder: getThumb(item.extName, item.type),
+	previewSrcList: item.url ? [item.url] : []
+})
+
 /**
  * 获取当前目录下文件列表
  */
@@ -54,13 +62,7 @@ export const useFetchFiles = () => {
 		isFetching.value = false
 
 		if (Array.isArray(data?.docs)) {
-			data.docs = data.docs.map((item: Storage) => ({
-				...item,
-				desc: getDesc(item.updatedAt),
-				thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
-				thumbPlaceholder: getThumb(item.extName, item.type),
-				previewSrcList: item.url ? [item.url] : []
-			}))
+			data.docs = data.docs.map((item: Storage) => convertItem(item))
 		}
 
 		const docs = [...listData.value.docs, ...data.docs]
