@@ -98,7 +98,7 @@ import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { UploadEventEnum } from '@/enums/events'
 import { getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
-import { useFetchFiles, convertItem } from '@/hooks/useFetchFiles'
+import { useFetchFiles } from '@/hooks/useFetchFiles'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 
 type BreadcrumbItem = {
@@ -269,7 +269,7 @@ const handleRenameFile = (name: string) => {
 		name: fullName,
 		parentId: doc?.parentId || 'root',
 		type: doc?.type
-	}).then(({ exist, _id: id, ...rest }) => {
+	}).then(({ exist, _id: id, name, baseName, extName, createdAt, updatedAt }) => {
 		if (exist) {
 			ElMessage.error('已存在同名文件，请修改名称')
 		} else {
@@ -279,10 +279,15 @@ const handleRenameFile = (name: string) => {
 			const index = docs.findIndex((doc: Storage) => doc.id === id)
 
 			if (index !== -1) {
-				docs[index] = convertItem({
+				docs[index] = {
+					...docs[index],
 					id,
-					...rest
-				})
+					name,
+					baseName,
+					extName,
+					createdAt,
+					updatedAt
+				}
 
 				listData.value.docs = docs
 			}
