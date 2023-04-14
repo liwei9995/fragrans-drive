@@ -26,6 +26,27 @@ export const convertItem = (item: Storage) => ({
 	previewSrcList: item.url ? [item.url] : []
 })
 
+const dateToNumber = (date: string) => +new Date(date)
+
+export const sortDocs = (docs: Storage[]) => {
+	const folderItems: Storage[] = []
+	const fileItems: Storage[] = []
+
+	docs
+		.sort((a, b) => dateToNumber(b.updatedAt) - dateToNumber(a.updatedAt))
+		.forEach((doc: Storage) => {
+			if (doc.type === 'folder') {
+				folderItems.push(doc)
+			} else {
+				fileItems.push(doc)
+			}
+		})
+
+	const sortedDocs = [...folderItems, ...fileItems]
+
+	return sortedDocs
+}
+
 /**
  * 获取当前目录下文件列表
  */
@@ -66,22 +87,10 @@ export const useFetchFiles = () => {
 		}
 
 		const docs = [...listData.value.docs, ...data.docs]
-		const folderItems: Storage[] = []
-		const fileItems: Storage[] = []
-
-		docs.forEach((doc: Storage) => {
-			if (doc.type === 'folder') {
-				folderItems.push(doc)
-			} else {
-				fileItems.push(doc)
-			}
-		})
-
-		const sortedDocs = [...folderItems, ...fileItems]
 
 		listData.value = {
 			...data,
-			docs: sortedDocs
+			docs: sortDocs(docs)
 		}
 	}
 

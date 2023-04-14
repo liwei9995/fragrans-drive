@@ -18,7 +18,7 @@
 						<Breadcrumb :breadcrumb-items="breadcrumbItems" />
 					</div>
 					<div class="items-wrapper">
-						<div v-infinite-scroll="load" infinite-scroll-delay="300" class="items">
+						<div v-infinite-scroll="load" class="items">
 							<Card
 								v-for="item in listData?.docs"
 								:key="item.id"
@@ -98,7 +98,7 @@ import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { UploadEventEnum } from '@/enums/events'
 import { getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
-import { useFetchFiles } from '@/hooks/useFetchFiles'
+import { useFetchFiles, convertItem, sortDocs } from '@/hooks/useFetchFiles'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 
 type BreadcrumbItem = {
@@ -279,7 +279,7 @@ const handleRenameFile = (name: string) => {
 			const index = docs.findIndex((doc: Storage) => doc.id === id)
 
 			if (index !== -1) {
-				docs[index] = {
+				docs[index] = convertItem({
 					...docs[index],
 					id,
 					name,
@@ -287,9 +287,9 @@ const handleRenameFile = (name: string) => {
 					extName,
 					createdAt,
 					updatedAt
-				}
+				})
 
-				listData.value.docs = docs
+				listData.value.docs = sortDocs(docs)
 			}
 		}
 	})
@@ -335,7 +335,6 @@ const handleTapCardActionItem = async (
 			.then(async () => {
 				try {
 					await deleteFile(id)
-					// fetchFiles(parentId.value)
 					const docs = listData.value.docs || []
 					const index = docs.findIndex((doc: Storage) => doc.id === id)
 
