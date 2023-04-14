@@ -263,7 +263,7 @@ const handleRenameFile = (name: string) => {
 
 	if (!doc) return
 
-	const fullName = `${name}${doc.extName}`
+	const fullName = doc.extName ? `${name}${doc.extName}` : name
 
 	updateFile(fileId, {
 		name: fullName,
