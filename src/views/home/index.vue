@@ -77,6 +77,7 @@
 						:on-close="handleCloseUploadStatus"
 					/>
 				</div>
+				<VideoPlayer></VideoPlayer>
 			</div>
 		</div>
 	</div>
@@ -88,6 +89,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, UploadProps, UploadFiles, ElNotification } from 'element-plus'
 import emitter from '@/utils/emitter'
 import Card from '@/components/StorageCard/index.vue'
+import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
 import Header from './widgets/Header/index.vue'
