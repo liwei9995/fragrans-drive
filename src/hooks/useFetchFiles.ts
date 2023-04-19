@@ -23,7 +23,8 @@ export const convertItem = (item: Storage) => ({
 	desc: getDesc(item.updatedAt),
 	thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
 	thumbPlaceholder: getThumb(item.extName, item.type),
-	previewSrcList: item.url ? [item.url] : []
+	previewSrcList: !item.mimeType?.startsWith('video/') && item.url ? [item.url] : [],
+	videoUrl: item.mimeType?.startsWith('video/') ? item.url : ''
 })
 
 const dateToNumber = (date: string) => +new Date(date)
