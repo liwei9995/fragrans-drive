@@ -25,13 +25,16 @@
 								:id="item.id"
 								:title="item.name"
 								:desc="item.desc"
-								:mimeType="item.mimeType"
+								:mime-type="item.mimeType"
 								:type="item.type"
-								:thumbUrl="item.thumb"
-								:thumbPlaceholder="item.thumbPlaceholder"
+								:ext-name="item.extName"
+								:thumb-url="item.thumb"
+								:thumb-placeholder="item.thumbPlaceholder"
 								:preview-src-list="item.previewSrcList"
+								:video-url="item.videoUrl"
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
+								:preview-video="handlePreviewVideo"
 							/>
 							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" isEmpty />
 						</div>
@@ -77,6 +80,7 @@
 					/>
 				</div>
 			</div>
+			<VideoPlayer v-if="videoPlayerVisible" :src="videoSrc" :close="handleCloseVideoPlayer" />
 		</div>
 	</div>
 </template>
@@ -87,6 +91,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, UploadProps, UploadFiles, ElNotification } from 'element-plus'
 import emitter from '@/utils/emitter'
 import Card from '@/components/StorageCard/index.vue'
+import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
 import Header from './widgets/Header/index.vue'
@@ -97,7 +102,7 @@ import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { UploadEventEnum } from '@/enums/events'
 import { getDownloadUrl, deleteFile, updateFile, getPath } from '@/api/modules/storage'
-import { useFetchFiles } from '@/hooks/useFetchFiles'
+import { useFetchFiles, convertItem, sortDocs } from '@/hooks/useFetchFiles'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 
 type BreadcrumbItem = {
@@ -110,6 +115,8 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const moveDialogFormVisible = ref(false)
+const videoPlayerVisible = ref(false)
+const videoSrc = ref('')
 const needToMoveId = ref('root')
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
@@ -228,7 +235,19 @@ const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
 
 const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
 
-const handleMoved = () => fetchFiles(parentId.value)
+const handleMoved = (id: string, parentId: string) => {
+	const paramId = (route.params.id as string) || 'root'
+
+	if (parentId === paramId) return
+
+	const docs = listData.value.docs || []
+	const index = docs.findIndex((doc: Storage) => doc.id == id)
+
+	if (index !== -1) {
+		docs.splice(index, 1)
+		listData.value.docs = docs
+	}
+}
 
 const handleFolderCreated = (parentId: string) => {
 	if (parentId === (route.params.id || 'root')) {
@@ -250,21 +269,41 @@ const handleRenameFile = (name: string) => {
 
 	if (!doc) return
 
+	const fullName = doc.extName ? `${name}${doc.extName}` : name
+
 	updateFile(fileId, {
-		name,
+		name: fullName,
 		parentId: doc?.parentId || 'root',
 		type: doc?.type
-	}).then(({ exist }) => {
+	}).then(({ exist, _id: id, name, baseName, extName, createdAt, updatedAt }) => {
 		if (exist) {
 			ElMessage.error('已存在同名文件，请修改名称')
 		} else {
 			renameDialogFormVisible.value = false
+
+			const docs = listData.value.docs || []
+			const index = docs.findIndex((doc: Storage) => doc.id === id)
+
+			if (index !== -1) {
+				docs[index] = convertItem({
+					...docs[index],
+					id,
+					name,
+					baseName,
+					extName,
+					createdAt,
+					updatedAt
+				})
+
+				listData.value.docs = sortDocs(docs)
+			}
 		}
-		fetchFiles(parentId.value)
 	})
 }
 
 const handleCloseUploadStatus = () => (uploadedFiles.value = [])
+
+const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
 
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
@@ -290,7 +329,8 @@ const handleTapCardActionItem = async (
 	id: string,
 	name: string,
 	type?: string,
-	thumb?: string
+	thumb?: string,
+	extName = ''
 ) => {
 	if (command === 'download') {
 		download(id)
@@ -301,20 +341,34 @@ const handleTapCardActionItem = async (
 			type: 'warning'
 		})
 			.then(async () => {
-				await deleteFile(id)
-				fetchFiles(parentId.value)
-				ElMessage.success('文件删除成功')
+				try {
+					await deleteFile(id)
+					const docs = listData.value.docs || []
+					const index = docs.findIndex((doc: Storage) => doc.id === id)
+
+					if (index !== -1) {
+						docs.splice(index, 1)
+					}
+					ElMessage.success('文件删除成功')
+				} catch {
+					ElMessage.error('文件删除失败，请重试')
+				}
 			})
 			.catch(() => {})
 	} else if (command === 'rename') {
 		renameDialogFormVisible.value = true
 		needToRenameThumb.value = thumb || ''
 		needToRenameFileId.value = id
-		needToRenameFileName.value = name
+		needToRenameFileName.value = name.replace(extName, '')
 	} else if (command === 'move') {
 		needToMoveId.value = id
 		moveDialogFormVisible.value = true
 	}
+}
+
+const handlePreviewVideo = (videoUrl: string) => {
+	videoPlayerVisible.value = true
+	videoSrc.value = videoUrl
 }
 
 const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {

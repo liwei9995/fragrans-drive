@@ -1,7 +1,7 @@
 <template>
 	<el-dialog class="move-dialog-wrapper" :title="title" v-model="dialogFormVisible" @close="handleClose">
 		<Breadcrumb :breadcrumb-items="breadcrumbItems" :autoNav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
-		<div class="list" v-infinite-scroll="load">
+		<div class="list" v-infinite-scroll="load" :infinite-scroll-disabled="!dialogFormVisible">
 			<FolderCreation
 				v-if="createFolderItemVisible"
 				:parentId="id"
@@ -51,7 +51,7 @@ interface MoveProps {
 	parentId?: string
 	title: string
 	onClose?: () => void
-	onMoved?: () => void
+	onMoved?: (id: string, parentId: string) => void
 	onFolderCreated?: (parentId: string) => void
 }
 
@@ -147,7 +147,7 @@ const handleMove = () => {
 			dialogFormVisible.value = false
 			ElMessage.closeAll()
 			ElMessage.success('移动成功')
-			props.onMoved && props.onMoved()
+			props.onMoved && props.onMoved(props.id, id.value)
 		})
 		.catch(() => {
 			ElMessage.closeAll()
