@@ -3,7 +3,7 @@
 # 定义变量
 REGISTRY_NAME="docker.oyiyio.com"
 CONTAINER_NAME="yi-drive"
-CONTAINER_PORT=8060
+CONTAINER_PORT=8061
 CONTAINER_INNER_PORT=80
 COMMIT_SHA=$(git rev-parse --short HEAD)
 

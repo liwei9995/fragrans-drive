@@ -3,7 +3,7 @@
 # 定义变量
 REGISTRY_NAME="docker.oyiyio.com"
 CONTAINER_NAME="yi-drive"
-CONTAINER_PORT=8060
+CONTAINER_PORT=8061
 CONTAINER_INNER_PORT=80
 COMMIT_SHA=$(git rev-parse --short HEAD)
 
@@ -24,6 +24,8 @@ docker logout
 
 # 删除已经生成或正在运行的容器
 cid=$(docker ps -a | grep "$CONTAINER_NAME" | awk '{print $1}')
+
+echo 'The container id is: '$cid''
 
 if [ "$cid" != "" ]; then
   docker rm -f $cid
