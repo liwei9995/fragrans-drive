@@ -25,14 +25,16 @@
 								:id="item.id"
 								:title="item.name"
 								:desc="item.desc"
-								:mine-type="item.mimeType"
+								:mime-type="item.mimeType"
 								:type="item.type"
 								:ext-name="item.extName"
 								:thumb-url="item.thumb"
 								:thumb-placeholder="item.thumbPlaceholder"
 								:preview-src-list="item.previewSrcList"
+								:video-url="item.videoUrl"
 								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
 								:tap-action-item="handleTapCardActionItem"
+								:preview-video="handlePreviewVideo"
 							/>
 							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" isEmpty />
 						</div>
@@ -77,8 +79,8 @@
 						:on-close="handleCloseUploadStatus"
 					/>
 				</div>
-				<VideoPlayer></VideoPlayer>
 			</div>
+			<VideoPlayer v-if="videoPlayerVisible" :src="videoSrc" :close="handleCloseVideoPlayer" />
 		</div>
 	</div>
 </template>
@@ -113,6 +115,8 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const moveDialogFormVisible = ref(false)
+const videoPlayerVisible = ref(false)
+const videoSrc = ref('')
 const needToMoveId = ref('root')
 const uploadStatusRef = ref()
 const uploadPercentage = ref(0)
@@ -299,6 +303,8 @@ const handleRenameFile = (name: string) => {
 
 const handleCloseUploadStatus = () => (uploadedFiles.value = [])
 
+const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
+
 const handleTapActionItem = (command: string | number | object) => {
 	if (command === 'folder') {
 		folderDialogFormVisible.value = true
@@ -358,6 +364,11 @@ const handleTapCardActionItem = async (
 		needToMoveId.value = id
 		moveDialogFormVisible.value = true
 	}
+}
+
+const handlePreviewVideo = (videoUrl: string) => {
+	videoPlayerVisible.value = true
+	videoSrc.value = videoUrl
 }
 
 const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {

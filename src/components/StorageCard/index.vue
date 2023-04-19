@@ -24,7 +24,7 @@
 						</el-dropdown>
 					</div>
 					<div class="node-card">
-						<div class="cover">
+						<div class="cover" @click="handleClickIcon">
 							<div :class="coverCls">
 								<div class="file-icon" :class="{ thumb: !showPlaceholder && previewSrcList.length > 0 }">
 									<el-image
@@ -84,6 +84,7 @@ interface StorageCardProps {
 	previewSrcList?: string[]
 	thumbUrl?: string
 	thumbPlaceholder?: string
+	videoUrl?: string
 	isEmpty?: boolean
 	actionItems?: Partial<ActionItem>[]
 	tapActionItem?: (
@@ -94,6 +95,7 @@ interface StorageCardProps {
 		thumbUrl?: string,
 		extName?: string
 	) => void
+	previewVideo?: (videoUrl: string) => void
 }
 
 const props = withDefaults(defineProps<StorageCardProps>(), {
@@ -125,6 +127,7 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
 	previewSrcList: () => [],
 	thumbUrl: 'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
 	thumbPlaceholder: '',
+	videoUrl: '',
 	isEmpty: false
 })
 
@@ -136,6 +139,12 @@ const handleCommand = (command: string | number | object) =>
 const handleClickCard = () => {
 	if (props.type === 'folder') {
 		router.push(`${HOME_URL}/${props.id}`)
+	}
+}
+
+const handleClickIcon = () => {
+	if (props.mimeType?.startsWith('video/')) {
+		props.previewVideo && props.previewVideo(props.videoUrl)
 	}
 }
 

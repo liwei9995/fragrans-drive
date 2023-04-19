@@ -1,24 +1,36 @@
 <template>
 	<div class="video-player-wrapper">
-		<videoPlay
-			:width="width"
-			:height="height"
-			:color="color"
-			:title="title"
-			:muted="muted"
-			:webFullScreen="webFullScreen"
-			:autoPlay="autoPlay"
-			:loop="loop"
-			:volume="volume"
-			:control="control"
-			:src="src"
-		/>
+		<div class="video-player-mask" />
+		<div class="video-player-close-btn" @click="handleClose">
+			<el-icon circle size="24">
+				<Close />
+			</el-icon>
+		</div>
+		<div class="video-wrapper">
+			<div class="inner-wrapper">
+				<videoPlay
+					:width="width"
+					:height="height"
+					:color="color"
+					:title="title"
+					:muted="muted"
+					:webFullScreen="webFullScreen"
+					:autoPlay="autoPlay"
+					:loop="loop"
+					:volume="volume"
+					:control="control"
+					:src="src"
+				/>
+			</div>
+		</div>
 	</div>
 </template>
 
 <script setup lang="ts" name="video-player">
+import { onMounted } from 'vue'
 import 'vue3-video-play/dist/style.css'
 import { videoPlay } from 'vue3-video-play'
+import { Close } from '@element-plus/icons-vue'
 
 interface VideoPlayerProps {
 	show?: boolean
@@ -33,13 +45,28 @@ interface VideoPlayerProps {
 	volume?: number
 	control?: boolean
 	src?: string
+	close?: () => void
 }
 
-withDefaults(defineProps<VideoPlayerProps>(), {
-	width: '800px',
-	height: '450px',
-	src: 'https://api.oyiyio.com/drive/v1/storage/64356e688c080f832f828421?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2MmUxNWVmZmRiNWVlOTJjZDNjNTJjNWQiLCJpYXQiOjE2ODE4MzUwMDAsImV4cCI6MTY4MTgzNTkwMH0.o-P42heNlStaJqmyfQoK8hO8BAKkkf0ppqCQnW8FcH'
+const props = withDefaults(defineProps<VideoPlayerProps>(), {
+	width: '100%',
+	height: '100%',
+	control: true,
+	src: ''
 })
+
+onMounted(() => {
+	// 监听esc事件
+	document.onkeydown = (e: any) => {
+		e = window.event || e
+
+		if (e.code === 'Escape' || e.code === 'Esc') {
+			props.close && props.close()
+		}
+	}
+})
+
+const handleClose = () => props.close && props.close()
 </script>
 
 <style scoped lang="scss">
