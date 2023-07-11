@@ -2,7 +2,7 @@
 FROM node:18-alpine as base
 
 LABEL web.maintainer=alex.li@oyiyio.com \
-  web.name=fragrans-storage \
+  web.name=fragrans-drive \
   web.version=0.0.9
 
 RUN npm i -g pnpm
