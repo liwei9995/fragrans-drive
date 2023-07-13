@@ -1,20 +1,71 @@
-# Vue 3 + TypeScript + Vite
+<p align="center">
+  <a href="https://www.oyiyio.com/" rel="noopener" target="_blank">
+    <img width="150" src="./public/logo.svg" alt="fragrans" />
+  </a>
+</p>
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+<h1 align="center">Fragrans Drive</h1>
 
-<video width="640" height="480" controls>
-  <source src="./public/fragrans.mp4" type="video/mp4">
-</video>
+一款基于 [Vue 3.x](https://vuejs.org/guide/introduction.html) + [Element UI](https://element-plus.org/zh-CN/) + [Pina](https://pinia.vuejs.org) + [TypeScript](https://www.typescriptlang.org/) 实现的可私有部署的个人云盘。
 
-## Recommended IDE Setup
+> Fragrans Drive 目前仍在开发中，部分功能将持续完善。
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+## 体验
 
-## Type Support For `.vue` Imports in TS
+### 登录
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+<p align="center">
+  <img src="./public/login.png" alt="login" />
+</p>
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+### 列表
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+<p align="center">
+  <img src="./public/home.png" alt="home" />
+</p>
+
+<p align="center">
+  <img src="./public/blank.png" alt="blank" />
+</p>
+
+### 移动
+
+<p align="center">
+  <img src="./public/move.png" alt="move" />
+</p>
+
+### 预览
+
+<p align="center">
+  <img src="./public/preview.png" alt="preview" />
+</p>
+
+可观看 [云盘介绍视频](https://www.youtube.com/embed/Uzeur9v44LE) 了解基本功能。
+
+## 安装
+
+推荐使用 **pnpm**
+
+```js
+pnpm install
+```
+
+## 开发
+
+```js
+pnpm run dev
+```
+
+## 打包
+
+```js
+pnpm run build
+```
+
+## API
+
+本项目仅为云盘的前端部分，依赖的 **后端 API** 需要参照 [fragrans](https://github.com/liwei9995/fragrans) 项目进行部署。
+
+## License
+
+Fragrans Drive is [MIT licensed](LICENSE).
