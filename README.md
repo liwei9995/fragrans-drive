@@ -42,6 +42,10 @@
 
 可观看 [云盘介绍视频](https://www.youtube.com/embed/Uzeur9v44LE) 了解基本功能。
 
+## 准备
+
+本项目仅为云盘的前端部分，依赖的 **后端 API** 需要参照 [fragrans](https://github.com/liwei9995/fragrans) 项目进行部署。
+
 ## 安装
 
 推荐使用 **pnpm**
@@ -62,9 +66,11 @@ pnpm run dev
 pnpm run build
 ```
 
-## API
+## 部署
 
-本项目仅为云盘的前端部分，依赖的 **后端 API** 需要参照 [fragrans](https://github.com/liwei9995/fragrans) 项目进行部署。
+```bash
+bash < deploy/helper.sh
+```
 
 ## License
 
