@@ -44,7 +44,7 @@
 
 ## 准备
 
-本项目仅为云盘的前端部分，依赖的 **后端 API** 需要参照 [fragrans](https://github.com/liwei9995/fragrans) 项目进行部署。
+本项目仅为云盘的前端部分，依赖的 **后端 API** 需要参照 [**Fragrans**](https://github.com/liwei9995/fragrans) 项目进行部署。
 
 ## 安装
 
@@ -67,6 +67,8 @@ pnpm run build
 ```
 
 ## 部署
+
+本项目基于 [**Docker**](https://www.docker.com/) 进行部署，请确保 [**Docker**](https://www.docker.com/) 已正确安装。
 
 ```bash
 bash < deploy/helper.sh
