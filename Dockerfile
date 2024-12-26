@@ -7,18 +7,13 @@ LABEL web.maintainer=alex.li@oyiyio.com \
 
 FROM base as build-stage
 
-# Run as an unprivileged user.
-RUN addgroup -S oyiyio && adduser -S -G oyiyio oyiyio
-RUN mkdir /app && chown oyiyio /app
-USER oyiyio
-
 WORKDIR /app
-COPY --chown=oyiyio:oyiyio package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 RUN npm config set registry https://registry.npmmirror.com
 RUN npm install -g pnpm
 RUN pnpm config set registry https://registry.npmmirror.com
 RUN pnpm install --verbose
-COPY --chown=oyiyio:oyiyio . .
+COPY . .
 RUN pnpm build:prod
 
 # production stage
