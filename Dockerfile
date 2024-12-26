@@ -1,11 +1,13 @@
 # build stage
-FROM node:18-alpine as base
+FROM node:20-alpine as base
 
 LABEL web.maintainer=alex.li@oyiyio.com \
   web.name=fragrans-storage \
   web.version=0.0.9
 
-RUN npm i -g pnpm
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm install -g pnpm
+RUN pnpm config set registry https://registry.npmmirror.com
 
 FROM base as build-stage
 
