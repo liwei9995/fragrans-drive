@@ -5,10 +5,6 @@ LABEL web.maintainer=alex.li@oyiyio.com \
   web.name=fragrans-storage \
   web.version=0.0.9
 
-RUN npm config set registry https://registry.npmmirror.com
-RUN npm install -g pnpm
-RUN pnpm config set registry https://registry.npmmirror.com
-
 FROM base as build-stage
 
 # Run as an unprivileged user.
@@ -18,6 +14,9 @@ USER oyiyio
 
 WORKDIR /app
 COPY --chown=oyiyio:oyiyio package.json pnpm-lock.yaml ./
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm install -g pnpm
+RUN pnpm config set registry https://registry.npmmirror.com
 RUN pnpm install --verbose
 COPY --chown=oyiyio:oyiyio . .
 RUN pnpm build:prod
