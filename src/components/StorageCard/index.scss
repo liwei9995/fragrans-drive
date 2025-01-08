@@ -36,7 +36,10 @@
 					background-color: rgb(255 255 255);
 					border-radius: 5px;
 					opacity: 0;
-					transition: opacity 0.3s ease, color 0.3s ease, background-color 0.3s ease;
+					transition:
+						opacity 0.3s ease,
+						color 0.3s ease,
+						background-color 0.3s ease;
 
 					&.show {
 						opacity: 1;
@@ -141,12 +144,12 @@
 							overflow: hidden;
 							font-size: 14px;
 							line-height: 1.5;
-							color: #222222;
+							color: #222;
 							text-align: center;
 							text-overflow: ellipsis;
+							-webkit-line-clamp: 2;
 							overflow-wrap: break-word;
 							transition: color 0.3s ease;
-							-webkit-line-clamp: 2;
 							-webkit-box-orient: vertical;
 						}
 
@@ -168,21 +171,21 @@
 	}
 }
 
-@media (max-width: 960px) {
+@media (width <= 960px) {
 	.card-wrapper {
 		width: 140px;
 		height: 180px;
 	}
 }
 
-@media (max-width: 767px) {
+@media (width <= 767px) {
 	.card-wrapper {
 		width: 140px;
 		height: 180px;
 	}
 }
 
-@media (max-width: 576px) {
+@media (width <= 576px) {
 	.card-wrapper {
 		width: 100px;
 		height: 180px;
@@ -234,7 +237,7 @@
 	}
 }
 
-@media (max-width: 370px) {
+@media (width <= 370px) {
 	.card-wrapper {
 		width: 100px;
 		height: 180px;

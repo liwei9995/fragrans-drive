@@ -1,26 +1,5 @@
-<template>
-	<div v-show="visible" class="upload-status-wrapper">
-		<div class="upload-status">
-			<el-icon :size="24" :class="type">
-				<component :is="icon" />
-			</el-icon>
-			<h2 class="title" v-text="title" />
-			<el-icon v-if="showClose" class="close-btn" @click.stop="close">
-				<Close />
-			</el-icon>
-		</div>
-		<el-progress
-			v-if="type === 'uploading'"
-			class="progress"
-			:percentage="uploadPercentage"
-			:stroke-width="4"
-			:show-text="false"
-		/>
-	</div>
-</template>
-
 <script setup lang="ts" name="upload-status">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { CircleCloseFilled, InfoFilled, SuccessFilled, UploadFilled, WarningFilled } from '@element-plus/icons-vue'
 
 interface UploadStatusProps {
@@ -65,6 +44,27 @@ defineExpose({
 })
 </script>
 
+<template>
+	<div v-show="visible" class="upload-status-wrapper">
+		<div class="upload-status">
+			<el-icon :size="24" :class="type">
+				<component :is="icon" />
+			</el-icon>
+			<h2 class="title" v-text="title" />
+			<el-icon v-if="showClose" class="close-btn" @click.stop="close">
+				<Close />
+			</el-icon>
+		</div>
+		<el-progress
+			v-if="type === 'uploading'"
+			class="progress"
+			:percentage="uploadPercentage"
+			:stroke-width="4"
+			:show-text="false"
+		/>
+	</div>
+</template>
+
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

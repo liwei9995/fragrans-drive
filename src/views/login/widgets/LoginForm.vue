@@ -1,53 +1,7 @@
-<template>
-	<div class="login-form-wrapper">
-		<div class="login-form">
-			<h1>Log in</h1>
-			<small>Sign in if you already have an account.</small>
-			<span>
-				<el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" size="large">
-					<el-form-item prop="username">
-						<el-input v-model="loginForm.username" placeholder="Email">
-							<template #prefix>
-								<el-icon class="el-input__icon"><user /></el-icon>
-							</template>
-						</el-input>
-					</el-form-item>
-					<el-form-item prop="password">
-						<el-input
-							type="password"
-							v-model="loginForm.password"
-							placeholder="Password"
-							show-password
-							autocomplete="new-password"
-						>
-							<template #prefix>
-								<el-icon class="el-input__icon"><lock /></el-icon>
-							</template>
-						</el-input>
-					</el-form-item>
-				</el-form>
-				<div class="login-btn">
-					<el-button
-						class="login"
-						round
-						@click="login(loginFormRef)"
-						size="large"
-						type="primary"
-						:disabled="loading"
-						:loading="loading"
-					>
-						Sign in
-					</el-button>
-				</div>
-			</span>
-		</div>
-	</div>
-</template>
-
 <script setup lang="ts" name="login">
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { Login } from '@/api/interface'
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { Login } from '@/api/interface'
 import type { ElForm } from 'element-plus'
 import { authLogin } from '@/api/modules/user'
 import { HOME_URL } from '@/config/config'
@@ -120,12 +74,59 @@ onMounted(() => {
 })
 </script>
 
+<template>
+	<div class="login-form-wrapper">
+		<div class="login-form">
+			<h1>Log in</h1>
+			<small>Sign in if you already have an account.</small>
+			<span>
+				<el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" size="large">
+					<el-form-item prop="username">
+						<el-input v-model="loginForm.username" placeholder="Email">
+							<template #prefix>
+								<el-icon class="el-input__icon"><user /></el-icon>
+							</template>
+						</el-input>
+					</el-form-item>
+					<el-form-item prop="password">
+						<el-input
+							v-model="loginForm.password"
+							type="password"
+							placeholder="Password"
+							show-password
+							autocomplete="new-password"
+						>
+							<template #prefix>
+								<el-icon class="el-input__icon"><lock /></el-icon>
+							</template>
+						</el-input>
+					</el-form-item>
+				</el-form>
+				<div class="login-btn">
+					<el-button
+						class="login"
+						round
+						size="large"
+						type="primary"
+						:disabled="loading"
+						:loading="loading"
+						@click="login(loginFormRef)"
+					>
+						Sign in
+					</el-button>
+				</div>
+			</span>
+		</div>
+	</div>
+</template>
+
 <style scoped lang="scss">
 .login-form-wrapper {
 	padding: 48px 44px;
-	background: #ffffff;
+	background: #fff;
 	border-radius: 21px;
-	box-shadow: inset 0 0 0 var(--border-width, 0) var(--border-color, transparent),
+	box-shadow:
+		inset 0 0 0 var(--border-width, 0) var(--border-color, transparent),
 		0 var(--shadow-y, 30px) var(--shadow-blur, 130px) 0 var(--shadow, var(--c-shadow));
 
 	.login-form {
@@ -145,6 +146,7 @@ onMounted(() => {
 		}
 
 		.login-btn {
+
 			.login {
 				width: 100%;
 			}
@@ -152,11 +154,13 @@ onMounted(() => {
 	}
 }
 
-@media (max-width: 767px) {
+@media (width <= 767px) {
+
 	.login-form-wrapper {
 		padding: 24px;
 
 		.login-form {
+
 			h1 {
 				font-size: 18px;
 				line-height: 28px;
@@ -169,9 +173,12 @@ onMounted(() => {
 	}
 }
 
-@media (min-width: 768px) {
+@media (width >= 768px) {
+
 	.login-form-wrapper {
+
 		.login-form {
+
 			h1 {
 				font-size: 28px;
 				line-height: 28px;

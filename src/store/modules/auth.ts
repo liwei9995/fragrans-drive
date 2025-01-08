@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { AuthState } from '../interface'
+import type { AuthState } from '../interface'
 import piniaPersistConfig from '@/config/piniaPersist'
 
 // AuthStore

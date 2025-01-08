@@ -1,30 +1,5 @@
-<template>
-	<template v-if="isUpload">
-		<Upload
-			multiple
-			:show-file-list="false"
-			:limit="limit"
-			:on-change="onUploadChange"
-			:on-exceed="onUploadExceed"
-			:on-progress="onUploadProgress"
-			:before-upload="beforeUpload"
-		>
-			<template #trigger>
-				<div class="empty-item-wrapper" @click="handleTap">
-					<span>{{ description }}</span>
-					<el-image class="icon" :src="icon" />
-				</div>
-			</template>
-		</Upload>
-	</template>
-	<div v-else class="empty-item-wrapper" @click.stop="handleTap">
-		<span>{{ description }}</span>
-		<el-image class="icon" :src="icon" />
-	</div>
-</template>
-
 <script setup lang="ts" name="empty-item">
-import { UploadProps } from 'element-plus'
+import type { UploadProps } from 'element-plus'
 import Upload from '../../Upload/index.vue'
 
 interface ItemProps {
@@ -50,6 +25,31 @@ const props = withDefaults(defineProps<ItemProps>(), {
 const handleTap = () => props.tapItem && props.tapItem(props.id)
 </script>
 
+<template>
+	<template v-if="isUpload">
+		<Upload
+			multiple
+			:show-file-list="false"
+			:limit="limit"
+			:on-change="onUploadChange"
+			:on-exceed="onUploadExceed"
+			:on-progress="onUploadProgress"
+			:before-upload="beforeUpload"
+		>
+			<template #trigger>
+				<div class="empty-item-wrapper" @click="handleTap">
+					<span>{{ description }}</span>
+					<el-image class="icon" :src="icon" />
+				</div>
+			</template>
+		</Upload>
+	</template>
+	<div v-else class="empty-item-wrapper" @click.stop="handleTap">
+		<span>{{ description }}</span>
+		<el-image class="icon" :src="icon" />
+	</div>
+</template>
+
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

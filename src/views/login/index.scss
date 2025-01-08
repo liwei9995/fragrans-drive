@@ -1,9 +1,6 @@
 .login {
 	position: relative;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
+	inset: 0;
 	height: 100vh;
 	background-color: #ebedf0;
 
@@ -38,7 +35,7 @@
 	}
 }
 
-@media (max-width: 767px) {
+@media (width <= 767px) {
 	.login {
 		.login-wrapper {
 			display: flex;
@@ -57,7 +54,7 @@
 	}
 }
 
-@media (min-width: 768px) {
+@media (width >= 768px) {
 	.login {
 		.login-wrapper {
 			position: fixed;

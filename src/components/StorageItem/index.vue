@@ -1,14 +1,3 @@
-<template>
-	<div class="storage-item-wrapper" :class="{ disabled: disabled }" @click="handleClick">
-		<el-image class="icon" :src="thumbUrl" fit="contain">
-			<template #error>
-				<div class="icon-placeholder" :style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }" />
-			</template>
-		</el-image>
-		<span>{{ name }}</span>
-	</div>
-</template>
-
 <script setup lang="ts" name="storage-item">
 interface StorageItemProps {
 	id: string
@@ -31,6 +20,17 @@ const handleClick = () => {
 }
 </script>
 
+<template>
+	<div class="storage-item-wrapper" :class="{ disabled: disabled }" @click="handleClick">
+		<el-image class="icon" :src="thumbUrl" fit="contain">
+			<template #error>
+				<div class="icon-placeholder" :style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }" />
+			</template>
+		</el-image>
+		<span>{{ name }}</span>
+	</div>
+</template>
+
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

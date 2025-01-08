@@ -14,8 +14,8 @@ const getDesc = (dateTime: string) => {
 	return dtDay === today
 		? `今天 ${format(dt, 'HH:mm')}`
 		: dtYear === year
-		? format(dt, 'MM/dd HH:mm')
-		: format(dt, 'yyyy/MM/dd HH:mm')
+			? format(dt, 'MM/dd HH:mm')
+			: format(dt, 'yyyy/MM/dd HH:mm')
 }
 
 export const convertItem = (item: Storage) => ({

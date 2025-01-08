@@ -1,23 +1,5 @@
-<template>
-	<el-dialog class="dialog-wrapper" width="340px" :title="title" v-model="dialogFormVisible" @close="handleClose">
-		<el-row justify="center">
-			<div class="thumb-wrapper">
-				<el-image style="width: 115px; height: 90px" :src="thumbUrl" class="thumb" fit="contain" />
-			</div>
-		</el-row>
-		<el-row justify="center">
-			<el-input v-model="inputValue" autofocus maxlength="30" />
-		</el-row>
-		<el-row justify="end">
-			<div class="dialog-footer">
-				<el-button type="primary" @click="handleClick" :disabled="!inputValue.trim()">确定</el-button>
-			</div>
-		</el-row>
-	</el-dialog>
-</template>
-
 <script setup lang="ts" name="form-dialog">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 
 interface DialogProps {
 	title: string
@@ -55,6 +37,24 @@ onMounted(() => {
 })
 </script>
 
+<template>
+	<el-dialog v-model="dialogFormVisible" class="dialog-wrapper" width="340px" :title="title" @close="handleClose">
+		<el-row justify="center">
+			<div class="thumb-wrapper">
+				<el-image style="width: 115px; height: 90px" :src="thumbUrl" class="thumb" fit="contain" />
+			</div>
+		</el-row>
+		<el-row justify="center">
+			<el-input v-model="inputValue" autofocus maxlength="30" />
+		</el-row>
+		<el-row justify="end">
+			<div class="dialog-footer">
+				<el-button type="primary" :disabled="!inputValue.trim()" @click="handleClick"> 确定 </el-button>
+			</div>
+		</el-row>
+	</el-dialog>
+</template>
+
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

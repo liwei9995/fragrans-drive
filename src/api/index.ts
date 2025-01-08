@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
+import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
 import { AxiosCanceler } from './helper/axiosCancel'
 import { ResultEnum } from '@/enums/httpEnum'
 import { checkStatus } from './helper/checkStatus'
@@ -67,7 +68,7 @@ class RequestHttp {
 				// * 在请求结束后，移除本次请求，并关闭请求 loading
 				axiosCanceler.removePending(config)
 				// * 登录失败（code == 401）
-				if (statusCode == ResultEnum.UNAUTHORIZED) {
+				if (statusCode === ResultEnum.UNAUTHORIZED) {
 					ElMessage.error(data.message)
 					globalStore.setToken('')
 					router.replace({

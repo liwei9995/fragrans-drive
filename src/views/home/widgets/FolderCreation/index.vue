@@ -1,22 +1,8 @@
-<template>
-	<div class="folder-creation-wrapper">
-		<el-image class="icon" :src="thumbUrl" fit="contain" />
-		<el-input class="folder-name" v-model="folderName" autofocus maxlength="30" />
-		<div class="actions">
-			<el-icon circle size="20" class="primary" @click="handleCreateFolder">
-				<SuccessFilled />
-			</el-icon>
-			<el-icon circle size="20" class="info" @click="handleClose">
-				<CircleCloseFilled />
-			</el-icon>
-		</div>
-	</div>
-</template>
-
 <script setup lang="ts" name="storage-item">
 import { ref } from 'vue'
-import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue'
-import { useCreateFolder, Item } from '@/hooks/useCreateFolder'
+import { CircleCloseFilled, SuccessFilled } from '@element-plus/icons-vue'
+import type { Item } from '@/hooks/useCreateFolder'
+import { useCreateFolder } from '@/hooks/useCreateFolder'
 
 interface FolderCreationProps {
 	parentId?: string
@@ -38,6 +24,21 @@ const handleCreateFolder = () =>
 const handleClose = () => props.close && props.close()
 </script>
 
+<template>
+	<div class="folder-creation-wrapper">
+		<el-image class="icon" :src="thumbUrl" fit="contain" />
+		<el-input v-model="folderName" class="folder-name" autofocus maxlength="30" />
+		<div class="actions">
+			<el-icon circle size="20" class="primary" @click="handleCreateFolder">
+				<SuccessFilled />
+			</el-icon>
+			<el-icon circle size="20" class="info" @click="handleClose">
+				<CircleCloseFilled />
+			</el-icon>
+		</div>
+	</div>
+</template>
+
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

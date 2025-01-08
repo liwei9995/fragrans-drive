@@ -1,50 +1,13 @@
-<template>
-	<el-dialog class="move-dialog-wrapper" :title="title" v-model="dialogFormVisible" @close="handleClose">
-		<Breadcrumb :breadcrumb-items="breadcrumbItems" :autoNav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
-		<div class="list" v-infinite-scroll="load" :infinite-scroll-disabled="!dialogFormVisible">
-			<FolderCreation
-				v-if="createFolderItemVisible"
-				:parentId="id"
-				:close="handleCloseFolderCreationItem"
-				:success="handleCreateFolderSuccess"
-			/>
-			<StorageItem
-				v-for="item in listData?.docs"
-				:key="item.id"
-				:id="item.id"
-				:disabled="item.type !== 'folder'"
-				:name="item.name"
-				:thumbUrl="item.thumb"
-				:thumb-placeholder="item.thumbPlaceholder"
-				:tap="handleTapItem"
-			/>
-			<div class="empty" v-if="listData?.docs.length === 0 && !isFetching && !createFolderItemVisible">
-				<el-image
-					class="icon"
-					src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"
-				/>
-				<div>文件夹为空</div>
-			</div>
-		</div>
-		<div class="action">
-			<div class="create" @click="handleCreateFolder">新建文件夹</div>
-			<div class="buttons">
-				<el-button @click="handleCancel">取消</el-button>
-				<el-button type="primary" @click="handleMove">移动到此处</el-button>
-			</div>
-		</div>
-	</el-dialog>
-</template>
-
 <script setup lang="ts" name="move">
-import { ref, onBeforeMount, watch } from 'vue'
+import { onBeforeMount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import StorageItem from '@/components/StorageItem/index.vue'
-import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
+import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
+import Breadcrumb from '../Breadcrumb/index.vue'
 import FolderCreation from '../FolderCreation/index.vue'
 import { getPath, moveFile } from '@/api/modules/storage'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
-import { Item } from '@/hooks/useCreateFolder'
+import type { Item } from '@/hooks/useCreateFolder'
 
 interface MoveProps {
 	id?: string
@@ -156,6 +119,44 @@ const handleMove = () => {
 }
 </script>
 
+<template>
+	<el-dialog v-model="dialogFormVisible" class="move-dialog-wrapper" :title="title" @close="handleClose">
+		<Breadcrumb :breadcrumb-items="breadcrumbItems" :auto-nav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
+		<div v-infinite-scroll="load" class="list" :infinite-scroll-disabled="!dialogFormVisible">
+			<FolderCreation
+				v-if="createFolderItemVisible"
+				:parent-id="id"
+				:close="handleCloseFolderCreationItem"
+				:success="handleCreateFolderSuccess"
+			/>
+			<StorageItem
+				v-for="item in listData?.docs"
+				:id="item.id"
+				:key="item.id"
+				:disabled="item.type !== 'folder'"
+				:name="item.name"
+				:thumb-url="item.thumb"
+				:thumb-placeholder="item.thumbPlaceholder"
+				:tap="handleTapItem"
+			/>
+			<div v-if="listData?.docs.length === 0 && !isFetching && !createFolderItemVisible" class="empty">
+				<el-image
+					class="icon"
+					src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"
+				/>
+				<div>文件夹为空</div>
+			</div>
+		</div>
+		<div class="action">
+			<div class="create" @click="handleCreateFolder">新建文件夹</div>
+			<div class="buttons">
+				<el-button @click="handleCancel">取消</el-button>
+				<el-button type="primary" @click="handleMove"> 移动到此处 </el-button>
+			</div>
+		</div>
+	</el-dialog>
+</template>
+
 <style lang="scss">
-@import './index.scss';
+@use './index';
 </style>

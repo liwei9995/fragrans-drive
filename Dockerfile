@@ -3,7 +3,7 @@ FROM node:20-alpine as base
 
 LABEL web.maintainer=alex.li@oyiyio.com \
   web.name=fragrans-storage \
-  web.version=0.0.9
+  web.version=0.1.0
 
 FROM base as build-stage
 

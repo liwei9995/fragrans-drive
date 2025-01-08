@@ -26,7 +26,7 @@
 		height: 55px;
 		padding: 0 12px 0 24px;
 		white-space: nowrap;
-		background-color: #ffffff;
+		background-color: #fff;
 		border-bottom: 1px solid rgb(60 60 60 / 12%);
 
 		.header-container {
@@ -38,8 +38,8 @@
 			.header-title {
 				position: relative;
 				display: flex;
-				flex-direction: row;
 				flex-grow: 1;
+				flex-direction: row;
 				align-items: center;
 				height: 100%;
 				margin-right: 24px;
@@ -100,7 +100,7 @@
 	overflow: hidden;
 }
 
-@media (max-width: 767px) {
+@media (width <= 767px) {
 	.header {
 		position: relative;
 	}
@@ -129,18 +129,18 @@
 		display: block;
 		width: 64px;
 		height: 64px;
-		background-color: #ffffff;
+		background-color: #fff;
 		border-radius: 50%;
 	}
 }
 
-@media (min-width: 768px) {
+@media (width >= 768px) {
 	.navbar-wrapper {
 		padding: 0 12px 0 32px;
 	}
 }
 
-@media (min-width: 1280px) {
+@media (width >= 1280px) {
 	.navbar-wrapper {
 		padding: 0 32px;
 	}
