@@ -53,6 +53,7 @@ lint-test-job:   # This job also runs in the test stage.
     - corepack prepare pnpm@latest-10 --activate
     - pnpm config set store-dir .pnpm-store
   script:
+    - pnpm install # 安装依赖
     - pnpm lint:eslint
 
 deploy-job:      # This job runs in the deploy stage.
