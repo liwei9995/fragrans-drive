@@ -47,6 +47,7 @@ build-job:       # This job runs in the build stage, which runs first.
 
 lint-test-job:   # This job also runs in the test stage.
   stage: test    # It can run at the same time as unit-test-job (in parallel).
+  image: node:20-alpine
   before_script:
     - corepack enable
     - corepack prepare pnpm@latest-10 --activate
