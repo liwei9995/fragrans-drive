@@ -65,4 +65,5 @@ deploy-job:      # This job runs in the deploy stage.
     DOCKER_TLS_CERTDIR: "/certs"
   environment: production
   script:
-    - bash < deploy/ci.sh
+    - chmod +x ./deploy/ci.sh
+    - sh ./deploy/ci.sh
