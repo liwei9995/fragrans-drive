@@ -17,7 +17,7 @@ echo 'The docker image being deployed is: '$REGISTRY_NAME'/'$CONTAINER_NAME':'$B
 echo $DOCKER_REGISTRY_PASSWORD | docker login $REGISTRY_NAME -u $DOCKER_REGISTRY_USER --password-stdin
 
 # 从镜像仓库再次拉取 yi-drive 镜像
-docker pull $REGISTRY_NAME/$CONTAINER_NAME
+docker pull $REGISTRY_NAME/$CONTAINER_NAME:$BUILD_IMAGE_TAG
 
 # 登出 Docker Registry
 docker logout
@@ -25,7 +25,7 @@ docker logout
 # 删除已经生成或正在运行的容器
 cid=$(docker ps -a | grep "$CONTAINER_NAME" | awk '{print $1}')
 
-echo 'The container id is: '$cid''
+echo 'The id of the container that will be removed is: '$cid''
 
 if [ "$cid" != "" ]; then
   docker rm -f $cid
@@ -38,7 +38,7 @@ if [ "$(uname)" == "Darwin" ]; then
     -d \
     -p $CONTAINER_PORT:$CONTAINER_INNER_PORT \
     --restart=always \
-    $REGISTRY_NAME/$CONTAINER_NAME
+    $REGISTRY_NAME/$CONTAINER_NAME:$BUILD_IMAGE_TAG
 # GNU/Linux操作系统
 elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
   docker run --name $CONTAINER_NAME \
@@ -47,5 +47,5 @@ elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     --restart=always \
     -v /etc/localtime:/etc/localtime:ro \
     -v /etc/timezone:/etc/timezone \
-    $REGISTRY_NAME/$CONTAINER_NAME
+    $REGISTRY_NAME/$CONTAINER_NAME:$BUILD_IMAGE_TAG
 fi
