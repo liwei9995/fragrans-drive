@@ -1,27 +1,23 @@
 # build stage
-FROM node:18-alpine as base
+FROM node:20-alpine AS base
 
 LABEL web.maintainer=alex.li@oyiyio.com \
   web.name=fragrans-drive \
-  web.version=0.0.9
+  web.version=0.1.1
 
-RUN npm i -g pnpm
-
-FROM base as build-stage
-
-# Run as an unprivileged user.
-RUN addgroup -S oyiyio && adduser -S -G oyiyio oyiyio
-RUN mkdir /app && chown oyiyio /app
-USER oyiyio
+FROM base AS build-stage
 
 WORKDIR /app
-COPY --chown=oyiyio:oyiyio package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm install -g pnpm
+RUN pnpm config set registry https://registry.npmmirror.com
 RUN pnpm install --verbose
-COPY --chown=oyiyio:oyiyio . .
-RUN pnpm build
+COPY . .
+RUN pnpm build:prod
 
 # production stage
-FROM nginx as production-stage
+FROM nginx AS production-stage
 RUN mkdir /app
 COPY --from=build-stage /app/dist /app
 COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf

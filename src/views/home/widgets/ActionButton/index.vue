@@ -1,3 +1,38 @@
+<script setup lang="ts" name="action-button">
+import { ref } from 'vue'
+import type { UploadInstance, UploadProps } from 'element-plus'
+import Upload from '../Upload/index.vue'
+
+const uploadRef = ref<UploadInstance>()
+
+type ActionItem = {
+	id?: string
+	name: string
+	isUpload?: boolean
+}
+
+interface ActionButtonProps {
+	actionItems?: Partial<ActionItem>[]
+	uploadFileLimit?: number
+	iconSize?: number
+	tapActionItem?: (command: string | number | object) => void
+	onUploadChange?: UploadProps['onChange']
+	onUploadExceed?: UploadProps['onExceed']
+	onUploadProgress?: UploadProps['onProgress']
+	onUploadSuccess?: UploadProps['onSuccess']
+	onUploadError?: UploadProps['onError']
+	beforeUpload?: UploadProps['beforeUpload']
+}
+
+const props = withDefaults(defineProps<ActionButtonProps>(), {
+	uploadFileLimit: () => 10,
+	actionItems: () => [],
+	iconSize: () => 32
+})
+
+const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
+</script>
+
 <template>
 	<div class="action-button-wrapper">
 		<el-dropdown trigger="click" @command="handleCommand">
@@ -34,41 +69,6 @@
 	</div>
 </template>
 
-<script setup lang="ts" name="action-button">
-import { ref } from 'vue'
-import { UploadProps, UploadInstance } from 'element-plus'
-import Upload from '../Upload/index.vue'
-
-const uploadRef = ref<UploadInstance>()
-
-type ActionItem = {
-	id?: string
-	name: string
-	isUpload?: boolean
-}
-
-interface ActionButtonProps {
-	actionItems?: Partial<ActionItem>[]
-	uploadFileLimit?: number
-	iconSize?: number
-	tapActionItem?: (command: string | number | object) => void
-	onUploadChange?: UploadProps['onChange']
-	onUploadExceed?: UploadProps['onExceed']
-	onUploadProgress?: UploadProps['onProgress']
-	onUploadSuccess?: UploadProps['onSuccess']
-	onUploadError?: UploadProps['onError']
-	beforeUpload?: UploadProps['beforeUpload']
-}
-
-const props = withDefaults(defineProps<ActionButtonProps>(), {
-	uploadFileLimit: () => 10,
-	actionItems: () => [],
-	iconSize: () => 32
-})
-
-const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
-</script>
-
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

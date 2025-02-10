@@ -1,3 +1,53 @@
+<script setup lang="ts" name="header">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import type { UploadInstance, UploadProps } from 'element-plus'
+import { UserFilled } from '@element-plus/icons-vue'
+import { HOME_URL } from '@/config/config'
+import ActionButton from '../ActionButton/index.vue'
+import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
+import Breadcrumb from '../Breadcrumb/index.vue'
+import logo from '@/assets/logo.svg'
+
+const router = useRouter()
+const uploadRef = ref<UploadInstance>()
+
+type ActionItem = {
+	id?: string
+	name: string
+	isUpload?: boolean
+}
+
+interface HeaderProps {
+	avatar?: string
+	breadcrumbItems?: Partial<BreadcrumbItem>[]
+	actionItems?: Partial<ActionItem>[]
+	avatarActionItems?: Partial<ActionItem>[]
+	uploadFileLimit?: number
+	tapActionItem?: (command: string | number | object) => void
+	onUploadChange?: UploadProps['onChange']
+	onUploadExceed?: UploadProps['onExceed']
+	onUploadProgress?: UploadProps['onProgress']
+	onUploadSuccess?: UploadProps['onSuccess']
+	onUploadError?: UploadProps['onError']
+	beforeUpload?: UploadProps['beforeUpload']
+}
+
+const props = withDefaults(defineProps<HeaderProps>(), {
+	avatar: () => 'https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif?imageView2/1/w/80/h/80',
+	uploadFileLimit: () => 10,
+	breadcrumbItems: () => [],
+	actionItems: () => [],
+	avatarActionItems: () => []
+})
+
+const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
+
+const handleClickGoHome = () => router.push(HOME_URL)
+
+const errorHandler = () => true
+</script>
+
 <template>
 	<header class="header">
 		<div class="navbar-wrapper">
@@ -63,55 +113,6 @@
 	</div>
 </template>
 
-<script setup lang="ts" name="header">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { UploadProps, UploadInstance } from 'element-plus'
-import { UserFilled } from '@element-plus/icons-vue'
-import { HOME_URL } from '@/config/config'
-import ActionButton from '../ActionButton/index.vue'
-import Breadcrumb, { BreadcrumbItem } from '../Breadcrumb/index.vue'
-import logo from '@/assets/logo.svg'
-
-const router = useRouter()
-const uploadRef = ref<UploadInstance>()
-
-type ActionItem = {
-	id?: string
-	name: string
-	isUpload?: boolean
-}
-
-interface HeaderProps {
-	avatar?: string
-	breadcrumbItems?: Partial<BreadcrumbItem>[]
-	actionItems?: Partial<ActionItem>[]
-	avatarActionItems?: Partial<ActionItem>[]
-	uploadFileLimit?: number
-	tapActionItem?: (command: string | number | object) => void
-	onUploadChange?: UploadProps['onChange']
-	onUploadExceed?: UploadProps['onExceed']
-	onUploadProgress?: UploadProps['onProgress']
-	onUploadSuccess?: UploadProps['onSuccess']
-	onUploadError?: UploadProps['onError']
-	beforeUpload?: UploadProps['beforeUpload']
-}
-
-const props = withDefaults(defineProps<HeaderProps>(), {
-	avatar: () => 'https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif?imageView2/1/w/80/h/80',
-	uploadFileLimit: () => 10,
-	breadcrumbItems: () => [],
-	actionItems: () => [],
-	avatarActionItems: () => []
-})
-
-const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
-
-const handleClickGoHome = () => router.push(HOME_URL)
-
-const errorHandler = () => true
-</script>
-
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

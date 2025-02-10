@@ -1,31 +1,3 @@
-<template>
-	<div class="video-player-wrapper">
-		<div class="video-player-mask" />
-		<div class="video-player-close-btn" @click="handleClose">
-			<el-icon circle size="24">
-				<Close />
-			</el-icon>
-		</div>
-		<div class="video-wrapper">
-			<div class="inner-wrapper">
-				<videoPlay
-					:width="width"
-					:height="height"
-					:color="color"
-					:title="title"
-					:muted="muted"
-					:webFullScreen="webFullScreen"
-					:autoPlay="autoPlay"
-					:loop="loop"
-					:volume="volume"
-					:control="control"
-					:src="src"
-				/>
-			</div>
-		</div>
-	</div>
-</template>
-
 <script setup lang="ts" name="video-player">
 import { onMounted } from 'vue'
 import 'vue3-video-play/dist/style.css'
@@ -69,6 +41,34 @@ onMounted(() => {
 const handleClose = () => props.close && props.close()
 </script>
 
+<template>
+	<div class="video-player-wrapper">
+		<div class="video-player-mask" />
+		<div class="video-player-close-btn" @click="handleClose">
+			<el-icon circle size="24">
+				<Close />
+			</el-icon>
+		</div>
+		<div class="video-wrapper">
+			<div class="inner-wrapper">
+				<videoPlay
+					:width="width"
+					:height="height"
+					:color="color"
+					:title="title"
+					:muted="muted"
+					:web-full-screen="webFullScreen"
+					:auto-play="autoPlay"
+					:loop="loop"
+					:volume="volume"
+					:control="control"
+					:src="src"
+				/>
+			</div>
+		</div>
+	</div>
+</template>
+
 <style scoped lang="scss">
-@import './index.scss';
+@use './index';
 </style>

@@ -1,4 +1,4 @@
-import { Storage } from '@/api/interface/index'
+import type { Storage } from '@/api/interface/index'
 import { PORT } from '@/api/config/servicePort'
 import { ResultEnum } from '@/enums/httpEnum'
 

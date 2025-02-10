@@ -10,6 +10,33 @@ export default defineConfig({
 			'@': resolve(__dirname, './src')
 		}
 	},
+	build: {
+		minify: 'esbuild',
+		reportCompressedSize: false,
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					'element-plus': ['element-plus']
+				}
+			}
+		}
+	},
+	css: {
+		postcss: {
+			plugins: [
+				{
+					postcssPlugin: 'internal:charset-removal',
+					AtRule: {
+						charset: atRule => {
+							if (atRule.name === 'charset') {
+								atRule.remove()
+							}
+						}
+					}
+				}
+			]
+		}
+	},
 	server: {
 		host: '0.0.0.0', // 服务器主机名，如果允许外部访问，可设置为"0.0.0.0"
 		open: true,

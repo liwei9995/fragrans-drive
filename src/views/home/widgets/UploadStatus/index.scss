@@ -5,11 +5,18 @@
 	z-index: 9999;
 	box-sizing: border-box;
 	overflow: hidden;
-	background-color: #ffffff;
+	background-color: #fff;
 	border: 1px solid #ebeef5;
 	border-radius: 8px;
 	box-shadow: 0 0 12px rgb(0 0 0 / 12%);
-	transition: opacity 0.3s, transform 0.3s, duration 0.3s, top 0.3s, right 0.3s, bottom 0.3s, left 0.3s;
+	transition:
+		opacity 0.3s,
+		transform 0.3s,
+		duration 0.3s,
+		top 0.3s,
+		right 0.3s,
+		bottom 0.3s,
+		left 0.3s;
 
 	.upload-status {
 		display: flex;
