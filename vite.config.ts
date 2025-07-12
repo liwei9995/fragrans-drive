@@ -15,8 +15,8 @@ export default defineConfig({
 		reportCompressedSize: false,
 		rollupOptions: {
 			output: {
-				manualChunks: {
-					'element-plus': ['element-plus']
+				advancedChunks: {
+					groups: [{ name: 'element-plus', test: /\/element-plus?/ }]
 				}
 			}
 		}

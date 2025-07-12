@@ -423,7 +423,8 @@ export default defineFlatConfig([
 				}
 			],
 			'vue/padding-line-between-blocks': ['error', 'always'],
-			'vue/script-setup-uses-vars': 'error'
+			'vue/script-setup-uses-vars': 'error',
+			'vue/max-attributes-per-line': 0
 		}
 	}
 ])

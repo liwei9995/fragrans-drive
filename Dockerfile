@@ -1,9 +1,9 @@
 # build stage
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 
 LABEL web.maintainer=alex.li@oyiyio.com \
   web.name=fragrans-drive \
-  web.version=0.1.1
+  web.version=0.2.0
 
 FROM base AS build-stage
 
