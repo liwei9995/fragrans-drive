@@ -1,44 +1,44 @@
 <script setup lang="ts" name="video-player">
 import { onMounted } from 'vue'
 import 'vue3-video-play/dist/style.css'
-import { videoPlay } from 'vue3-video-play'
-import { Close } from '@element-plus/icons-vue'
 
 interface VideoPlayerProps {
-	show?: boolean
-	width?: string
-	height?: string
-	color?: string
-	title?: string
-	muted?: boolean
-	webFullScreen?: boolean
-	autoPlay?: boolean
-	loop?: boolean
-	volume?: number
-	control?: boolean
-	src?: string
-	close?: () => void
+  show?: boolean
+  width?: string
+  height?: string
+  color?: string
+  title?: string
+  muted?: boolean
+  webFullScreen?: boolean
+  autoPlay?: boolean
+  loop?: boolean
+  volume?: number
+  control?: boolean
+  src?: string
+  close?: () => void
 }
 
 const props = withDefaults(defineProps<VideoPlayerProps>(), {
-	width: '100%',
-	height: '100%',
-	control: true,
-	src: ''
+  width: '100%',
+  height: '100%',
+  control: true,
+  src: '',
 })
 
 onMounted(() => {
-	// 监听esc事件
-	document.onkeydown = (e: any) => {
-		e = window.event || e
+  // 监听esc事件
+  document.onkeydown = (e: KeyboardEvent) => {
+    e = (window.event as KeyboardEvent) || e
 
-		if (e.code === 'Escape' || e.code === 'Esc') {
-			props.close && props.close()
-		}
-	}
+    if (e.code === 'Escape' || e.code === 'Esc') {
+      props.close?.()
+    }
+  }
 })
 
-const handleClose = () => props.close && props.close()
+const handleClose = () => props.close?.()
+
+defineExpose({ handleClose })
 </script>
 
 <template>

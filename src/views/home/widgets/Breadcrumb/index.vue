@@ -3,36 +3,37 @@ import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
 
 export type BreadcrumbItem = {
-	id?: string
-	text?: string
-	isHighlight?: boolean
-	isOmit?: boolean
+  id?: string
+  text?: string
+  isHighlight?: boolean
+  isOmit?: boolean
 }
 
 interface BreadcrumbProps {
-	autoNav?: boolean
-	breadcrumbItems?: Partial<BreadcrumbItem>[]
-	onClickBreadcrumbItem?: (item: BreadcrumbItem) => void
+  autoNav?: boolean
+  breadcrumbItems?: Partial<BreadcrumbItem>[]
+  onClickBreadcrumbItem?: (item: BreadcrumbItem) => void
 }
 
 const props = withDefaults(defineProps<BreadcrumbProps>(), {
-	autoNav: () => true,
-	breadcrumbItems: () => []
+  autoNav: () => true,
+  breadcrumbItems: () => [],
 })
 
 const router = useRouter()
 
-const handleClickItem = (item: BreadcrumbItem) => props.onClickBreadcrumbItem && props.onClickBreadcrumbItem(item)
+const handleClickItem = (item: BreadcrumbItem) =>
+  props.onClickBreadcrumbItem && props.onClickBreadcrumbItem(item)
 
 const handleClickGoHome = () => {
-	if (props.autoNav) {
-		router.push(HOME_URL)
-	} else {
-		props.onClickBreadcrumbItem &&
-			props.onClickBreadcrumbItem({
-				id: 'root'
-			})
-	}
+  if (props.autoNav) {
+    router.push(HOME_URL)
+  } else {
+    props.onClickBreadcrumbItem &&
+      props.onClickBreadcrumbItem({
+        id: 'root',
+      })
+  }
 }
 </script>
 

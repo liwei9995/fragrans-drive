@@ -1,23 +1,30 @@
 <script setup lang="ts" name="storage-item">
 interface StorageItemProps {
-	id: string
-	disabled?: boolean
-	thumbUrl?: string
-	thumbPlaceholder?: string
-	name: string
-	tap?: (id: string) => void
+  id: string
+  disabled?: boolean
+  thumbUrl?: string
+  thumbPlaceholder?: string
+  name: string
+  tap?: (id: string) => void
 }
 
 const props = withDefaults(defineProps<StorageItemProps>(), {
-	disabled: true,
-	thumbUrl: ''
+  disabled: true,
+  thumbUrl: '',
 })
 
-const handleClick = () => {
-	if (props.disabled) return
+const isHover = ref(false)
 
-	props.tap && props.tap(props.id)
+const handleClick = () => {
+  if (props.disabled) return
+
+  props.tap?.(props.id)
 }
+
+defineExpose({
+  isHover,
+  handleClick,
+})
 </script>
 
 <template>

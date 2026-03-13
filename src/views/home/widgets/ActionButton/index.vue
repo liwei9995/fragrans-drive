@@ -1,36 +1,37 @@
 <script setup lang="ts" name="action-button">
-import { ref } from 'vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
+import { ref } from 'vue'
 import Upload from '../Upload/index.vue'
 
 const uploadRef = ref<UploadInstance>()
 
 type ActionItem = {
-	id?: string
-	name: string
-	isUpload?: boolean
+  id?: string
+  name: string
+  isUpload?: boolean
 }
 
 interface ActionButtonProps {
-	actionItems?: Partial<ActionItem>[]
-	uploadFileLimit?: number
-	iconSize?: number
-	tapActionItem?: (command: string | number | object) => void
-	onUploadChange?: UploadProps['onChange']
-	onUploadExceed?: UploadProps['onExceed']
-	onUploadProgress?: UploadProps['onProgress']
-	onUploadSuccess?: UploadProps['onSuccess']
-	onUploadError?: UploadProps['onError']
-	beforeUpload?: UploadProps['beforeUpload']
+  actionItems?: Partial<ActionItem>[]
+  uploadFileLimit?: number
+  iconSize?: number
+  tapActionItem?: (command: string | number | object) => void
+  onUploadChange?: UploadProps['onChange']
+  onUploadExceed?: UploadProps['onExceed']
+  onUploadProgress?: UploadProps['onProgress']
+  onUploadSuccess?: UploadProps['onSuccess']
+  onUploadError?: UploadProps['onError']
+  beforeUpload?: UploadProps['beforeUpload']
 }
 
 const props = withDefaults(defineProps<ActionButtonProps>(), {
-	uploadFileLimit: () => 10,
-	actionItems: () => [],
-	iconSize: () => 32
+  uploadFileLimit: () => 10,
+  actionItems: () => [],
+  iconSize: () => 32,
 })
 
-const handleCommand = (command: string | number | object) => props.tapActionItem && props.tapActionItem(command)
+const handleCommand = (command: string | number | object) =>
+  props.tapActionItem && props.tapActionItem(command)
 </script>
 
 <template>

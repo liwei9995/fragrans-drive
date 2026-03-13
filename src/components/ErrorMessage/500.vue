@@ -1,6 +1,7 @@
 <script setup lang="ts" name="500">
 import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
+
 const router = useRouter()
 </script>
 

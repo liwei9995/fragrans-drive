@@ -3,23 +3,24 @@ import type { UploadProps } from 'element-plus'
 import Upload from '../../Upload/index.vue'
 
 interface ItemProps {
-	id: string
-	description: string
-	icon?: string
-	isUpload?: boolean
-	limit?: number
-	tapItem?: (id: string) => void
-	onUploadChange?: UploadProps['onChange']
-	onUploadExceed?: UploadProps['onExceed']
-	onUploadProgress?: UploadProps['onProgress']
-	beforeUpload?: UploadProps['beforeUpload']
+  id: string
+  description: string
+  icon?: string
+  isUpload?: boolean
+  limit?: number
+  tapItem?: (id: string) => void
+  onUploadChange?: UploadProps['onChange']
+  onUploadExceed?: UploadProps['onExceed']
+  onUploadProgress?: UploadProps['onProgress']
+  beforeUpload?: UploadProps['beforeUpload']
 }
 
 const props = withDefaults(defineProps<ItemProps>(), {
-	description: () => '',
-	isUpload: () => false,
-	limit: () => 10,
-	icon: () => 'https://img.alicdn.com/imgextra/i4/O1CN01Ojh9qS1rrJtSy0dN4_!!6000000005684-2-tps-224-224.png'
+  description: () => '',
+  isUpload: () => false,
+  limit: () => 10,
+  icon: () =>
+    'https://img.alicdn.com/imgextra/i4/O1CN01Ojh9qS1rrJtSy0dN4_!!6000000005684-2-tps-224-224.png',
 })
 
 const handleTap = () => props.tapItem && props.tapItem(props.id)

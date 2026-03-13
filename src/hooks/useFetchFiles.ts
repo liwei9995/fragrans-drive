@@ -1,104 +1,108 @@
-import { ref } from 'vue'
 import { format } from 'date-fns'
+import { ref } from 'vue'
 import { getFiles } from '@/api/modules/storage'
 import { getThumb } from '@/utils/thumb/index'
 
 const getDesc = (dateTime: string) => {
-	const dt = new Date(dateTime)
-	const now = new Date()
-	const dtYear = format(dt, 'yyyy')
-	const year = format(now, 'yyyy')
-	const dtDay = format(dt, 'yyyy/MM/dd')
-	const today = format(now, 'yyyy/MM/dd')
+  const dt = new Date(dateTime)
+  const now = new Date()
+  const dtYear = format(dt, 'yyyy')
+  const year = format(now, 'yyyy')
+  const dtDay = format(dt, 'yyyy/MM/dd')
+  const today = format(now, 'yyyy/MM/dd')
 
-	return dtDay === today
-		? `今天 ${format(dt, 'HH:mm')}`
-		: dtYear === year
-			? format(dt, 'MM/dd HH:mm')
-			: format(dt, 'yyyy/MM/dd HH:mm')
+  return dtDay === today
+    ? `今天 ${format(dt, 'HH:mm')}`
+    : dtYear === year
+      ? format(dt, 'MM/dd HH:mm')
+      : format(dt, 'yyyy/MM/dd HH:mm')
 }
 
 export const convertItem = (item: Storage) => ({
-	...item,
-	desc: getDesc(item.updatedAt),
-	thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
-	thumbPlaceholder: getThumb(item.extName, item.type),
-	previewSrcList: !item.mimeType?.startsWith('video/') && item.url ? [item.url] : [],
-	videoUrl: item.mimeType?.startsWith('video/') ? item.url : ''
+  ...item,
+  desc: getDesc(item.updatedAt),
+  thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
+  thumbPlaceholder: getThumb(item.extName, item.type),
+  previewSrcList:
+    !item.mimeType?.startsWith('video/') && item.url ? [item.url] : [],
+  videoUrl: item.mimeType?.startsWith('video/') ? item.url : '',
 })
 
 const dateToNumber = (date: string) => +new Date(date)
 
 export const sortDocs = (docs: Storage[]) => {
-	const folderItems: Storage[] = []
-	const fileItems: Storage[] = []
+  const folderItems: Storage[] = []
+  const fileItems: Storage[] = []
 
-	docs
-		.sort((a, b) => dateToNumber(b.updatedAt) - dateToNumber(a.updatedAt))
-		.forEach((doc: Storage) => {
-			if (doc.type === 'folder') {
-				folderItems.push(doc)
-			} else {
-				fileItems.push(doc)
-			}
-		})
+  docs
+    .sort((a, b) => dateToNumber(b.updatedAt) - dateToNumber(a.updatedAt))
+    .forEach((doc: Storage) => {
+      if (doc.type === 'folder') {
+        folderItems.push(doc)
+      } else {
+        fileItems.push(doc)
+      }
+    })
 
-	const sortedDocs = [...folderItems, ...fileItems]
+  const sortedDocs = [...folderItems, ...fileItems]
 
-	return sortedDocs
+  return sortedDocs
 }
 
 /**
  * 获取当前目录下文件列表
  */
 export const useFetchFiles = () => {
-	const initialData = {
-		docs: [],
-		limit: 100,
-		page: 0,
-		pages: 1
-	}
-	const listData = ref<{ [key: string]: any }>(initialData)
-	const isFetching = ref(false)
+  const initialData = {
+    docs: [] as Storage[],
+    limit: 100,
+    page: 0,
+    pages: 1,
+  }
+  const listData = ref(initialData)
+  const isFetching = ref(false)
 
-	const resetListData = () => (listData.value = initialData)
+  const resetListData = () => (listData.value = initialData)
 
-	const fetchFiles = async (parentId: string, init = true) => {
-		isFetching.value = true
+  const fetchFiles = async (parentId: string, init = true) => {
+    isFetching.value = true
 
-		if (init) {
-			listData.value = initialData
-		}
+    if (init) {
+      listData.value = initialData
+    }
 
-		const data = await getFiles({
-			query: { parentId },
-			pagination: {
-				page: listData.value.page + 1,
-				limit: listData.value.limit,
-				sort: {
-					updatedAt: -1
-				}
-			}
-		})
+    const data = (await getFiles({
+      query: { parentId },
+      pagination: {
+        page: listData.value.page + 1,
+        limit: listData.value.limit,
+        sort: {
+          updatedAt: -1,
+        },
+      },
+    })) as { docs: Storage[]; [key: string]: unknown }
 
-		isFetching.value = false
+    isFetching.value = false
 
-		if (Array.isArray(data?.docs)) {
-			data.docs = data.docs.map((item: Storage) => convertItem(item))
-		}
+    if (Array.isArray(data?.docs)) {
+      data.docs = data.docs.map((item: Storage) => convertItem(item))
+    }
 
-		const docs = [...listData.value.docs, ...data.docs]
+    const docs = [...listData.value.docs, ...data.docs]
 
-		listData.value = {
-			...data,
-			docs: sortDocs(docs)
-		}
-	}
+    listData.value = {
+      ...data,
+      limit: listData.value.limit,
+      page: (data.page as number) ?? listData.value.page,
+      pages: (data.pages as number) ?? listData.value.pages,
+      docs: sortDocs(docs),
+    }
+  }
 
-	return {
-		fetchFiles,
-		isFetching,
-		listData,
-		resetListData
-	}
+  return {
+    fetchFiles,
+    isFetching,
+    listData,
+    resetListData,
+  }
 }

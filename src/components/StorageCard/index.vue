@@ -11,83 +11,94 @@ const globalStore = GlobalStore()
 const isMobile = globalStore.isMobile
 
 type ActionItem = {
-	id?: string
-	name: string
-	divided?: boolean
+  id?: string
+  name: string
+  divided?: boolean
 }
 
 interface StorageCardProps {
-	id: string
-	title?: string
-	mimeType?: string
-	type?: string
-	extName?: string
-	desc?: string
-	previewSrcList?: string[]
-	thumbUrl?: string
-	thumbPlaceholder?: string
-	videoUrl?: string
-	isEmpty?: boolean
-	actionItems?: Partial<ActionItem>[]
-	tapActionItem?: (
-		command: string | number | object,
-		id: string,
-		title: string,
-		mimeType?: string,
-		thumbUrl?: string,
-		extName?: string
-	) => void
-	previewVideo?: (videoUrl: string) => void
+  id: string
+  title?: string
+  mimeType?: string
+  type?: string
+  extName?: string
+  desc?: string
+  previewSrcList?: string[]
+  thumbUrl?: string
+  thumbPlaceholder?: string
+  videoUrl?: string
+  isEmpty?: boolean
+  actionItems?: Partial<ActionItem>[]
+  tapActionItem?: (
+    command: string | number | object,
+    id: string,
+    title: string,
+    mimeType?: string,
+    thumbUrl?: string,
+    extName?: string,
+  ) => void
+  previewVideo?: (videoUrl: string) => void
 }
 
 const props = withDefaults(defineProps<StorageCardProps>(), {
-	title: '',
-	desc: '',
-	extName: '',
-	actionItems: () => [
-		{
-			id: 'download',
-			name: '下载',
-			divided: false
-		},
-		{
-			id: 'rename',
-			name: '重命名',
-			divided: false
-		},
-		{
-			id: 'move',
-			name: '移动',
-			divided: false
-		},
-		{
-			id: 'delete',
-			name: '删除',
-			divided: true
-		}
-	],
-	previewSrcList: () => [],
-	thumbUrl: 'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
-	thumbPlaceholder: '',
-	videoUrl: '',
-	isEmpty: false
+  title: '',
+  desc: '',
+  extName: '',
+  actionItems: () => [
+    {
+      id: 'download',
+      name: '下载',
+      divided: false,
+    },
+    {
+      id: 'rename',
+      name: '重命名',
+      divided: false,
+    },
+    {
+      id: 'move',
+      name: '移动',
+      divided: false,
+    },
+    {
+      id: 'delete',
+      name: '删除',
+      divided: true,
+    },
+  ],
+  previewSrcList: () => [],
+  thumbUrl:
+    'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
+  thumbPlaceholder: '',
+  videoUrl: '',
+  isEmpty: false,
 })
 
-const coverCls = computed(() => (showPlaceholder.value ? 'file-cover' : `${props.type}-cover`))
+const coverCls = computed(() =>
+  showPlaceholder.value ? 'file-cover' : `${props.type}-cover`,
+)
 
 const handleCommand = (command: string | number | object) =>
-	props.tapActionItem && props.tapActionItem(command, props.id, props.title, props.mimeType, props.thumbUrl, props.extName)
+  props.tapActionItem &&
+  props.tapActionItem(
+    command,
+    props.id,
+    props.title,
+    props.mimeType,
+    props.thumbUrl,
+    props.extName,
+  )
 
 const handleClickCard = () => {
-	if (props.type === 'folder') {
-		router.push(`${HOME_URL}/${props.id}`)
-	}
+  if (props.type === 'folder') {
+    router.push(`${HOME_URL}/${props.id}`)
+  }
 }
 
 const handleClickIcon = () => {
-	if (props.mimeType?.startsWith('video/')) {
-		props.previewVideo && props.previewVideo(props.videoUrl)
-	}
+  if (props.mimeType?.startsWith('video/')) {
+    props.previewVideo && props.previewVideo(props.videoUrl)
+  }
 }
 
 const handleClosePreview = () => (showMoreAction.value = false)

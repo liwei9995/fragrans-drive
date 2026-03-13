@@ -1,149 +1,145 @@
 :root {
-	font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 24px;
-	color: rgb(255 255 255 / 87%);
-	color-scheme: light dark;
-	background-color: #fff;
-	font-synthesis: none;
-	text-rendering: optimizelegibility;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	text-size-adjust: 100%;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  color: rgb(255 255 255 / 87%);
+  color-scheme: light dark;
+  background-color: #fff;
+  font-synthesis: none;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-size-adjust: 100%;
 
-	--c-primary: #008ffd;
-	--global-category-color: #008ffd;
-	--min: 812px;
+  --c-primary: #008ffd;
+  --global-category-color: #008ffd;
+  --min: 812px;
 }
 
 *,
 ::after,
 ::before {
-	box-sizing: border-box;
-	scroll-behavior: smooth;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
 }
 
 a {
-	font-weight: 500;
-	color: #646cff;
-	text-decoration: inherit;
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
 }
 
 a:hover {
-	color: #535bf2;
+  color: #535bf2;
 }
 
 body {
-	display: flex;
-	place-items: center;
-	min-width: 320px;
-	min-height: 100vh;
-	margin: 0;
-	overflow: hidden;
-	overscroll-behavior-y: none;
-	background-color: #fff;
-	scroll-behavior: smooth;
-	text-rendering: optimizespeed;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior-y: none;
+  background-color: #fff;
+  scroll-behavior: smooth;
+  text-rendering: optimizespeed;
 }
 
 h1 {
-	font-size: 3.2em;
-	line-height: 1.1;
+  font-size: 3.2em;
+  line-height: 1.1;
 }
 
 button {
-	padding: 0.6em 1.2em;
-	font-family: inherit;
-	font-size: 1em;
-	font-weight: 500;
-	cursor: pointer;
-	background-color: #1a1a1a;
-	border: 1px solid transparent;
-	border-radius: 8px;
-	transition: border-color 0.25s;
+  padding: 0.6em 1.2em;
+  font-family: inherit;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: #1a1a1a;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.25s;
 }
 
 button:hover {
-	border-color: #646cff;
+  border-color: #646cff;
 }
 
 button:focus,
 button:focus-visible {
-	outline: 4px auto -webkit-focus-ring-color;
+  outline: 4px auto -webkit-focus-ring-color;
 }
 
 .card {
-	padding: 2em;
+  padding: 2em;
 }
 
 #app {
-	/* max-width: 1280px; */
+  /* max-width: 1280px; */
 
-	margin: 0 auto;
-	overflow-y: auto;
-	text-align: center;
+  margin: 0 auto;
+  overflow-y: auto;
+  text-align: center;
 }
 
 #app::after,
 #app::before {
-	position: fixed;
-	top: 0;
-	content: '';
+  position: fixed;
+  top: 0;
+  content: "";
 }
 
 #app::before {
-	left: var(--blur-left, 340px);
-	z-index: 4;
-	width: var(--blur-width, 70%);
-	height: 250px;
-	border-radius: 0 0 100px 20px;
-	box-shadow: 25px 240px 96px var(--global-category-color, var(--c-primary));
-	opacity: 0.11;
-	transition: box-shadow 0.25s linear;
-	transform: rotate(-8deg) translateY(-185%) translateZ(0);
-	animation: fade-in 0.5s cubic-bezier(0.46, 0, 0, 1);
-	will-change: auto;
+  left: var(--blur-left, 340px);
+  z-index: 4;
+  width: var(--blur-width, 70%);
+  height: 250px;
+  border-radius: 0 0 100px 20px;
+  box-shadow: 25px 240px 96px var(--global-category-color, var(--c-primary));
+  opacity: 0.11;
+  transition: box-shadow 0.25s linear;
+  transform: rotate(-8deg) translateY(-185%) translateZ(0);
+  animation: fade-in 0.5s cubic-bezier(0.46, 0, 0, 1);
+  will-change: auto;
 }
 
 @media (width <= 1199px) {
-
-	#app::before {
-		--blur-left: 300px;
-	}
+  #app::before {
+    --blur-left: 300px;
+  }
 }
 
 @media (width <= 991px) {
-
-	#app::before {
-		--blur-left: 260px;
-	}
+  #app::before {
+    --blur-left: 260px;
+  }
 }
 
 @media (width <= 767px) {
+  #app::before {
+    --blur-left: -10%;
+    --blur-width: 100%;
+  }
 
-	#app::before {
-		--blur-left: -10%;
-		--blur-width: 100%;
-	}
-
-	.dialog-folder {
-		max-width: calc(100vw - 16px);
-	}
+  .dialog-folder {
+    max-width: calc(100vw - 16px);
+  }
 }
 
 @media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #fff;
+  }
 
-	:root {
-		color: #213547;
-		background-color: #fff;
-	}
+  a:hover {
+    color: #747bff;
+  }
 
-	a:hover {
-		color: #747bff;
-	}
-
-	button {
-		background-color: #f9f9f9;
-	}
+  button {
+    background-color: #f9f9f9;
+  }
 }

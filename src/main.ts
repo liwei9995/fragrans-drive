@@ -1,7 +1,7 @@
-import { createApp } from 'vue'
-import App from './App.vue'
 // element plus
 import ElementPlus from 'element-plus'
+import { createApp } from 'vue'
+import App from './App.vue'
 // reset style sheet
 import '@/styles/reset.scss'
 // app style sheet
@@ -22,8 +22,8 @@ import pinia from '@/store/index'
 const app = createApp(App)
 
 // 注册element Icons组件
-Object.keys(Icons).forEach(key => {
-	app.component(key, Icons[key as keyof typeof Icons])
-})
+for (const [key, component] of Object.entries(Icons)) {
+  app.component(key, component)
+}
 
 app.use(router).use(pinia).use(ElementPlus).mount('#app')

@@ -1,27 +1,32 @@
 <script setup lang="ts" name="home">
-import { onBeforeMount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import type { UploadFiles, UploadProps } from 'element-plus'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import emitter from '@/utils/emitter'
+import { onBeforeMount, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  deleteFile,
+  getDownloadUrl,
+  getPath,
+  updateFile,
+} from '@/api/modules/storage'
 import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
-import Dialog from './widgets/Dialog/index.vue'
-import UploadStatus from './widgets/UploadStatus/index.vue'
-import Header from './widgets/Header/index.vue'
-import Breadcrumb from './widgets/Breadcrumb/index.vue'
-import Empty from './widgets/Empty/index.vue'
-import Move from './widgets/Move/index.vue'
 import { LOGIN_URL } from '@/config/config'
-import { GlobalStore } from '@/store'
 import { UploadEventEnum } from '@/enums/events'
-import { deleteFile, getDownloadUrl, getPath, updateFile } from '@/api/modules/storage'
-import { convertItem, sortDocs, useFetchFiles } from '@/hooks/useFetchFiles'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
+import { convertItem, sortDocs, useFetchFiles } from '@/hooks/useFetchFiles'
+import { GlobalStore } from '@/store'
+import emitter from '@/utils/emitter'
+import Breadcrumb from './widgets/Breadcrumb/index.vue'
+import Dialog from './widgets/Dialog/index.vue'
+import Empty from './widgets/Empty/index.vue'
+import Header from './widgets/Header/index.vue'
+import Move from './widgets/Move/index.vue'
+import UploadStatus from './widgets/UploadStatus/index.vue'
 
 type BreadcrumbItem = {
-	id: string
-	name: string
+  id: string
+  text: string
 }
 
 const globalStore = GlobalStore()
@@ -48,99 +53,104 @@ const router = useRouter()
 const { fetchFiles, listData, resetListData, isFetching } = useFetchFiles()
 const parentId = ref((route.params.id as string) || 'root')
 const basicActionItems = [
-	{
-		id: 'rename',
-		name: '重命名',
-		divided: false
-	},
-	{
-		id: 'move',
-		name: '移动',
-		divided: false
-	},
-	{
-		id: 'delete',
-		name: '删除',
-		divided: true
-	}
+  {
+    id: 'rename',
+    name: '重命名',
+    divided: false,
+  },
+  {
+    id: 'move',
+    name: '移动',
+    divided: false,
+  },
+  {
+    id: 'delete',
+    name: '删除',
+    divided: true,
+  },
 ]
 const fullActionItems = [
-	{
-		id: 'download',
-		name: '下载',
-		divided: false
-	},
-	...basicActionItems
+  {
+    id: 'download',
+    name: '下载',
+    divided: false,
+  },
+  ...basicActionItems,
 ]
 
 const actionItems = [
-	{
-		id: 'folder',
-		name: '新建文件夹'
-	},
-	{
-		id: 'file',
-		name: '上传文件',
-		isUpload: true
-	}
+  {
+    id: 'folder',
+    name: '新建文件夹',
+  },
+  {
+    id: 'file',
+    name: '上传文件',
+    isUpload: true,
+  },
 ]
 
 const avatarActionItems = [
-	{
-		id: 'logout',
-		name: '退出登录'
-	}
+  {
+    id: 'logout',
+    name: '退出登录',
+  },
 ]
 
 interface Storage {
-	id: string
-	name: string
-	baseName?: string
-	extName?: string
-	mimeType?: string
-	encoding?: string
-	size?: string
-	parentId: string
-	type: string
-	thumbnail?: string
-	url?: string
-	createdAt: string
-	updatedAt: string
+  id: string
+  name: string
+  baseName?: string
+  extName?: string
+  mimeType?: string
+  encoding?: string
+  size?: string
+  parentId: string
+  type: string
+  thumbnail?: string
+  url?: string
+  createdAt: string
+  updatedAt: string
 }
 
 const load = () => {
-	if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
+  if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
 
-	fetchFiles(parentId.value, false)
+  fetchFiles(parentId.value, false)
 }
 
 const fetchPath = async () => {
-	const fileId = route.params.id as string
+  const fileId = route.params.id as string
 
-	if (fileId) {
-		const pathItems = await getPath(fileId)
-
-		breadcrumbItems.value = [
-			...pathItems.map((path: { id: string; name: string }) => ({
-				id: path.id,
-				text: path.name
-			}))
-		]
-	} else {
-		breadcrumbItems.value = []
-	}
+  if (fileId) {
+    const pathItems = await getPath(fileId)
+    if (pathItems && Array.isArray(pathItems)) {
+      breadcrumbItems.value = [
+        { id: '0', text: '全部文件' },
+        ...pathItems.map((path: any) => ({
+          id: String(path.id),
+          text: path.name,
+        })),
+      ]
+    } else {
+      // Handle case where pathItems is empty or not an array
+      breadcrumbItems.value = [{ id: '0', text: '全部文件' }]
+    }
+  } else {
+    breadcrumbItems.value = []
+  }
 }
 
 onBeforeMount(() => fetchPath())
 
 watch(
-	() => router.currentRoute.value,
-	() => {
-		parentId.value = (route.params.id as string) || 'root'
-		resetListData()
-		fetchFiles(parentId.value)
-		fetchPath()
-	}
+  () => router.currentRoute.value,
+  () => {
+    parentId.value = (route.params.id as string) || 'root'
+    resetListData()
+    fetchFiles(parentId.value)
+    fetchPath()
+  },
 )
 
 const handleCloseFolderDialog = () => (folderDialogFormVisible.value = false)
@@ -150,69 +160,80 @@ const handleCloseRenameDialog = () => (renameDialogFormVisible.value = false)
 const handleCloseMoveDialog = () => (moveDialogFormVisible.value = false)
 
 const handleMoved = (id: string, parentId: string) => {
-	const paramId = (route.params.id as string) || 'root'
+  const paramId = (route.params.id as string) || 'root'
 
-	if (parentId === paramId) return
+  if (parentId === paramId) return
 
-	const docs = listData.value.docs || []
-	const index = docs.findIndex((doc: Storage) => doc.id === id)
+  const docs = (listData.value.docs || []) as any as Storage[]
+  const index = docs.findIndex((doc: any) => doc.id === id)
 
-	if (index !== -1) {
-		docs.splice(index, 1)
-		listData.value.docs = docs
-	}
+  if (index !== -1) {
+    docs.splice(index, 1)
+    listData.value.docs = docs as any
+  }
 }
 
 const handleFolderCreated = (parentId: string) => {
-	if (parentId === (route.params.id || 'root')) {
-		fetchFiles(parentId)
-	}
+  if (parentId === (route.params.id || 'root')) {
+    fetchFiles(parentId)
+  }
 }
 
 const handleCreateFolder = (name: string) => {
-	const parentId = (route.params.id || 'root') as string
+  const parentId = (route.params.id || 'root') as string
 
-	folderDialogFormVisible.value = false
-	useCreateFolder(name, parentId, () => fetchFiles(parentId))
-	folderName.value = defaultFolderName
+  folderDialogFormVisible.value = false
+  useCreateFolder(name, parentId, () => fetchFiles(parentId))
+  folderName.value = defaultFolderName
 }
 
 const handleRenameFile = (name: string) => {
-	const fileId = needToRenameFileId.value
-	const doc = (listData?.value?.docs as Storage[])?.find(item => item.id === fileId)
+  const fileId = needToRenameFileId.value
+  const doc = (listData?.value?.docs as any as Storage[])?.find(
+    (item) => item.id === fileId,
+  )
 
-	if (!doc) return
+  if (!doc) return
 
-	const fullName = doc.extName ? `${name}${doc.extName}` : name
+  const fullName = doc.extName ? `${name}${doc.extName}` : name
 
-	updateFile(fileId, {
-		name: fullName,
-		parentId: doc?.parentId || 'root',
-		type: doc?.type
-	}).then(({ exist, _id: id, name, baseName, extName, createdAt, updatedAt }) => {
-		if (exist) {
-			ElMessage.error('已存在同名文件，请修改名称')
-		} else {
-			renameDialogFormVisible.value = false
+  updateFile(fileId, {
+    name: fullName,
+    parentId: doc?.parentId || 'root',
+    type: doc?.type,
+  }).then((res: any) => {
+    const {
+      exist,
+      _id: id,
+      name,
+      baseName,
+      extName,
+      createdAt,
+      updatedAt,
+    } = res
+    if (exist) {
+      ElMessage.error('已存在同名文件，请修改名称')
+    } else {
+      renameDialogFormVisible.value = false
 
-			const docs = listData.value.docs || []
-			const index = docs.findIndex((doc: Storage) => doc.id === id)
+      const docs = listData.value.docs || []
+      const index = docs.findIndex((doc: any) => doc.id === id)
 
-			if (index !== -1) {
-				docs[index] = convertItem({
-					...docs[index],
-					id,
-					name,
-					baseName,
-					extName,
-					createdAt,
-					updatedAt
-				})
+      if (index !== -1) {
+        docs[index] = convertItem({
+          ...docs[index],
+          id,
+          name,
+          baseName,
+          extName,
+          createdAt,
+          updatedAt,
+        })
 
-				listData.value.docs = sortDocs(docs)
-			}
-		}
-	})
+        listData.value.docs = sortDocs(docs) as any
+      }
+    }
+  })
 }
 
 const handleCloseUploadStatus = () => (uploadedFiles.value = [])
@@ -220,128 +241,152 @@ const handleCloseUploadStatus = () => (uploadedFiles.value = [])
 const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
 
 const handleTapActionItem = (command: string | number | object) => {
-	if (command === 'folder') {
-		folderDialogFormVisible.value = true
-	} else if (command === 'logout') {
-		// * 清空 token
-		globalStore.setToken('')
-		// * 跳转到登录页面
-		router.push(LOGIN_URL)
-	}
+  if (command === 'folder') {
+    folderDialogFormVisible.value = true
+  } else if (command === 'logout') {
+    // * 清空 token
+    globalStore.setToken('')
+    // * 跳转到登录页面
+    router.push(LOGIN_URL)
+  }
 }
 
 const download = async (id: string) => {
-	ElMessage.info('文件下载准备中...')
-	const { url } = await getDownloadUrl(id)
+  ElMessage.info('文件下载准备中...')
+  const { url } = (await getDownloadUrl(id)) as { url: string }
 
-	// * 在当前页面弹出下载窗口
-	window.open(url, '_self')
+  // * 在当前页面弹出下载窗口
+  window.open(url, '_self')
 }
 
 const handleTapCardActionItem = async (
-	command: string | number | object,
-	id: string,
-	name: string,
-	type?: string,
-	thumb?: string,
-	extName = ''
+  command: string | number | object,
+  id: string,
+  name: string,
+  _type?: string,
+  thumb?: string,
+  extName = '',
 ) => {
-	if (command === 'download') {
-		download(id)
-	} else if (command === 'delete') {
-		ElMessageBox.confirm('文件删除后将无法恢复，确定要删除么？', '删除文件', {
-			confirmButtonText: '确定删除',
-			cancelButtonText: '取消',
-			type: 'warning'
-		})
-			.then(async () => {
-				try {
-					await deleteFile(id)
-					const docs = listData.value.docs || []
-					const index = docs.findIndex((doc: Storage) => doc.id === id)
+  if (command === 'download') {
+    download(id)
+  } else if (command === 'delete') {
+    ElMessageBox.confirm('文件删除后将无法恢复，确定要删除么？', '删除文件', {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+      .then(async () => {
+        try {
+          await deleteFile(id)
+          const docs = listData.value.docs || []
+          const index = docs.findIndex((doc: any) => doc.id === id)
 
-					if (index !== -1) {
-						docs.splice(index, 1)
-					}
-					ElMessage.success('文件删除成功')
-				} catch {
-					ElMessage.error('文件删除失败，请重试')
-				}
-			})
-			.catch(() => {})
-	} else if (command === 'rename') {
-		renameDialogFormVisible.value = true
-		needToRenameThumb.value = thumb || ''
-		needToRenameFileId.value = id
-		needToRenameFileName.value = name.replace(extName, '')
-	} else if (command === 'move') {
-		needToMoveId.value = id
-		moveDialogFormVisible.value = true
-	}
+          if (index !== -1) {
+            docs.splice(index, 1)
+            listData.value.docs = docs as any
+          }
+          ElMessage.success('文件删除成功')
+        } catch {
+          ElMessage.error('文件删除失败，请重试')
+        }
+      })
+      .catch(() => {})
+  } else if (command === 'rename') {
+    renameDialogFormVisible.value = true
+    needToRenameThumb.value = thumb || ''
+    needToRenameFileId.value = id
+    needToRenameFileName.value = name.replace(extName, '')
+  } else if (command === 'move') {
+    needToMoveId.value = id
+    moveDialogFormVisible.value = true
+  }
 }
 
 const handlePreviewVideo = (videoUrl: string) => {
-	videoPlayerVisible.value = true
-	videoSrc.value = videoUrl
+  videoPlayerVisible.value = true
+  videoSrc.value = videoUrl
 }
 
-const handleUploadChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {
-	const isUploadingFiles = uploadFiles.filter(file => ['uploading', 'ready'].includes(file.status))
-	const isSuccessFiles = uploadFiles.filter(file => file.status === 'success')
-	const isFailFiles = uploadFiles.filter(file => file.status === 'fail')
+const handleUploadChange: UploadProps['onChange'] = (
+  _uploadFile,
+  uploadFiles,
+) => {
+  const isUploadingFiles = uploadFiles.filter((file) =>
+    ['uploading', 'ready'].includes(file.status),
+  )
+  const isSuccessFiles = uploadFiles.filter((file) => file.status === 'success')
+  const isFailFiles = uploadFiles.filter((file) => file.status === 'fail')
 
-	if (isUploadingFiles.length === 0 && isSuccessFiles.length === 0 && isFailFiles.length === 0) return
+  if (
+    isUploadingFiles.length === 0 &&
+    isSuccessFiles.length === 0 &&
+    isFailFiles.length === 0
+  )
+    return
 
-	const totalFiles = [...uploadedFiles.value, ...isSuccessFiles]
-	const title =
-		isUploadingFiles.length > 0
-			? `正在上传 ∙ 剩余${isUploadingFiles.length}项`
-			: isFailFiles.length > 0 || uploadedFiles.value.filter(file => file.status === 'fail').length > 0
-				? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
-				: `上传完成 ∙ 共${totalFiles.length}项`
-	const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
+  const totalFiles = [...uploadedFiles.value, ...isSuccessFiles]
+  const title =
+    isUploadingFiles.length > 0
+      ? `正在上传 ∙ 剩余${isUploadingFiles.length}项`
+      : isFailFiles.length > 0 ||
+          uploadedFiles.value.filter((file) => file.status === 'fail').length >
+            0
+        ? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
+        : `上传完成 ∙ 共${totalFiles.length}项`
+  const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
 
-	ElNotification.closeAll()
-	uploadStatusRef.value!.show()
-	notificationTitle.value = title
-	notificationType.value = type
+  ElNotification.closeAll()
+  uploadStatusRef.value?.show()
+  notificationTitle.value = title
+  notificationType.value = type
 
-	if (type === 'success') {
-		uploadPercentage.value = 0
-	}
+  if (type === 'success') {
+    uploadPercentage.value = 0
+  }
 
-	// refetch the file list
-	if (isUploadingFiles.length === 0) {
-		uploadedFiles.value = totalFiles
-		emitter.emit(UploadEventEnum.CLEAR_FILES)
-		fetchFiles(parentId.value)
-	}
+  // refetch the file list
+  if (isUploadingFiles.length === 0) {
+    uploadedFiles.value = totalFiles
+    emitter.emit(UploadEventEnum.CLEAR_FILES)
+    fetchFiles(parentId.value)
+  }
 }
 
-const handleUploadExceed: UploadProps['onExceed'] = files => {
-	ElMessage.warning(`一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`)
+const handleUploadExceed: UploadProps['onExceed'] = (files) => {
+  ElMessage.warning(
+    `一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`,
+  )
 }
 
-const handleUploadProgress: UploadProps['onProgress'] = (event, uploadFile, uploadFiles) => {
-	const totalSize = uploadFiles.reduce((accumulator, current) => accumulator + (current?.size || 0), 0)
-	const uploadedSize = uploadFiles.reduce((accumulator, current) => {
-		const cur = ['uploading', 'success'].includes(current?.status) ? ((current?.size || 0) * (current?.percentage || 0)) / 100 : 0
+const handleUploadProgress: UploadProps['onProgress'] = (
+  _event,
+  _uploadFile,
+  uploadFiles,
+) => {
+  const totalSize = uploadFiles.reduce(
+    (accumulator, current) => accumulator + (current?.size || 0),
+    0,
+  )
+  const uploadedSize = uploadFiles.reduce((accumulator, current) => {
+    const cur = ['uploading', 'success'].includes(current?.status)
+      ? ((current?.size || 0) * (current?.percentage || 0)) / 100
+      : 0
 
-		return accumulator + cur
-	}, 0)
-	const percentage = (uploadedSize / totalSize) * 100
+    return accumulator + cur
+  }, 0)
+  const percentage = (uploadedSize / totalSize) * 100
 
-	uploadPercentage.value = percentage
+  uploadPercentage.value = percentage
 }
 
-const handelBeforeUpload: UploadProps['beforeUpload'] = rawFile => {
-	if (rawFile.size / 1024 / 1024 > 512) {
-		ElMessage.error('上传文件的大小不能超过512MB')
+const handelBeforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
+  if (rawFile.size / 1024 / 1024 > 512) {
+    ElMessage.error('上传文件的大小不能超过512MB')
 
-		return false
-	}
+    return false
+  }
 
-	return true
+  return true
 }
 </script>
 

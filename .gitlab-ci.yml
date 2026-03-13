@@ -29,7 +29,7 @@ build-job:       # This job runs in the build stage, which runs first.
     - corepack prepare pnpm@latest-10 --activate
     - pnpm config set store-dir .pnpm-store
   script:
-    - pnpm install # 安装依赖
+    - pnpm install --frozen-lockfile # 安装依赖
     - pnpm build:prod
   cache:
     key:
@@ -53,8 +53,8 @@ lint-test-job:   # This job also runs in the test stage.
     - corepack prepare pnpm@latest-10 --activate
     - pnpm config set store-dir .pnpm-store
   script:
-    - pnpm install # 安装依赖
-    - pnpm lint:eslint
+    - pnpm install --frozen-lockfile # 安装依赖
+    - pnpm lint
 
 deploy-job:      # This job runs in the deploy stage.
   stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.

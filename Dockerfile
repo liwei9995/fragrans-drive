@@ -12,12 +12,12 @@ COPY package.json pnpm-lock.yaml ./
 RUN npm config set registry https://registry.npmmirror.com
 RUN npm install -g pnpm
 RUN pnpm config set registry https://registry.npmmirror.com
-RUN pnpm install --verbose
+RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build:prod
 
 # production stage
-FROM nginx AS production-stage
+FROM nginx:alpine AS production-stage
 RUN mkdir /app
 COPY --from=build-stage /app/dist /app
 COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf

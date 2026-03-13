@@ -1,95 +1,96 @@
 <script setup lang="ts" name="move">
-import { onBeforeMount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import StorageItem from '@/components/StorageItem/index.vue'
-import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
-import Breadcrumb from '../Breadcrumb/index.vue'
-import FolderCreation from '../FolderCreation/index.vue'
+import { onBeforeMount, ref, watch } from 'vue'
 import { getPath, moveFile } from '@/api/modules/storage'
-import { useFetchFiles } from '@/hooks/useFetchFiles'
 import type { Item } from '@/hooks/useCreateFolder'
+import { useFetchFiles } from '@/hooks/useFetchFiles'
+import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
 
 interface MoveProps {
-	id?: string
-	parentId?: string
-	title: string
-	onClose?: () => void
-	onMoved?: (id: string, parentId: string) => void
-	onFolderCreated?: (parentId: string) => void
+  id?: string
+  parentId?: string
+  title: string
+  onClose?: () => void
+  onMoved?: (id: string, parentId: string) => void
+  onFolderCreated?: (parentId: string) => void
 }
 
 const props = withDefaults(defineProps<MoveProps>(), {
-	id: () => '',
-	parentId: () => 'root',
-	title: () => ''
+  id: () => '',
+  parentId: () => 'root',
+  title: () => '',
 })
 const id = ref(props.parentId)
 const createFolderItemVisible = ref(false)
 const { fetchFiles, listData, isFetching } = useFetchFiles()
 const breadcrumbItems = ref([] as BreadcrumbItem[])
 const fetchPath = async () => {
-	if (!id.value) return
+  if (!id.value) return
 
-	if (id.value === 'root') {
-		breadcrumbItems.value = []
+  if (id.value === 'root') {
+    breadcrumbItems.value = []
 
-		return
-	}
+    return
+  }
 
-	const pathItems = await getPath(id.value)
+  const pathItems = (await getPath(id.value)) as Array<{
+    id: string
+    name: string
+  }>
 
-	breadcrumbItems.value = [
-		...pathItems.map((path: { id: string; name: string }) => ({
-			id: path.id,
-			text: path.name
-		}))
-	]
+  breadcrumbItems.value = [
+    ...pathItems.map((path) => ({
+      id: path.id,
+      text: path.name,
+    })),
+  ]
 }
 
 const dialogFormVisible = ref(true)
 
 onBeforeMount(() => {
-	fetchPath()
-	fetchFiles(id.value)
+  fetchPath()
+  fetchFiles(id.value)
 })
 
 const load = () => {
-	if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
+  if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
 
-	fetchFiles(props.parentId, false)
+  fetchFiles(id.value, false)
 }
 
 watch(
-	() => props.id,
-	() => (id.value = props.id)
+  () => props.id,
+  () => (id.value = props.id),
 )
 
-const handleClose = () => props.onClose && props.onClose()
+const handleClose = () => props.onClose?.()
 
 const handleClickBreadcrumbItem = (item: BreadcrumbItem) => {
-	if (item?.id && item?.id !== id.value) {
-		createFolderItemVisible.value = false
-		id.value = item.id
-		fetchPath()
-		fetchFiles(id.value)
-	}
+  if (item?.id && item?.id !== id.value) {
+    createFolderItemVisible.value = false
+    id.value = item.id
+    fetchPath()
+    fetchFiles(id.value)
+  }
 }
 
-const handleCloseFolderCreationItem = () => (createFolderItemVisible.value = false)
+const handleCloseFolderCreationItem = () =>
+  (createFolderItemVisible.value = false)
 
 const handleCreateFolderSuccess = (item: Item) => {
-	createFolderItemVisible.value = false
-	id.value = item.id
-	fetchPath()
-	fetchFiles(id.value)
-	props.onFolderCreated && props.onFolderCreated(item.parentId)
+  createFolderItemVisible.value = false
+  id.value = item.id
+  fetchPath()
+  fetchFiles(id.value)
+  props.onFolderCreated?.(item.parentId)
 }
 
 const handleTapItem = (itemId: string) => {
-	createFolderItemVisible.value = false
-	id.value = itemId
-	fetchPath()
-	fetchFiles(id.value)
+  createFolderItemVisible.value = false
+  id.value = itemId
+  fetchPath()
+  fetchFiles(id.value)
 }
 
 const handleCreateFolder = () => (createFolderItemVisible.value = true)
@@ -97,26 +98,42 @@ const handleCreateFolder = () => (createFolderItemVisible.value = true)
 const handleCancel = () => (dialogFormVisible.value = false)
 
 const handleMove = () => {
-	ElMessage.info({
-		message: '正在移动文件...',
-		duration: 0
-	})
+  ElMessage.info({
+    message: '正在移动文件...',
+    duration: 0,
+  })
 
-	moveFile({
-		fileId: props.id,
-		parentId: id.value
-	})
-		.then(() => {
-			dialogFormVisible.value = false
-			ElMessage.closeAll()
-			ElMessage.success('移动成功')
-			props.onMoved && props.onMoved(props.id, id.value)
-		})
-		.catch(() => {
-			ElMessage.closeAll()
-			ElMessage.error('移动失败，请重试')
-		})
+  moveFile({
+    fileId: props.id,
+    parentId: id.value,
+  })
+    .then(() => {
+      dialogFormVisible.value = false
+      ElMessage.closeAll()
+      ElMessage.success('移动成功')
+      props.onMoved?.(props.id, id.value)
+    })
+    .catch(() => {
+      ElMessage.closeAll()
+      ElMessage.error('移动失败，请重试')
+    })
 }
+
+defineExpose({
+  dialogFormVisible,
+  breadcrumbItems,
+  createFolderItemVisible,
+  listData,
+  load,
+  handleTapItem,
+  handleMove,
+  handleClickBreadcrumbItem,
+  handleCreateFolder,
+  handleCloseFolderCreationItem,
+  handleCreateFolderSuccess,
+  handleClose,
+  handleCancel,
+})
 </script>
 
 <template>

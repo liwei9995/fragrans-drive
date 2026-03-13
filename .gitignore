@@ -23,3 +23,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Auto-generated
+src/auto-imports.d.ts
+src/components.d.ts
+.biomeignore

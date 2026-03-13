@@ -1,8 +1,8 @@
 <script setup lang="ts" name="login">
+import type { ElForm } from 'element-plus'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Login } from '@/api/interface'
-import type { ElForm } from 'element-plus'
 import { authLogin } from '@/api/modules/user'
 import { HOME_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
@@ -13,26 +13,26 @@ const globalStore = GlobalStore()
 type FormInstance = InstanceType<typeof ElForm>
 const loginFormRef = ref<FormInstance>()
 const loginRules = reactive({
-	username: [
-		{
-			required: true,
-			message: '请输入用户名',
-			trigger: 'blur'
-		}
-	],
-	password: [
-		{
-			required: true,
-			message: '请输入密码',
-			trigger: 'blur'
-		}
-	]
+  username: [
+    {
+      required: true,
+      message: '请输入用户名',
+      trigger: 'blur',
+    },
+  ],
+  password: [
+    {
+      required: true,
+      message: '请输入密码',
+      trigger: 'blur',
+    },
+  ],
 })
 
 // 登录表单数据
 const loginForm = reactive<Login.ReqLoginForm>({
-	username: '',
-	password: ''
+  username: '',
+  password: '',
 })
 const loading = ref<boolean>(false)
 const router = useRouter()
@@ -40,38 +40,42 @@ const route = useRoute()
 
 // login
 const login = (formEl: FormInstance | undefined) => {
-	if (!formEl) return
-	formEl.validate(async valid => {
-		if (!valid) return
-		loading.value = true
-		try {
-			const requestLoginForm: Login.ReqLoginForm = {
-				username: loginForm.username,
-				password: loginForm.password
-			}
-			const res = await authLogin(requestLoginForm)
-			const { redirect } = route.query
-			const path = (redirect || HOME_URL) as string
+  if (!formEl) return
+  formEl.validate(async (valid) => {
+    if (!valid) return
+    loading.value = true
+    try {
+      const requestLoginForm: Login.ReqLoginForm = {
+        username: loginForm.username,
+        password: loginForm.password,
+      }
+      const res = (await authLogin(requestLoginForm)) as {
+        access_token: string
+      }
+      const { redirect } = route.query
+      const path = (redirect || HOME_URL) as string
 
-			// * 存储 token
-			globalStore.setToken(res?.access_token)
-			router.push(path)
-		} finally {
-			loading.value = false
-		}
-	})
+      // * 存储 token
+      globalStore.setToken(res?.access_token)
+      router.push(path)
+    } finally {
+      loading.value = false
+    }
+  })
 }
 
 onMounted(() => {
-	// 监听enter事件（调用登录）
-	document.onkeydown = (e: any) => {
-		e = window.event || e
-		if (e.code === 'Enter' || e.code === 'enter' || e.code === 'NumpadEnter') {
-			if (loading.value) return
-			login(loginFormRef.value)
-		}
-	}
+  // 监听enter事件（调用登录）
+  document.onkeydown = (e: KeyboardEvent) => {
+    e = (window.event as KeyboardEvent) || e
+    if (e.code === 'Enter' || e.code === 'enter' || e.code === 'NumpadEnter') {
+      if (loading.value) return
+      login(loginFormRef.value)
+    }
+  }
 })
+
+defineExpose({ loginRules, loginFormRef, loginForm, loading, login })
 </script>
 
 <template>

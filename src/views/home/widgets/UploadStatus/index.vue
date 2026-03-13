@@ -1,46 +1,56 @@
 <script setup lang="ts" name="upload-status">
+import {
+  CircleCloseFilled,
+  InfoFilled,
+  SuccessFilled,
+  UploadFilled,
+  WarningFilled,
+} from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
-import { CircleCloseFilled, InfoFilled, SuccessFilled, UploadFilled, WarningFilled } from '@element-plus/icons-vue'
 
 interface UploadStatusProps {
-	type?: string
-	showClose?: boolean
-	title?: string
-	percentage?: number
-	zIndex?: number
-	onClose?: () => void
+  type?: string
+  showClose?: boolean
+  title?: string
+  percentage?: number
+  zIndex?: number
+  onClose?: () => void
 }
 
 const visible = ref(false)
 const TypeComponentsMap = {
-	error: CircleCloseFilled,
-	info: InfoFilled,
-	success: SuccessFilled,
-	warning: WarningFilled,
-	uploading: UploadFilled
-} as Record<string, any>
+  error: CircleCloseFilled,
+  info: InfoFilled,
+  success: SuccessFilled,
+  warning: WarningFilled,
+  uploading: UploadFilled,
+} as Record<string, unknown>
 
 const props = withDefaults(defineProps<UploadStatusProps>(), {
-	type: () => 'uploading',
-	title: () => '',
-	percentage: () => 0,
-	zIndex: () => 0,
-	showClose: () => true
+  type: () => 'uploading',
+  title: () => '',
+  percentage: () => 0,
+  zIndex: () => 0,
+  showClose: () => true,
 })
 
 const icon = computed(() => TypeComponentsMap[props.type])
-const uploadPercentage = computed(() => (props.type === 'uploading' ? props.percentage : 0))
+const uploadPercentage = computed(() =>
+  props.type === 'uploading' ? props.percentage : 0,
+)
 
 const show = () => (visible.value = true)
 
 const close = () => {
-	visible.value = false
-	props.onClose && props.onClose()
+  visible.value = false
+  props.onClose?.()
 }
 
 defineExpose({
-	show,
-	close
+  show,
+  close,
+  icon,
+  uploadPercentage,
 })
 </script>
 

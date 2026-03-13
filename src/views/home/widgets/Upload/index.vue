@@ -1,10 +1,10 @@
 <script setup lang="ts" name="upload">
+import type { UploadInstance, UploadProps } from 'element-plus'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { UploadInstance, UploadProps } from 'element-plus'
+import { UploadEventEnum } from '@/enums/events'
 import { GlobalStore } from '@/store'
 import emitter from '@/utils/emitter'
-import { UploadEventEnum } from '@/enums/events'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,43 +13,47 @@ const parentId = (route.params.id as string) || 'root'
 const uploadPayload = ref({ parentId })
 
 const uploadRef = ref<UploadInstance>()
-const storageAction = computed(() => `${import.meta.env.VITE_API_URL}/v1/storage/upload`)
+const storageAction = computed(
+  () => `${import.meta.env.VITE_API_URL}/v1/storage/upload`,
+)
 const globalStore = GlobalStore()
 const uploadHeaders = {
-	Authorization: `Bearer ${globalStore.token}`
+  Authorization: `Bearer ${globalStore.token}`,
 }
 
 interface UploaderProps {
-	multiple?: boolean
-	showFileList?: boolean
-	limit?: number
-	onUploadChange?: UploadProps['onChange']
-	onUploadExceed?: UploadProps['onExceed']
-	onUploadProgress?: UploadProps['onProgress']
-	onUploadSuccess?: UploadProps['onSuccess']
-	onUploadError?: UploadProps['onError']
-	beforeUpload?: UploadProps['beforeUpload']
+  multiple?: boolean
+  showFileList?: boolean
+  limit?: number
+  onUploadChange?: UploadProps['onChange']
+  onUploadExceed?: UploadProps['onExceed']
+  onUploadProgress?: UploadProps['onProgress']
+  onUploadSuccess?: UploadProps['onSuccess']
+  onUploadError?: UploadProps['onError']
+  beforeUpload?: UploadProps['beforeUpload']
 }
 
 withDefaults(defineProps<UploaderProps>(), {
-	multiple: () => true,
-	showFileList: () => false,
-	limit: () => 10
+  multiple: () => true,
+  showFileList: () => false,
+  limit: () => 10,
 })
 
-const clearFiles = (status?: Array<'ready' | 'uploading' | 'success' | 'fail'>) => {
-	uploadRef.value?.clearFiles(status)
+const clearFiles = (
+  status?: Array<'ready' | 'uploading' | 'success' | 'fail'>,
+) => {
+  uploadRef.value?.clearFiles(status)
 }
 
-emitter.on(UploadEventEnum.CLEAR_FILES, clearFiles)
+emitter.on(UploadEventEnum.CLEAR_FILES, clearFiles as any)
 
 watch(
-	() => router.currentRoute.value,
-	() => {
-		const parentId = (route.params.id as string) || 'root'
+  () => router.currentRoute.value,
+  () => {
+    const parentId = (route.params.id as string) || 'root'
 
-		uploadPayload.value = { parentId }
-	}
+    uploadPayload.value = { parentId }
+  },
 )
 
 onBeforeUnmount(() => clearFiles())
