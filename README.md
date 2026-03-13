@@ -76,17 +76,22 @@ cargo clippy
 
 ### 访问方式
 
-您可以查看 `src/api/mod.rs` 获取完整的路由定义。主要接口包括：
+本项目通过 **utoipa** 自动生成 OpenAPI 接口文档，您可以通过交互式 UI 直接测试接口：
+
+- **Swagger UI**: [http://localhost:3821/swagger-ui](http://localhost:3821/swagger-ui)
+- **OpenAPI JSON**: `/api-docs/openapi.json`
+
+主要接口概览：
 
 | 模块        | 路径                 | 方法     | 描述                       |
 | ----------- | -------------------- | -------- | -------------------------- |
-| **Auth**    | `/v1/auth/login`     | POST     | 用户登录                   |
-| **Users**   | `/v1/users`          | GET/POST | 用户管理                   |
-| **Storage** | `/v1/storage/upload` | POST     | 文件上传 (Multipart)       |
-| **Storage** | `/v1/storage/list`   | POST     | 获取文件列表               |
-| **Storage** | `/v1/storage/:id`    | GET      | 文件下载 (支持 token 验证) |
+| **Auth**    | `/v1/auth/login`     | POST     | 用户登录 (获取 Token)      |
+| **Users**   | `/v1/users`          | GET/POST | 用户管理 (需 Token)        |
+| **Storage** | `/v1/storage/upload` | POST     | 文件上传 (需 Token)        |
+| **Storage** | `/v1/storage/list`   | POST     | 获取文件列表 (需 Token)    |
+| **Storage** | `/v1/storage/{id}`   | GET      | 文件下载 (支持 token 验证) |
 
-_提示：由于本项目目前不通过 Swagger 自动生成文档，建议配合 Postman 或 Insomnia 使用。_
+*提示：在 Swagger UI 中点击 "Authorize" 并输入 Bearer Token 即可测试加密接口。*
 
 ## 📦 部署 (Deployment)
 
