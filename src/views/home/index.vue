@@ -381,42 +381,34 @@ const handleUploadChange: UploadProps['onChange'] = (
   isDragging.value = false
   dragCounter = 0
 
-  // Filter files that are actually being processed or finished
-  // We exclude 'ready' files if they are not the only thing in the list,
-  // as they might be aborted or rejected files.
-  const isUploadingFiles = uploadFiles.filter(
-    (file) => file.status === 'uploading',
+  // Total items in current batch that are either waiting or active
+  const activeFiles = uploadFiles.filter((file) =>
+    ['uploading', 'ready'].includes(file.status),
   )
-  const isSuccessFiles = uploadFiles.filter((file) => file.status === 'success')
-  const isFailFiles = uploadFiles.filter((file) => file.status === 'fail')
+  const isActuallyFinished = activeFiles.length === 0
 
-  // If there are files with 'ready' status but no 'uploading' files,
-  // it might mean they were rejected or are waiting.
-  // But if there's nothing else going on, we don't want to get stuck.
-  const isReadyFiles = uploadFiles.filter((file) => file.status === 'ready')
+  if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) return
 
-  if (
-    isUploadingFiles.length === 0 &&
-    isSuccessFiles.length === 0 &&
-    isFailFiles.length === 0 &&
-    isReadyFiles.length === 0
+  // Manage cumulative finished files counts using UIDs for deduplication to ensure accuracy
+  const allFinishedFiles = [...uploadedFiles.value, ...uploadFiles].filter(
+    (f) => ['success', 'fail'].includes(f.status),
   )
-    return
 
-  const totalSuccess =
-    uploadedFiles.value.filter((f) => f.status === 'success').length +
-    isSuccessFiles.length
-  const totalFail =
-    uploadedFiles.value.filter((f) => f.status === 'fail').length +
-    isFailFiles.length
+  const uniqueFinished = new Map()
+  for (const f of allFinishedFiles) {
+    const key = f.uid || f.name || Math.random()
+    uniqueFinished.set(key, f)
+  }
 
-  const isActuallyFinished = isUploadingFiles.length === 0
+  const finishedList = Array.from(uniqueFinished.values())
+  const successCount = finishedList.filter((f) => f.status === 'success').length
+  const failCount = finishedList.filter((f) => f.status === 'fail').length
 
   const title = !isActuallyFinished
-    ? `正在上传 ∙ 剩余${isUploadingFiles.length + isReadyFiles.length}项`
-    : totalFail > 0
-      ? `上传完成 ∙ 成功${totalSuccess}项 失败${totalFail}项`
-      : `上传完成 ∙ 共${totalSuccess}项`
+    ? `正在上传 ∙ 剩余${activeFiles.length}项`
+    : failCount > 0
+      ? `上传完成 ∙ 成功${successCount}项 失败${failCount}项`
+      : `上传完成 ∙ 共${successCount}项`
 
   const type = !isActuallyFinished ? 'uploading' : 'success'
 
@@ -430,18 +422,15 @@ const handleUploadChange: UploadProps['onChange'] = (
   }
 
   // Finalize the batch only when all files in the current list have reached a terminal state
-  if (isActuallyFinished) {
-    // Only add unique files to the cumulative list
-    const currentBatchFinished = uploadFiles.filter((f) =>
-      ['success', 'fail'].includes(f.status),
-    )
-    uploadedFiles.value = [...uploadedFiles.value, ...currentBatchFinished]
+  if (isActuallyFinished && uploadFiles.length > 0) {
+    // Current batch is done, move to cumulative historical list
+    uploadedFiles.value = finishedList
 
-    // Use a small delay before clearing to ensure the Success state is visible
+    // Use a slightly longer delay before clearing to ensure the Success state is visible
     setTimeout(() => {
       emitter.emit(UploadEventEnum.CLEAR_FILES)
       fetchFiles(parentId.value)
-    }, 100)
+    }, 200)
   }
 }
 
