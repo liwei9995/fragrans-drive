@@ -16,7 +16,7 @@ defineProps<GlobalDropzoneProps>()
 
 <template>
   <transition name="fade">
-    <div v-if="show" class="global-dropzone">
+    <div v-show="show" class="global-dropzone">
       <Upload
         drag
         multiple

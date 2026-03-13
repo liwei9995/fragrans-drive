@@ -3,7 +3,7 @@ FROM node:24-alpine AS base
 
 LABEL web.maintainer=alex.li@oyiyio.com \
   web.name=fragrans-drive \
-  web.version=0.2.0
+  web.version=0.3.0
 
 FROM base AS build-stage
 

@@ -32,9 +32,9 @@ const handleTap = () => props.tapItem && props.tapItem(props.id)
       multiple
       :show-file-list="false"
       :limit="limit"
-      :on-change="onUploadChange"
-      :on-exceed="onUploadExceed"
-      :on-progress="onUploadProgress"
+      :on-upload-change="onUploadChange"
+      :on-upload-exceed="onUploadExceed"
+      :on-upload-progress="onUploadProgress"
       :before-upload="beforeUpload"
     >
       <template #trigger>

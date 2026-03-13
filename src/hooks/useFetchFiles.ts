@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { format } from 'date-fns'
 import { ref } from 'vue'
 import { getFiles } from '@/api/modules/storage'
@@ -71,16 +72,23 @@ export const useFetchFiles = () => {
       listData.value = initialData
     }
 
-    const data = (await getFiles({
-      query: { parentId },
-      pagination: {
-        page: listData.value.page + 1,
-        limit: listData.value.limit,
-        sort: {
-          updatedAt: -1,
+    let data: { docs: Storage[]; [key: string]: unknown }
+    try {
+      data = (await getFiles({
+        query: { parentId },
+        pagination: {
+          page: listData.value.page + 1,
+          limit: listData.value.limit,
+          sort: {
+            updatedAt: -1,
+          },
         },
-      },
-    })) as { docs: Storage[]; [key: string]: unknown }
+      })) as { docs: Storage[]; [key: string]: unknown }
+    } catch (err) {
+      isFetching.value = false
+      if (axios.isCancel(err)) return
+      throw err
+    }
 
     isFetching.value = false
 

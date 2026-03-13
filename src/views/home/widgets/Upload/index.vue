@@ -33,11 +33,29 @@ interface UploaderProps {
   beforeUpload?: UploadProps['beforeUpload']
 }
 
-withDefaults(defineProps<UploaderProps>(), {
+const props = withDefaults(defineProps<UploaderProps>(), {
   multiple: () => true,
   showFileList: () => false,
   limit: () => 10,
 })
+
+const handleSuccess: UploadProps['onSuccess'] = (
+  response,
+  uploadFile,
+  uploadFiles,
+) => {
+  props.onUploadSuccess?.(response, uploadFile, uploadFiles)
+  props.onUploadChange?.(uploadFile, uploadFiles)
+}
+
+const handleError: UploadProps['onError'] = (
+  error,
+  uploadFile,
+  uploadFiles,
+) => {
+  props.onUploadError?.(error, uploadFile, uploadFiles)
+  props.onUploadChange?.(uploadFile, uploadFiles)
+}
 
 const clearFiles = (
   status?: Array<'ready' | 'uploading' | 'success' | 'fail'>,
@@ -72,8 +90,8 @@ onBeforeUnmount(() => clearFiles())
     :on-change="onUploadChange"
     :on-exceed="onUploadExceed"
     :on-progress="onUploadProgress"
-    :on-success="onUploadSuccess"
-    :on-error="onUploadError"
+    :on-success="handleSuccess"
+    :on-error="handleError"
     :before-upload="beforeUpload"
   >
     <template #trigger>

@@ -54,6 +54,7 @@ const breadcrumbItems = ref([] as BreadcrumbItem[])
 const isDragging = ref(false)
 const selectedIds = ref(new Set<string>())
 let dragCounter = 0
+let uploadCleanedUp = false
 const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
@@ -376,17 +377,16 @@ const handlePreviewVideo = (videoUrl: string) => {
 }
 
 const handleUploadChange: UploadProps['onChange'] = (
-  _uploadFile,
+  uploadFile,
   uploadFiles,
 ) => {
-  // Clear drag state
   isDragging.value = false
   dragCounter = 0
 
-  // Gate: Only proceed if there's an active session or files are being added
-  if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) return
+  if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) {
+    if (!uploadFile || !['success', 'fail'].includes(uploadFile.status)) return
+  }
 
-  // 1. Identify active vs finished files in the current batch
   const activeFiles = uploadFiles.filter((f) =>
     ['uploading', 'ready'].includes(f.status),
   )
@@ -394,29 +394,35 @@ const handleUploadChange: UploadProps['onChange'] = (
     ['success', 'fail'].includes(f.status),
   )
 
-  // 2. Sync finished files into our session state (deduplicated by UID)
+  // uploadFile might already be success/fail but not yet reflected in uploadFiles
+  if (
+    uploadFile &&
+    ['success', 'fail'].includes(uploadFile.status) &&
+    !finishedInBatch.some((f) => f.uid === uploadFile.uid)
+  ) {
+    finishedInBatch.push(uploadFile)
+  }
+
   const combined = [...uploadedFiles.value]
   for (const f of finishedInBatch) {
     const idx = combined.findIndex((h) => h.uid === f.uid)
     if (idx > -1) combined[idx] = f
     else combined.push(f)
   }
-
-  // 3. Update the session state
   uploadedFiles.value = combined
 
-  // 4. Determine if the ENTIRE session is finished
-  // We are finished if there are no active files in the current component
-  // AND there's at least one finished file to show.
-  const isCurrentlyFinished = activeFiles.length === 0
+  const pendingCount = activeFiles.filter(
+    (f) => !finishedInBatch.some((done) => done.uid === f.uid),
+  ).length
+  const isAllDone = pendingCount === 0
 
   const successCount = combined.filter((f) => f.status === 'success').length
   const failCount = combined.filter((f) => f.status === 'fail').length
 
-  // 5. Update UI Labels
-  if (!isCurrentlyFinished) {
-    notificationTitle.value = `正在上传 ∙ 剩余${activeFiles.length}项`
+  if (!isAllDone) {
+    notificationTitle.value = `正在上传 ∙ 剩余${pendingCount}项`
     notificationType.value = 'uploading'
+    uploadCleanedUp = false
   } else if (combined.length > 0) {
     notificationTitle.value =
       failCount > 0
@@ -428,16 +434,11 @@ const handleUploadChange: UploadProps['onChange'] = (
 
   uploadStatusRef.value?.show()
 
-  // 6. Handle automatic cleanup and refresh
-  if (isCurrentlyFinished && uploadFiles.length > 0) {
+  if (isAllDone && combined.length > 0 && !uploadCleanedUp) {
+    uploadCleanedUp = true
+    emitter.emit(UploadEventEnum.CLEAR_FILES)
+    uploadedFiles.value = []
     fetchFiles(parentId.value)
-
-    // Clear the component's internal list after a short delay
-    // This allows the user to see the "Success" state
-    setTimeout(() => {
-      emitter.emit(UploadEventEnum.CLEAR_FILES)
-      fetchFiles(parentId.value)
-    }, 200)
   }
 }
 

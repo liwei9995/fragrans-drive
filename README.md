@@ -6,6 +6,10 @@
 
 <h1 align="center">Fragrans Drive</h1>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.3.0-blue" alt="version" />
+</p>
+
 一款基于 [Vue 3.x](https://vuejs.org/guide/introduction.html) + [Element UI](https://element-plus.org/zh-CN/) + [Pina](https://pinia.vuejs.org) + [TypeScript](https://www.typescriptlang.org/) 实现的可私有部署的个人云盘。
 
 > Fragrans Drive 目前仍在开发中，部分功能将持续完善。

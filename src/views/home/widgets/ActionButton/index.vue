@@ -52,11 +52,11 @@ const handleCommand = (command: string | number | object) =>
                 multiple
                 :show-file-list="false"
                 :limit="uploadFileLimit"
-                :on-change="onUploadChange"
-                :on-exceed="onUploadExceed"
-                :on-progress="onUploadProgress"
-                :on-success="onUploadSuccess"
-                :on-error="onUploadError"
+                :on-upload-change="onUploadChange"
+                :on-upload-exceed="onUploadExceed"
+                :on-upload-progress="onUploadProgress"
+                :on-upload-success="onUploadSuccess"
+                :on-upload-error="onUploadError"
                 :before-upload="beforeUpload"
               >
                 <template #trigger>{{ item.name }}</template>
