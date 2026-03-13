@@ -1,4 +1,4 @@
-<script setup lang="ts" name="login">
+<script setup lang="ts" name="LoginForm">
 import type { ElForm } from 'element-plus'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

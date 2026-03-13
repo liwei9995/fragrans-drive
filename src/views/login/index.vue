@@ -1,4 +1,5 @@
 <script setup lang="ts" name="login">
+import LoginForm from './widgets/LoginForm.vue'
 </script>
 
 <template>

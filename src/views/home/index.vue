@@ -473,17 +473,26 @@ const onDrop = (e: DragEvent) => {
   isDragging.value = false
 }
 
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    isDragging.value = false
+    dragCounter = 0
+  }
+}
+
 onMounted(() => {
   window.addEventListener('dragenter', onDragEnter)
   window.addEventListener('dragleave', onDragLeave)
   window.addEventListener('dragover', (e) => e.preventDefault())
   window.addEventListener('drop', onDrop)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('dragenter', onDragEnter)
   window.removeEventListener('dragleave', onDragLeave)
   window.removeEventListener('drop', onDrop)
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

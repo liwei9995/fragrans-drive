@@ -1,4 +1,5 @@
 <script setup lang="ts" name="empty">
+import { UploadFilled } from '@element-plus/icons-vue'
 import type { UploadProps } from 'element-plus'
 import EmptyItem from './Item/index.vue'
 
@@ -36,6 +37,10 @@ const handleTapItem = (id: string) => props.tapItem && props.tapItem(id)
 
 <template>
   <div class="empty-placeholder">
+    <div class="drag-hint">
+      <el-icon><UploadFilled /></el-icon>
+      <span>拖拽文件到此处上传</span>
+    </div>
     <div class="items">
       <EmptyItem
         v-for="item in items"

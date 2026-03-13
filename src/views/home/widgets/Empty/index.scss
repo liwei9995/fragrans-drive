@@ -7,6 +7,32 @@
   align-items: center;
   justify-content: center;
 
+  .drag-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 32px;
+    color: var(--c-primary);
+    opacity: 0.6;
+    transition: all 0.3s ease;
+
+    .el-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    span {
+      font-size: 16px;
+      font-weight: 500;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    &:hover {
+      opacity: 1;
+      transform: translateY(-4px);
+    }
+  }
+
   .items {
     display: flex;
     justify-content: space-between;
