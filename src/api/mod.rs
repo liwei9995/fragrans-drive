@@ -29,10 +29,10 @@ pub fn router(db: Database, config: Config) -> Router {
             axum::routing::get(users::get_all_users).post(users::create_user),
         )
         .route(
-            "/:id",
+            "/{id}",
             axum::routing::get(users::get_user).delete(users::delete_user),
         )
-        .route("/profile/:id", axum::routing::post(users::update_profile))
+        .route("/profile/{id}", axum::routing::post(users::update_profile))
         .route("/password", axum::routing::post(users::update_password))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
@@ -51,14 +51,14 @@ pub fn router(db: Database, config: Config) -> Router {
             axum::routing::post(storage::get_download_url),
         )
         .route(
-            "/:id",
+            "/{id}",
             axum::routing::put(storage::update_file).delete(storage::remove_file),
         )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::auth_guard,
         ))
-        .route("/:id", axum::routing::get(storage::get_file)) // Move public Get here or keep it outside layer? Legacy had @Public()
+        .route("/{id}", axum::routing::get(storage::get_file)) // Move public Get here or keep it outside layer? Legacy had @Public()
         .with_state(state.clone());
 
     let v1 = Router::new()
