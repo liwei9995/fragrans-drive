@@ -381,29 +381,44 @@ const handleUploadChange: UploadProps['onChange'] = (
   isDragging.value = false
   dragCounter = 0
 
-  const isUploadingFiles = uploadFiles.filter((file) =>
-    ['uploading', 'ready'].includes(file.status),
+  // Filter files that are actually being processed or finished
+  // We exclude 'ready' files if they are not the only thing in the list,
+  // as they might be aborted or rejected files.
+  const isUploadingFiles = uploadFiles.filter(
+    (file) => file.status === 'uploading',
   )
   const isSuccessFiles = uploadFiles.filter((file) => file.status === 'success')
   const isFailFiles = uploadFiles.filter((file) => file.status === 'fail')
 
+  // If there are files with 'ready' status but no 'uploading' files,
+  // it might mean they were rejected or are waiting.
+  // But if there's nothing else going on, we don't want to get stuck.
+  const isReadyFiles = uploadFiles.filter((file) => file.status === 'ready')
+
   if (
     isUploadingFiles.length === 0 &&
     isSuccessFiles.length === 0 &&
-    isFailFiles.length === 0
+    isFailFiles.length === 0 &&
+    isReadyFiles.length === 0
   )
     return
 
-  const totalFiles = [...uploadedFiles.value, ...isSuccessFiles]
-  const title =
-    isUploadingFiles.length > 0
-      ? `正在上传 ∙ 剩余${isUploadingFiles.length}项`
-      : isFailFiles.length > 0 ||
-          uploadedFiles.value.filter((file) => file.status === 'fail').length >
-            0
-        ? `上传完成 ∙ 成功${isSuccessFiles.length}项 失败${isFailFiles.length}项`
-        : `上传完成 ∙ 共${totalFiles.length}项`
-  const type = isUploadingFiles.length > 0 ? 'uploading' : 'success'
+  const totalSuccess =
+    uploadedFiles.value.filter((f) => f.status === 'success').length +
+    isSuccessFiles.length
+  const totalFail =
+    uploadedFiles.value.filter((f) => f.status === 'fail').length +
+    isFailFiles.length
+
+  const isActuallyFinished = isUploadingFiles.length === 0
+
+  const title = !isActuallyFinished
+    ? `正在上传 ∙ 剩余${isUploadingFiles.length + isReadyFiles.length}项`
+    : totalFail > 0
+      ? `上传完成 ∙ 成功${totalSuccess}项 失败${totalFail}项`
+      : `上传完成 ∙ 共${totalSuccess}项`
+
+  const type = !isActuallyFinished ? 'uploading' : 'success'
 
   ElNotification.closeAll()
   uploadStatusRef.value?.show()
@@ -414,11 +429,19 @@ const handleUploadChange: UploadProps['onChange'] = (
     uploadPercentage.value = 0
   }
 
-  // refetch the file list
-  if (isUploadingFiles.length === 0) {
-    uploadedFiles.value = totalFiles
-    emitter.emit(UploadEventEnum.CLEAR_FILES)
-    fetchFiles(parentId.value)
+  // Finalize the batch only when all files in the current list have reached a terminal state
+  if (isActuallyFinished) {
+    // Only add unique files to the cumulative list
+    const currentBatchFinished = uploadFiles.filter((f) =>
+      ['success', 'fail'].includes(f.status),
+    )
+    uploadedFiles.value = [...uploadedFiles.value, ...currentBatchFinished]
+
+    // Use a small delay before clearing to ensure the Success state is visible
+    setTimeout(() => {
+      emitter.emit(UploadEventEnum.CLEAR_FILES)
+      fetchFiles(parentId.value)
+    }, 100)
   }
 }
 
