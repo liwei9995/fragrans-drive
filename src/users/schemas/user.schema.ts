@@ -1,7 +1,7 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document } from 'mongoose'
-import * as bcrypt from 'bcryptjs'
-import { Role } from '../../common/enums/role.enum'
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import * as bcrypt from "bcryptjs";
+import type { Document } from "mongoose";
+import { Role } from "../../common/enums/role.enum";
 
 export type UserDocument = User & Document;
 
@@ -10,35 +10,35 @@ export type UserDocument = User & Document;
 })
 export class User {
   @Prop({ required: true, unique: true })
-    email: string
+  email: string;
 
   @Prop({ required: true })
-    password: string
+  password: string;
 
   @Prop()
-    firstName: string
+  firstName: string;
 
   @Prop()
-    lastName: string
+  lastName: string;
 
   @Prop()
-    gender?: number
+  gender?: number;
 
   @Prop()
-    age?: number
+  age?: number;
 
   @Prop()
-    avatar?: string
+  avatar?: string;
 
   @Prop({
     type: Array,
     enum: Role,
-    default: [ Role.User ],
+    default: [Role.User],
   })
-    roles?: Role[]
+  roles?: Role[];
 }
 
-export const UserSchema = SchemaFactory.createForClass(User)
+export const UserSchema = SchemaFactory.createForClass(User);
 
 type comparePasswordFunction = (
   candidatePassword: string,
@@ -53,26 +53,26 @@ const comparePassword: comparePasswordFunction = function (
     candidatePassword,
     this.password,
     (err: Error, isMatch: boolean) => {
-      cb(err, isMatch)
+      cb(err, isMatch);
     },
-  )
-}
+  );
+};
 
-UserSchema.pre('save', async function save(next) {
-  const user = this as UserDocument
-  const saltOrRounds = 10
+UserSchema.pre("save", async function save(next) {
+  const user = this as UserDocument;
+  const saltOrRounds = 10;
 
-  if (!user.isModified('password')) {
-    return next()
+  if (!user.isModified("password")) {
+    return next();
   }
 
   try {
-    const hash = await bcrypt.hash(user.password, saltOrRounds)
+    const hash = await bcrypt.hash(user.password, saltOrRounds);
 
-    user.password = hash
+    user.password = hash;
   } catch (err) {
-    return next(err)
+    return next(err);
   }
-})
+});
 
-UserSchema.methods.comparePassword = comparePassword
+UserSchema.methods.comparePassword = comparePassword;

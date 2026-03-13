@@ -1,22 +1,22 @@
-import { basename, extname } from 'path'
+import { basename, extname } from "node:path";
 
 export type File = {
-  size?: number
-  originalname?: string
-  mimetype?: string
-  type?: string
-  encoding?: string
-  hash?: string
-  iv?: string
-  parentId?: string
-  userId: string
-  thumbnail?: string
-}
+  size?: number;
+  originalname?: string;
+  mimetype?: string;
+  type?: string;
+  encoding?: string;
+  hash?: string;
+  iv?: string;
+  parentId?: string;
+  userId: string;
+  thumbnail?: string;
+};
 
 export default class StorageClass {
-  static findOne: any
-  static paginate: any
-  static create: any
+  static findOne: any;
+  static paginate: any;
+  static create: any;
 
   static async createByFile(file = {} as File) {
     const obj = {
@@ -30,11 +30,11 @@ export default class StorageClass {
       iv: file.iv,
       parentId: file.parentId,
       userId: file.userId,
-      type: file.type || 'file',
-      thumbnail: file.thumbnail
-    }
+      type: file.type || "file",
+      thumbnail: file.thumbnail,
+    };
 
-    return this.create(obj)
+    return StorageClass.create(obj);
   }
 
   static async createByFolder(folder = {} as File) {
@@ -42,21 +42,21 @@ export default class StorageClass {
       name: folder.originalname,
       parentId: folder.parentId,
       userId: folder.userId,
-      type: folder.type || 'folder',
-    }
+      type: folder.type || "folder",
+    };
 
-    return this.create(obj)
+    return StorageClass.create(obj);
   }
 
   static async findByHash(hash) {
-    return this.findOne({
+    return StorageClass.findOne({
       MD5Hash: hash,
-    })
+    });
   }
 
   static async getFiles(query = {}, pagination = {}) {
-    const files = await this.paginate(query, pagination)
+    const files = await StorageClass.paginate(query, pagination);
 
-    return files
+    return files;
   }
 }

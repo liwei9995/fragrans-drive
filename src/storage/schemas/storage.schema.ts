@@ -1,56 +1,56 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document } from 'mongoose'
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import type { Document } from "mongoose";
 
-export type StorageDocument = Storage & Document
+export type StorageDocument = Storage & Document;
 
 @Schema({
   timestamps: true,
 })
 export class Storage {
   @Prop({ required: true })
-    name: string
+  name: string;
 
   @Prop()
-    baseName?: string
+  baseName?: string;
 
   @Prop()
-    extName?: string
+  extName?: string;
 
   @Prop()
-    mimeType?: string
+  mimeType?: string;
 
   @Prop()
-    encoding?: string
+  encoding?: string;
 
   @Prop()
-    size?: number
+  size?: number;
 
   @Prop()
-    MD5Hash?: string
+  MD5Hash?: string;
 
   @Prop()
-    iv?: string
+  iv?: string;
 
-  @Prop({ default: 'root' })
-    parentId?: string
+  @Prop({ default: "root" })
+  parentId?: string;
 
   @Prop({ required: true })
-    type: string
+  type: string;
 
   @Prop()
-    userId?: string
+  userId?: string;
 
   @Prop()
-    thumbnail?: string
+  thumbnail?: string;
 
   @Prop({ default: false })
-    trashed: boolean
+  trashed: boolean;
 
   @Prop()
-    createdAt: Date
+  createdAt: Date;
 
   @Prop()
-    updatedAt: Date
+  updatedAt: Date;
 }
 
-export const StorageSchema = SchemaFactory.createForClass(Storage)
+export const StorageSchema = SchemaFactory.createForClass(Storage);

@@ -1,7 +1,7 @@
-import * as stream from 'stream'
+import * as stream from "node:stream";
 
 const isStream = (obj) => {
-  return obj instanceof stream.Stream
-}
+  return obj instanceof stream.Stream;
+};
 
-export default isStream
+export default isStream;

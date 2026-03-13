@@ -31,10 +31,9 @@ services:
     volumes:
       - storage-files:/app/bucket
     ports:
-      - 8085:3000
+      - 8085:3847
     depends_on:
       - mongo
-    privileged: true
 
 volumes:
   storage-files:

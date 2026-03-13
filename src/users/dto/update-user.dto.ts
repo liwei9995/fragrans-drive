@@ -1,40 +1,40 @@
 import {
+  IsArray,
+  IsMobilePhone,
   IsNumber,
   IsOptional,
   IsString,
-  IsMobilePhone,
-  IsArray,
-  MaxLength
-} from 'class-validator'
+  MaxLength,
+} from "class-validator";
 
 export class UpdateUserDto {
   @IsString()
   @IsOptional()
   @MaxLength(30)
-    firstName: string
+  firstName: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(30)
-    lastName: string
+  lastName: string;
 
   @IsNumber()
   @IsOptional()
-    gender: number
+  gender: number;
 
   @IsNumber()
   @IsOptional()
-    age: number
+  age: number;
 
   @IsString()
   @IsOptional()
-    avatar: string
+  avatar: string;
 
-  @IsMobilePhone('zh-CN')
+  @IsMobilePhone("zh-CN")
   @IsOptional()
-    phone: string
+  phone: string;
 
   @IsArray()
   @IsOptional()
-    roles: string[]
+  roles: string[];
 }

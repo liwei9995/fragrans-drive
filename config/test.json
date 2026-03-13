@@ -7,13 +7,13 @@
     "mongo": {
       "url": "localhost",
       "port": 25018,
-      "database": "nest-practice",
+      "database": "nest-practice-test",
       "username": "test",
       "password": "nest"
     }
   },
   "storage": {
-    "destination": "/bucket/storage"
+    "destination": "/tmp/fragrans-test-storage"
   },
   "drive": {
     "domain": ""

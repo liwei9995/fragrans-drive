@@ -1,5 +1,5 @@
 # build stage
-FROM node:18-alpine as base
+FROM node:25-alpine as base
 
 LABEL svc.maintainer=alex.li@oyiyio.com \
       svc.name=yi-svc-storage \
@@ -37,4 +37,4 @@ RUN pnpm install --prod --frozen-lockfile
 # Start the server using the production build
 CMD [ "node", "dist/main.js" ]
 
-EXPOSE 3000
+EXPOSE 3847

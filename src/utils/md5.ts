@@ -1,41 +1,41 @@
-import * as crypto from 'crypto'
-import isStream from './isStream'
-import { isString, isFunction, isUndefined } from './index'
+import * as crypto from "node:crypto";
+import { isFunction, isString, isUndefined } from "./index";
+import isStream from "./isStream";
 
 const md5 = (obj) => {
   if (obj === null || isUndefined(obj)) {
-    return Promise.resolve(null)
+    return Promise.resolve(null);
   }
 
   if (!isStream(obj) && !isString(obj) && !Buffer.isBuffer(obj)) {
     if (!isFunction(obj.toString)) {
-      return Promise.resolve(null)
+      return Promise.resolve(null);
     }
-    obj = obj.toString()
+    obj = obj.toString();
   }
 
   return new Promise((res, rej) => {
-    const hash = crypto.createHash('md5')
+    const hash = crypto.createHash("md5");
 
     if (isStream(obj)) {
-      obj.on('data', (d) => {
-        hash.update(d)
-      })
+      obj.on("data", (d) => {
+        hash.update(d);
+      });
 
-      obj.on('end', () => {
-        res(hash.digest('hex'))
-      })
+      obj.on("end", () => {
+        res(hash.digest("hex"));
+      });
 
-      obj.on('error', (err) => {
-        rej(err)
-      })
+      obj.on("error", (err) => {
+        rej(err);
+      });
 
-      return
+      return;
     }
 
-    hash.update(obj, 'utf8')
-    res(hash.digest('hex'))
-  })
-}
+    hash.update(obj, "utf8");
+    res(hash.digest("hex"));
+  });
+};
 
-export default md5
+export default md5;

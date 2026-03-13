@@ -1,31 +1,44 @@
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common'
-import { NestFactory } from '@nestjs/core'
-import { AppModule } from './app.module'
-import helmet from 'helmet'
-import * as config from 'config'
+import "dotenv/config";
+import { Logger, ValidationPipe, VersioningType } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import * as config from "config";
+import helmet from "helmet";
+import { AppModule } from "./app.module";
 
-const port = config.get<number>('http.port') || 3000
-const logger = new Logger('NestApplicationMain')
+const port =
+  Number(process.env.HTTP_PORT) || config.get<number>("http.port") || 3847;
+const logger = new Logger("NestApplicationMain");
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create(AppModule);
 
-  // Starts listening for shutdown hooks
-  app.enableShutdownHooks()
+  app.enableShutdownHooks();
+  app.useGlobalPipes(new ValidationPipe());
+  app.enableVersioning({ type: VersioningType.URI });
 
-  // Add global validation pipe
-  app.useGlobalPipes(new ValidationPipe())
+  app.use(helmet({ crossOriginResourcePolicy: false }));
+  const corsOrigins = process.env.CORS_ORIGINS?.split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: corsOrigins?.length ? corsOrigins : "*",
+    credentials: !!corsOrigins?.length,
+  });
 
-  // Add default version
-  app.enableVersioning({
-    type: VersioningType.URI
-  })
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle("Fragrans API")
+    .setDescription("自托管文件存储服务 API")
+    .setVersion("1.0")
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup("api", app, document);
 
-  app.use(helmet({ crossOriginResourcePolicy: false }))
-  app.enableCors({ origin: '*' })
+  await app.listen(port);
 
-  await app.listen(port)
-
-  logger.log(`Application is running on: ${await app.getUrl()}`)
+  logger.log(`Application is running on: ${await app.getUrl()}`);
+  logger.log(`Swagger docs: ${await app.getUrl()}/api`);
 }
-bootstrap()
+
+void bootstrap();
