@@ -379,62 +379,57 @@ const handleUploadChange: UploadProps['onChange'] = (
   _uploadFile,
   uploadFiles,
 ) => {
-  // Clear drag state whenever files are added or changed
+  // Clear drag state
   isDragging.value = false
   dragCounter = 0
 
-  if (uploadFiles.length === 0) return
+  // Gate: Only proceed if there's an active session or files are being added
+  if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) return
 
-  // Strictly identify files that are actively transferring or about to start
+  // 1. Identify active vs finished files in the current batch
   const activeFiles = uploadFiles.filter((f) =>
     ['uploading', 'ready'].includes(f.status),
   )
-
-  // Terminal files (completed in this specific batch)
-  const finishedFiles = uploadFiles.filter((f) =>
+  const finishedInBatch = uploadFiles.filter((f) =>
     ['success', 'fail'].includes(f.status),
   )
 
-  // A batch is "actually finished" if there are no active (uploading/ready) files left
-  const isActuallyFinished = activeFiles.length === 0
-
-  // Calculate cumulative session counts
-  // We combine historical 'uploadedFiles' with the current batch's results
-  const allHistorical = uploadedFiles.value
-  const combined = [...allHistorical]
-
-  // Update or add finished files to combined list by UID
-  for (const f of finishedFiles) {
+  // 2. Sync finished files into our session state (deduplicated by UID)
+  const combined = [...uploadedFiles.value]
+  for (const f of finishedInBatch) {
     const idx = combined.findIndex((h) => h.uid === f.uid)
     if (idx > -1) combined[idx] = f
     else combined.push(f)
   }
 
+  // 3. Update the session state
+  uploadedFiles.value = combined
+
+  // 4. Determine if the ENTIRE session is finished
+  // We are finished if there are no active files in the current component
+  // AND there's at least one finished file to show.
+  const isCurrentlyFinished = activeFiles.length === 0
+
   const successCount = combined.filter((f) => f.status === 'success').length
   const failCount = combined.filter((f) => f.status === 'fail').length
 
-  const title = !isActuallyFinished
-    ? `正在上传 ∙ 剩余${activeFiles.length}项`
-    : failCount > 0
-      ? `上传完成 ∙ 成功${successCount}项 失败${failCount}项`
-      : `上传完成 ∙ 共${successCount}项`
-
-  const type = !isActuallyFinished ? 'uploading' : 'success'
-
-  // Update UI
-  notificationTitle.value = title
-  notificationType.value = type
-  uploadStatusRef.value?.show()
-
-  if (type === 'success') {
+  // 5. Update UI Labels
+  if (!isCurrentlyFinished) {
+    notificationTitle.value = `正在上传 ∙ 剩余${activeFiles.length}项`
+    notificationType.value = 'uploading'
+  } else if (combined.length > 0) {
+    notificationTitle.value =
+      failCount > 0
+        ? `上传完成 ∙ 成功${successCount}项 失败${failCount}项`
+        : `上传完成 ∙ 共${successCount}项`
+    notificationType.value = 'success'
     uploadPercentage.value = 0
   }
 
-  // Handle session finalization
-  if (isActuallyFinished) {
-    uploadedFiles.value = combined
+  uploadStatusRef.value?.show()
 
-    // Auto-refresh the file list
+  // 6. Handle automatic cleanup and refresh
+  if (isCurrentlyFinished && uploadFiles.length > 0) {
     fetchFiles(parentId.value)
 
     // Clear the component's internal list after a short delay
