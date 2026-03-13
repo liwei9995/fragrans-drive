@@ -21,7 +21,6 @@ pub struct UserContext {
     pub user_id: String,
 }
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for UserContext
 where
     S: Send + Sync,

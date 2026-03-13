@@ -111,7 +111,6 @@ docker-compose up -d
 - `src/infrastructure/`: 外部服务实现 (DB, Storage I/O, Image processing)。
 - `src/config/`: 配置加载逻辑。
 - `src/utils/`: 通用工具类 (加密、哈希)。
-- `.legacy/`: 归档的 Node.js 原始版本代码。
 
 ## 🤝 贡献与支持
 
