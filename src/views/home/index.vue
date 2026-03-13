@@ -245,7 +245,10 @@ const handleRenameFile = (name: string) => {
   })
 }
 
-const handleCloseUploadStatus = () => (uploadedFiles.value = [])
+const handleCloseUploadStatus = () => {
+  uploadStatusRef.value?.close()
+  uploadedFiles.value = []
+}
 
 const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
 
@@ -381,15 +384,20 @@ const handleUploadChange: UploadProps['onChange'] = (
   isDragging.value = false
   dragCounter = 0
 
-  // Total items in current batch that are either waiting or active
-  const activeFiles = uploadFiles.filter((file) =>
-    ['uploading', 'ready'].includes(file.status),
+  // Files that are actively being processed by the browser/server
+  const uploadingFiles = uploadFiles.filter((f) => f.status === 'uploading')
+  // Files that are in the queue but haven't started (might be waiting or blocked)
+  const readyFiles = uploadFiles.filter((f) => f.status === 'ready')
+
+  // We are finished ONLY if every file in the list has reached a terminal state (success or fail)
+  // This prevents 'ready' files that might be stuck/rejected from hanging the notification.
+  const isActuallyFinished = uploadFiles.every((f) =>
+    ['success', 'fail'].includes(f.status),
   )
-  const isActuallyFinished = activeFiles.length === 0
 
   if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) return
 
-  // Manage cumulative finished files counts using UIDs for deduplication to ensure accuracy
+  // Manage cumulative finished files counts using UIDs for deduplication
   const allFinishedFiles = [...uploadedFiles.value, ...uploadFiles].filter(
     (f) => ['success', 'fail'].includes(f.status),
   )
@@ -404,8 +412,10 @@ const handleUploadChange: UploadProps['onChange'] = (
   const successCount = finishedList.filter((f) => f.status === 'success').length
   const failCount = finishedList.filter((f) => f.status === 'fail').length
 
+  const activeCount = uploadingFiles.length + readyFiles.length
+
   const title = !isActuallyFinished
-    ? `正在上传 ∙ 剩余${activeFiles.length}项`
+    ? `正在上传 ∙ 剩余${activeCount}项`
     : failCount > 0
       ? `上传完成 ∙ 成功${successCount}项 失败${failCount}项`
       : `上传完成 ∙ 共${successCount}项`
@@ -423,10 +433,9 @@ const handleUploadChange: UploadProps['onChange'] = (
 
   // Finalize the batch only when all files in the current list have reached a terminal state
   if (isActuallyFinished && uploadFiles.length > 0) {
-    // Current batch is done, move to cumulative historical list
     uploadedFiles.value = finishedList
 
-    // Use a slightly longer delay before clearing to ensure the Success state is visible
+    // Use a delay before clearing to ensure the Success state is visible
     setTimeout(() => {
       emitter.emit(UploadEventEnum.CLEAR_FILES)
       fetchFiles(parentId.value)
@@ -466,7 +475,6 @@ const handelBeforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
     ElMessage.error('上传文件的大小不能超过512MB')
     return false
   }
-  return true
 }
 
 const onDragEnter = (e: DragEvent) => {
