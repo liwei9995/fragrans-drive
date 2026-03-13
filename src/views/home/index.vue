@@ -377,6 +377,10 @@ const handleUploadChange: UploadProps['onChange'] = (
   _uploadFile,
   uploadFiles,
 ) => {
+  // Clear drag state whenever files are added or changed
+  isDragging.value = false
+  dragCounter = 0
+
   const isUploadingFiles = uploadFiles.filter((file) =>
     ['uploading', 'ready'].includes(file.status),
   )
@@ -588,6 +592,7 @@ onUnmounted(() => {
             :on-upload-exceed="handleUploadExceed"
             :on-upload-progress="handleUploadProgress"
             :before-upload="handelBeforeUpload"
+            @drop="onDrop"
           />
           <FloatingActionBar
             :selected-count="selectedIds.size"
