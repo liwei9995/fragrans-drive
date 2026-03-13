@@ -38,7 +38,10 @@ interface StorageCardProps {
     extName?: string,
   ) => void
   previewVideo?: (videoUrl: string) => void
+  selected?: boolean
 }
+
+const emit = defineEmits(['toggle-select'])
 
 const props = withDefaults(defineProps<StorageCardProps>(), {
   title: '',
@@ -107,61 +110,77 @@ const handleLoad = () => (showPlaceholder.value = false)
 </script>
 
 <template>
-	<div class="card-wrapper" :class="{ empty: isEmpty }">
-		<div v-if="!isEmpty" class="drop-wrapper">
-			<div class="card-container" @click="handleClickCard">
-				<div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
-					<div class="action-btn"></div>
-					<div class="action-btn-more-wrapper" @click.stop>
-						<el-dropdown
-							class="action-btn-more"
-							:class="{ show: showMoreAction || isMobile }"
-							trigger="click"
-							@command="handleCommand"
-						>
-							<el-icon :size="18">
-								<More />
-							</el-icon>
-							<template #dropdown>
-								<el-dropdown-menu>
-									<el-dropdown-item v-for="item in actionItems" :key="item.id" :divided="item.divided" :command="item.id">
-										{{ item.name }}
-									</el-dropdown-item>
-								</el-dropdown-menu>
-							</template>
-						</el-dropdown>
-					</div>
-					<div class="node-card">
-						<div class="cover" @click="handleClickIcon">
-							<div :class="coverCls">
-								<div class="file-icon" :class="{ thumb: !showPlaceholder && previewSrcList.length > 0 }">
-									<el-image
-										class="icon"
-										:class="{ show: !showPlaceholder }"
-										alt="folder"
-										:src="thumbUrl"
-										:preview-src-list="previewSrcList"
-										fit="contain"
-										@close="handleClosePreview"
-										@load="handleLoad"
-									/>
-									<div
-										v-if="showPlaceholder"
-										class="icon-placeholder"
-										:style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }"
-									/>
-								</div>
-							</div>
-						</div>
-						<div class="info">
-							<p class="title">{{ title }}</p>
-							<p class="desc">{{ desc }}</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+  <div class="card-wrapper" :class="{ empty: isEmpty }">
+    <div v-if="!isEmpty" class="drop-wrapper">
+      <el-dropdown trigger="contextmenu" @command="handleCommand" placement="bottom-start" popper-class="premium-context-menu">
+        <div class="card-container" @click="handleClickCard">
+          <div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
+            <div class="action-btn"></div>
+          <div class="selection-checkbox" :class="{ visible: selected }" @click.stop="emit('toggle-select', id)">
+            <el-icon v-if="selected" class="check-icon"><SuccessFilled /></el-icon>
+            <div v-else class="check-placeholder"></div>
+          </div>
+          <div class="action-btn-more-wrapper" @click.stop>
+              <el-dropdown
+                class="action-btn-more"
+                :class="{ show: showMoreAction || isMobile }"
+                trigger="click"
+                @command="handleCommand"
+                >
+                <el-icon :size="18">
+                  <More />
+                </el-icon>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-for="item in actionItems" :key="item.id" :divided="item.divided" :command="item.id">
+                      {{ item.name }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          <div class="node-card">
+            <div class="cover" @click="handleClickIcon">
+              <div :class="coverCls">
+                <div class="file-icon" :class="{ thumb: !showPlaceholder && previewSrcList.length > 0 }">
+                  <el-image
+                    class="icon"
+                    :class="{ show: !showPlaceholder }"
+                    alt="source"
+                    :src="thumbUrl"
+                    :preview-src-list="previewSrcList"
+                    :initial-index="0"
+                    preview-teleported
+                    hide-on-click-modal
+                    fit="contain"
+                    @close="handleClosePreview"
+                    @load="handleLoad"
+                  />
+                  <div
+                    v-if="showPlaceholder"
+                    class="icon-placeholder"
+                    :style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }"
+                  />
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <p class="title">{{ title }}</p>
+              <p class="desc">{{ desc }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #dropdown>
+        <el-dropdown-menu>
+          <el-dropdown-item v-for="item in actionItems" :key="item.id" :divided="item.divided" :command="item.id">
+            {{ item.name }}
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+      </el-dropdown>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">

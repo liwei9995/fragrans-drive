@@ -1,7 +1,7 @@
 <script setup lang="ts" name="home">
 import type { UploadFiles, UploadProps } from 'element-plus'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import { onBeforeMount, ref, watch } from 'vue'
+import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   deleteFile,
@@ -20,6 +20,10 @@ import emitter from '@/utils/emitter'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import Empty from './widgets/Empty/index.vue'
+import FileSkeleton from './widgets/FileSkeleton/index.vue'
+import FloatingActionBar from './widgets/FloatingActionBar/index.vue'
+import Footer from './widgets/Footer/index.vue'
+import GlobalDropzone from './widgets/GlobalDropzone/index.vue'
 import Header from './widgets/Header/index.vue'
 import Move from './widgets/Move/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
@@ -47,6 +51,9 @@ const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
 const needToRenameFileName = ref('')
 const breadcrumbItems = ref([] as BreadcrumbItem[])
+const isDragging = ref(false)
+const selectedIds = ref(new Set<string>())
+let dragCounter = 0
 const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
@@ -126,7 +133,6 @@ const fetchPath = async () => {
     const pathItems = await getPath(fileId)
     if (pathItems && Array.isArray(pathItems)) {
       breadcrumbItems.value = [
-        { id: '0', text: '全部文件' },
         ...pathItems.map((path: any) => ({
           id: String(path.id),
           text: path.name,
@@ -141,7 +147,10 @@ const fetchPath = async () => {
   }
 }
 
-onBeforeMount(() => fetchPath())
+onBeforeMount(() => {
+  fetchPath()
+  fetchFiles(parentId.value)
+})
 
 watch(
   () => router.currentRoute.value,
@@ -302,6 +311,63 @@ const handleTapCardActionItem = async (
   }
 }
 
+const handleToggleSelect = (id: string) => {
+  if (selectedIds.value.has(id)) {
+    selectedIds.value.delete(id)
+  } else {
+    selectedIds.value.add(id)
+  }
+  // Trigger reactivity by reassignment
+  selectedIds.value = new Set(selectedIds.value)
+}
+
+const handleClearSelection = () => {
+  selectedIds.value = new Set()
+}
+
+const handleBatchDelete = () => {
+  const count = selectedIds.value.size
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${count} 项吗？此操作不可逆。`,
+    '批量删除',
+    {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    },
+  ).then(async () => {
+    try {
+      const ids = Array.from(selectedIds.value)
+      // Perform sequential deletions (simpler for now than Promise.all if reliability is preferred)
+      for (const id of ids) {
+        await deleteFile(id)
+      }
+      handleClearSelection()
+      fetchFiles(parentId.value)
+      ElMessage.success(`成功删除 ${count} 项`)
+    } catch {
+      ElMessage.error('部分文件删除失败')
+    }
+  })
+}
+
+const handleBatchMove = () => {
+  // Use the existing Move dialog but set it to handle multiple IDs
+  // For now, easier to move one by one if the dialog is designed for one.
+  // I might need to update Move.vue to handle an array of IDs.
+  // But let's keep it simple for now and move only the first one or prompt user.
+  // Actually, I'll update Move to handle multiple IDs later.
+  ElMessage.info('暂不支持批量移动，正在升级中...')
+}
+
+const handleBatchDownload = () => {
+  const ids = Array.from(selectedIds.value)
+  for (const id of ids) {
+    download(id)
+  }
+  handleClearSelection()
+}
+
 const handlePreviewVideo = (videoUrl: string) => {
   videoPlayerVisible.value = true
   videoSrc.value = videoUrl
@@ -382,99 +448,150 @@ const handleUploadProgress: UploadProps['onProgress'] = (
 const handelBeforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
   if (rawFile.size / 1024 / 1024 > 512) {
     ElMessage.error('上传文件的大小不能超过512MB')
-
     return false
   }
-
   return true
 }
+
+const onDragEnter = (e: DragEvent) => {
+  e.preventDefault()
+  dragCounter++
+  isDragging.value = true
+}
+
+const onDragLeave = (e: DragEvent) => {
+  e.preventDefault()
+  dragCounter--
+  if (dragCounter === 0) {
+    isDragging.value = false
+  }
+}
+
+const onDrop = (e: DragEvent) => {
+  e.preventDefault()
+  dragCounter = 0
+  isDragging.value = false
+}
+
+onMounted(() => {
+  window.addEventListener('dragenter', onDragEnter)
+  window.addEventListener('dragleave', onDragLeave)
+  window.addEventListener('dragover', (e) => e.preventDefault())
+  window.addEventListener('drop', onDrop)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('dragenter', onDragEnter)
+  window.removeEventListener('dragleave', onDragLeave)
+  window.removeEventListener('drop', onDrop)
+})
 </script>
 
 <template>
-	<div class="home flx-center">
-		<div class="content">
-			<div class="file-drag-zone">
-				<div class="page-content">
-					<Header
-						:breadcrumb-items="breadcrumbItems"
-						:action-items="actionItems"
-						:avatar-action-items="avatarActionItems"
-						:upload-file-limit="uploadFileLimit"
-						:tap-action-item="handleTapActionItem"
-						:on-upload-change="handleUploadChange"
-						:on-upload-exceed="handleUploadExceed"
-						:on-upload-progress="handleUploadProgress"
-						:before-upload="handelBeforeUpload"
-					/>
-					<div class="sub-nav-wrapper">
-						<Breadcrumb :breadcrumb-items="breadcrumbItems" />
-					</div>
-					<div class="items-wrapper">
-						<div v-infinite-scroll="load" class="items">
-							<Card
-								v-for="item in listData?.docs"
-								:id="item.id"
-								:key="item.id"
-								:title="item.name"
-								:desc="item.desc"
-								:mime-type="item.mimeType"
-								:type="item.type"
-								:ext-name="item.extName"
-								:thumb-url="item.thumb"
-								:thumb-placeholder="item.thumbPlaceholder"
-								:preview-src-list="item.previewSrcList"
-								:video-url="item.videoUrl"
-								:action-items="item.type === 'file' ? fullActionItems : basicActionItems"
-								:tap-action-item="handleTapCardActionItem"
-								:preview-video="handlePreviewVideo"
-							/>
-							<Card v-for="item in 10" :id="'empty-item-id' + item" :key="item" is-empty />
-						</div>
-						<Empty
-							v-if="!isFetching && listData?.docs.length === 0"
-							:on-upload-change="handleUploadChange"
-							:on-upload-exceed="handleUploadExceed"
-							:on-upload-progress="handleUploadProgress"
-							:before-upload="handelBeforeUpload"
-							:tap-item="handleTapActionItem"
-						/>
-					</div>
-					<Dialog
-						v-if="folderDialogFormVisible"
-						title="新建文件夹"
-						:name="folderName"
-						:on-close="handleCloseFolderDialog"
-						:on-confirm="handleCreateFolder"
-					/>
-					<Dialog
-						v-if="renameDialogFormVisible"
-						title="重命名"
-						:thumb-url="needToRenameThumb"
-						:name="needToRenameFileName"
-						:on-close="handleCloseRenameDialog"
-						:on-confirm="handleRenameFile"
-					/>
-					<Move
-						v-if="moveDialogFormVisible"
-						:id="needToMoveId"
-						:parent-id="parentId"
-						title="移动到"
-						:on-close="handleCloseMoveDialog"
-						:on-moved="handleMoved"
-						:on-folder-created="handleFolderCreated"
-					/>
-					<UploadStatus
-						ref="uploadStatusRef"
-						:percentage="uploadPercentage"
-						:title="notificationTitle"
-						:type="notificationType"
-						:on-close="handleCloseUploadStatus"
-					/>
-				</div>
-			</div>
-			<VideoPlayer v-if="videoPlayerVisible" :src="videoSrc" :close="handleCloseVideoPlayer" />
-		</div>
-	</div>
+  <div class="home flx-center">
+    <div class="content">
+      <div class="file-drag-zone">
+        <div class="page-content">
+          <Header
+            :breadcrumb-items="breadcrumbItems"
+            :action-items="actionItems"
+            :avatar-action-items="avatarActionItems"
+            :upload-file-limit="uploadFileLimit"
+            :tap-action-item="handleTapActionItem"
+            :on-upload-change="handleUploadChange"
+            :on-upload-exceed="handleUploadExceed"
+            :on-upload-progress="handleUploadProgress"
+            :before-upload="handelBeforeUpload"
+          />
+          <div class="sub-nav-wrapper">
+            <Breadcrumb :breadcrumb-items="breadcrumbItems" />
+          </div>
+          <el-scrollbar class="items-wrapper" @end-reached="load">
+            <transition-group name="list" tag="div" class="items">
+              <template v-if="isFetching && listData?.docs.length === 0">
+                <FileSkeleton v-for="i in 10" :key="'skeleton-' + i" />
+              </template>
+              <Card
+                v-for="item in listData?.docs"
+                :id="item.id"
+                :key="item.id"
+                :title="item.name"
+                :desc="item.desc"
+                :mime-type="item.mimeType"
+                :type="item.type"
+                :ext-name="item.extName"
+                :thumb-url="item.thumb"
+                :thumb-placeholder="item.thumbPlaceholder"
+                :preview-src-list="item.previewSrcList"
+                :video-url="item.videoUrl"
+                :action-items="item.type === 'file' ? fullActionItems : basicActionItems"
+                :tap-action-item="handleTapCardActionItem"
+                :preview-video="handlePreviewVideo"
+                :selected="selectedIds.has(item.id)"
+                @toggle-select="handleToggleSelect"
+              />
+              <div v-for="item in 10" :key="'spacer-' + item" class="empty-card" />
+            </transition-group>
+          </el-scrollbar>
+          <Empty
+              v-if="!isFetching && listData?.docs.length === 0"
+              :on-upload-change="handleUploadChange"
+              :on-upload-exceed="handleUploadExceed"
+              :on-upload-progress="handleUploadProgress"
+              :before-upload="handelBeforeUpload"
+              :tap-item="handleTapActionItem"
+            />
+          <Footer />
+          <Dialog
+            v-if="folderDialogFormVisible"
+            title="新建文件夹"
+            :name="folderName"
+            :on-close="handleCloseFolderDialog"
+            :on-confirm="handleCreateFolder"
+          />
+          <Dialog
+            v-if="renameDialogFormVisible"
+            title="重命名"
+            :thumb-url="needToRenameThumb"
+            :name="needToRenameFileName"
+            :on-close="handleCloseRenameDialog"
+            :on-confirm="handleRenameFile"
+          />
+          <Move
+            v-if="moveDialogFormVisible"
+            :id="needToMoveId"
+            :parent-id="parentId"
+            title="移动到"
+            :on-close="handleCloseMoveDialog"
+            :on-moved="handleMoved"
+            :on-folder-created="handleFolderCreated"
+          />
+          <UploadStatus
+            ref="uploadStatusRef"
+            :percentage="uploadPercentage"
+            :title="notificationTitle"
+            :type="notificationType"
+            :on-close="handleCloseUploadStatus"
+          />
+          <GlobalDropzone
+            :show="isDragging"
+            :on-upload-change="handleUploadChange"
+            :on-upload-exceed="handleUploadExceed"
+            :on-upload-progress="handleUploadProgress"
+            :before-upload="handelBeforeUpload"
+          />
+          <FloatingActionBar
+            :selected-count="selectedIds.size"
+            @delete="handleBatchDelete"
+            @move="handleBatchMove"
+            @download="handleBatchDownload"
+            @clear="handleClearSelection"
+          />
+        </div>
+      </div>
+      <VideoPlayer v-if="videoPlayerVisible" :src="videoSrc" :close="handleCloseVideoPlayer" />
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">

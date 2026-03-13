@@ -2,15 +2,15 @@
 </script>
 
 <template>
-	<div class="login">
-		<div class="login-wrapper">
-			<div class="logo-wrapper">
-				<div class="logo"></div>
-				<div class="name">fragrans</div>
-			</div>
-			<LoginForm></LoginForm>
-		</div>
-	</div>
+  <div class="login">
+    <div class="login-wrapper">
+      <div class="logo-wrapper">
+        <div class="logo"></div>
+        <div class="name">fragrans</div>
+      </div>
+      <LoginForm></LoginForm>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">

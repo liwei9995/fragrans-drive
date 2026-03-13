@@ -42,31 +42,31 @@ defineExpose({ handleClose })
 </script>
 
 <template>
-	<div class="video-player-wrapper">
-		<div class="video-player-mask" />
-		<div class="video-player-close-btn" @click="handleClose">
-			<el-icon circle size="24">
-				<Close />
-			</el-icon>
-		</div>
-		<div class="video-wrapper">
-			<div class="inner-wrapper">
-				<videoPlay
-					:width="width"
-					:height="height"
-					:color="color"
-					:title="title"
-					:muted="muted"
-					:web-full-screen="webFullScreen"
-					:auto-play="autoPlay"
-					:loop="loop"
-					:volume="volume"
-					:control="control"
-					:src="src"
-				/>
-			</div>
-		</div>
-	</div>
+  <div class="video-player-wrapper">
+    <div class="video-player-mask" />
+    <div class="video-player-close-btn" @click="handleClose">
+      <el-icon circle size="24">
+        <Close />
+      </el-icon>
+    </div>
+    <div class="video-wrapper">
+      <div class="inner-wrapper">
+        <videoPlay
+          :width="width"
+          :height="height"
+          :color="color"
+          :title="title"
+          :muted="muted"
+          :web-full-screen="webFullScreen"
+          :auto-play="autoPlay"
+          :loop="loop"
+          :volume="volume"
+          :control="control"
+          :src="src"
+        />
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">

@@ -51,68 +51,68 @@ const errorHandler = () => true
 </script>
 
 <template>
-	<header class="header">
-		<div class="navbar-wrapper">
-			<div class="header-container">
-				<div class="header-title">
-					<div class="logo-container" @click="handleClickGoHome">
-						<el-image :src="logo" style="width: 24px; height: 24px" />
-						<div class="logo-name">Fragrans</div>
-					</div>
-					<Breadcrumb :breadcrumb-items="breadcrumbItems" />
-				</div>
-				<div class="content">
-					<div class="search">
-						<el-icon :size="24">
-							<Search />
-						</el-icon>
-					</div>
-					<div class="action">
-						<ActionButton
-							ref="uploadRef"
-							:action-items="actionItems"
-							:upload-file-limit="uploadFileLimit"
-							:tap-action-item="handleCommand"
-							:on-upload-change="onUploadChange"
-							:on-upload-exceed="onUploadExceed"
-							:on-upload-progress="onUploadProgress"
-							:on-upload-success="onUploadSuccess"
-							:on-upload-error="onUploadError"
-							:before-upload="beforeUpload"
-						/>
-					</div>
-					<el-dropdown trigger="click" @command="handleCommand">
-						<div class="avatar">
-							<el-avatar :src="avatar" :size="32" @error="errorHandler">
-								<el-avatar :icon="UserFilled" />
-							</el-avatar>
-						</div>
-						<template #dropdown>
-							<el-dropdown-menu>
-								<el-dropdown-item v-for="item in avatarActionItems" :key="item.id" :command="item.id">
-									{{ item.name }}
-								</el-dropdown-item>
-							</el-dropdown-menu>
-						</template>
-					</el-dropdown>
-				</div>
-			</div>
-		</div>
-	</header>
-	<div class="float-action">
-		<ActionButton
-			:action-items="actionItems"
-			:upload-file-limit="uploadFileLimit"
-			:icon-size="64"
-			:tap-action-item="handleCommand"
-			:on-upload-change="onUploadChange"
-			:on-upload-exceed="onUploadExceed"
-			:on-upload-progress="onUploadProgress"
-			:on-upload-success="onUploadSuccess"
-			:on-upload-error="onUploadError"
-			:before-upload="beforeUpload"
-		/>
-	</div>
+  <header class="header">
+    <div class="navbar-wrapper">
+      <div class="header-container">
+        <div class="header-title">
+          <div class="logo-container" @click="handleClickGoHome">
+            <el-image :src="logo" style="width: 24px; height: 24px" />
+            <div class="logo-name">Fragrans</div>
+          </div>
+          <Breadcrumb :breadcrumb-items="breadcrumbItems" />
+        </div>
+        <div class="content">
+          <div class="search">
+            <el-icon :size="24">
+              <Search />
+            </el-icon>
+          </div>
+          <div class="action">
+            <ActionButton
+              ref="uploadRef"
+              :action-items="actionItems"
+              :upload-file-limit="uploadFileLimit"
+              :tap-action-item="handleCommand"
+              :on-upload-change="onUploadChange"
+              :on-upload-exceed="onUploadExceed"
+              :on-upload-progress="onUploadProgress"
+              :on-upload-success="onUploadSuccess"
+              :on-upload-error="onUploadError"
+              :before-upload="beforeUpload"
+            />
+          </div>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <div class="avatar">
+              <el-avatar :src="avatar" :size="32" @error="errorHandler">
+                <el-avatar :icon="UserFilled" />
+              </el-avatar>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="item in avatarActionItems" :key="item.id" :command="item.id">
+                  {{ item.name }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="float-action">
+    <ActionButton
+      :action-items="actionItems"
+      :upload-file-limit="uploadFileLimit"
+      :icon-size="64"
+      :tap-action-item="handleCommand"
+      :on-upload-change="onUploadChange"
+      :on-upload-exceed="onUploadExceed"
+      :on-upload-progress="onUploadProgress"
+      :on-upload-success="onUploadSuccess"
+      :on-upload-error="onUploadError"
+      :before-upload="beforeUpload"
+    />
+  </div>
 </template>
 
 <style scoped lang="scss">

@@ -137,41 +137,41 @@ defineExpose({
 </script>
 
 <template>
-	<el-dialog v-model="dialogFormVisible" class="move-dialog-wrapper" :title="title" @close="handleClose">
-		<Breadcrumb :breadcrumb-items="breadcrumbItems" :auto-nav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
-		<div v-infinite-scroll="load" class="list" :infinite-scroll-disabled="!dialogFormVisible">
-			<FolderCreation
-				v-if="createFolderItemVisible"
-				:parent-id="id"
-				:close="handleCloseFolderCreationItem"
-				:success="handleCreateFolderSuccess"
-			/>
-			<StorageItem
-				v-for="item in listData?.docs"
-				:id="item.id"
-				:key="item.id"
-				:disabled="item.type !== 'folder'"
-				:name="item.name"
-				:thumb-url="item.thumb"
-				:thumb-placeholder="item.thumbPlaceholder"
-				:tap="handleTapItem"
-			/>
-			<div v-if="listData?.docs.length === 0 && !isFetching && !createFolderItemVisible" class="empty">
-				<el-image
-					class="icon"
-					src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"
-				/>
-				<div>文件夹为空</div>
-			</div>
-		</div>
-		<div class="action">
-			<div class="create" @click="handleCreateFolder">新建文件夹</div>
-			<div class="buttons">
-				<el-button @click="handleCancel">取消</el-button>
-				<el-button type="primary" @click="handleMove"> 移动到此处 </el-button>
-			</div>
-		</div>
-	</el-dialog>
+  <el-dialog v-model="dialogFormVisible" class="move-dialog-wrapper" :title="title" @close="handleClose">
+    <Breadcrumb :breadcrumb-items="breadcrumbItems" :auto-nav="false" :on-click-breadcrumb-item="handleClickBreadcrumbItem" />
+    <el-scrollbar class="list" @end-reached="load">
+      <FolderCreation
+        v-if="createFolderItemVisible"
+        :parent-id="id"
+        :close="handleCloseFolderCreationItem"
+        :success="handleCreateFolderSuccess"
+      />
+      <StorageItem
+        v-for="item in listData?.docs"
+        :id="item.id"
+        :key="item.id"
+        :disabled="item.type !== 'folder'"
+        :name="item.name"
+        :thumb-url="item.thumb"
+        :thumb-placeholder="item.thumbPlaceholder"
+        :tap="handleTapItem"
+      />
+      <div v-if="listData?.docs.length === 0 && !isFetching && !createFolderItemVisible" class="empty">
+        <el-image
+          class="icon"
+          src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"
+        />
+        <div>文件夹为空</div>
+      </div>
+    </el-scrollbar>
+    <div class="action">
+      <div class="create" @click="handleCreateFolder">新建文件夹</div>
+      <div class="buttons">
+        <el-button @click="handleCancel">取消</el-button>
+        <el-button type="primary" @click="handleMove"> 移动到此处 </el-button>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <style lang="scss">

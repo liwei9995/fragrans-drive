@@ -27,28 +27,28 @@ const handleTap = () => props.tapItem && props.tapItem(props.id)
 </script>
 
 <template>
-	<template v-if="isUpload">
-		<Upload
-			multiple
-			:show-file-list="false"
-			:limit="limit"
-			:on-change="onUploadChange"
-			:on-exceed="onUploadExceed"
-			:on-progress="onUploadProgress"
-			:before-upload="beforeUpload"
-		>
-			<template #trigger>
-				<div class="empty-item-wrapper" @click="handleTap">
-					<span>{{ description }}</span>
-					<el-image class="icon" :src="icon" />
-				</div>
-			</template>
-		</Upload>
-	</template>
-	<div v-else class="empty-item-wrapper" @click.stop="handleTap">
-		<span>{{ description }}</span>
-		<el-image class="icon" :src="icon" />
-	</div>
+  <template v-if="isUpload">
+    <Upload
+      multiple
+      :show-file-list="false"
+      :limit="limit"
+      :on-change="onUploadChange"
+      :on-exceed="onUploadExceed"
+      :on-progress="onUploadProgress"
+      :before-upload="beforeUpload"
+    >
+      <template #trigger>
+        <div class="empty-item-wrapper" @click="handleTap">
+          <span>{{ description }}</span>
+          <el-image class="icon" :src="icon" />
+        </div>
+      </template>
+    </Upload>
+  </template>
+  <div v-else class="empty-item-wrapper" @click.stop="handleTap">
+    <span>{{ description }}</span>
+    <el-image class="icon" :src="icon" />
+  </div>
 </template>
 
 <style scoped lang="scss">

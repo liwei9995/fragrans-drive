@@ -25,7 +25,8 @@
         "noExplicitAny": "off"
       },
       "complexity": {
-        "useOptionalChain": "off"
+        "useOptionalChain": "off",
+        "noImportantStyles": "off"
       }
     }
   },

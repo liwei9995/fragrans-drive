@@ -60,24 +60,24 @@ onBeforeUnmount(() => clearFiles())
 </script>
 
 <template>
-	<el-upload
-		ref="uploadRef"
-		class="upload-zone"
-		:multiple="multiple"
-		:action="storageAction"
-		:data="uploadPayload"
-		:headers="uploadHeaders"
-		:show-file-list="showFileList"
-		:limit="limit"
-		:on-change="onUploadChange"
-		:on-exceed="onUploadExceed"
-		:on-progress="onUploadProgress"
-		:on-success="onUploadSuccess"
-		:on-error="onUploadError"
-		:before-upload="beforeUpload"
-	>
-		<template #trigger>
-			<slot name="trigger" />
-		</template>
-	</el-upload>
+  <el-upload
+    ref="uploadRef"
+    class="upload-zone"
+    :multiple="multiple"
+    :action="storageAction"
+    :data="uploadPayload"
+    :headers="uploadHeaders"
+    :show-file-list="showFileList"
+    :limit="limit"
+    :on-change="onUploadChange"
+    :on-exceed="onUploadExceed"
+    :on-progress="onUploadProgress"
+    :on-success="onUploadSuccess"
+    :on-error="onUploadError"
+    :before-upload="beforeUpload"
+  >
+    <template #trigger>
+      <slot name="trigger" />
+    </template>
+  </el-upload>
 </template>

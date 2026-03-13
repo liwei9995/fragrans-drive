@@ -41,21 +41,21 @@ onMounted(() => {
 </script>
 
 <template>
-	<el-dialog v-model="dialogFormVisible" class="dialog-wrapper" width="340px" :title="title" @close="handleClose">
-		<el-row justify="center">
-			<div class="thumb-wrapper">
-				<el-image style="width: 115px; height: 90px" :src="thumbUrl" class="thumb" fit="contain" />
-			</div>
-		</el-row>
-		<el-row justify="center">
-			<el-input v-model="inputValue" autofocus maxlength="30" />
-		</el-row>
-		<el-row justify="end">
-			<div class="dialog-footer">
-				<el-button type="primary" :disabled="!inputValue.trim()" @click="handleClick"> 确定 </el-button>
-			</div>
-		</el-row>
-	</el-dialog>
+  <el-dialog v-model="dialogFormVisible" class="dialog-wrapper" width="340px" :title="title" @close="handleClose">
+    <el-row justify="center">
+      <div class="thumb-wrapper">
+        <el-image style="width: 115px; height: 90px" :src="thumbUrl" class="thumb" fit="contain" />
+      </div>
+    </el-row>
+    <el-row justify="center">
+      <el-input v-model="inputValue" autofocus maxlength="30" />
+    </el-row>
+    <el-row justify="end">
+      <div class="dialog-footer">
+        <el-button type="primary" :disabled="!inputValue.trim()" @click="handleClick"> 确定 </el-button>
+      </div>
+    </el-row>
+  </el-dialog>
 </template>
 
 <style scoped lang="scss">

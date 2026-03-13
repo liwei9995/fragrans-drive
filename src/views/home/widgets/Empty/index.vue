@@ -35,26 +35,26 @@ const handleTapItem = (id: string) => props.tapItem && props.tapItem(id)
 </script>
 
 <template>
-	<div class="empty-placeholder">
-		<div class="items">
-			<EmptyItem
-				v-for="item in items"
-				:id="item.id"
-				:key="item.id"
-				:description="item.description"
-				:icon="item.icon"
-				:limit="limit"
-				:is-upload="item.isUpload"
-				:tap-item="handleTapItem"
-				:on-change="onUploadChange"
-				:on-exceed="onUploadExceed"
-				:on-progress="onUploadProgress"
-				:on-upload-success="onUploadSuccess"
-				:on-upload-error="onUploadError"
-				:before-upload="beforeUpload"
-			/>
-		</div>
-	</div>
+  <div class="empty-placeholder">
+    <div class="items">
+      <EmptyItem
+        v-for="item in items"
+        :id="item.id"
+        :key="item.id"
+        :description="item.description"
+        :icon="item.icon"
+        :limit="limit"
+        :is-upload="item.isUpload"
+        :tap-item="handleTapItem"
+        :on-change="onUploadChange"
+        :on-exceed="onUploadExceed"
+        :on-progress="onUploadProgress"
+        :on-upload-success="onUploadSuccess"
+        :on-upload-error="onUploadError"
+        :before-upload="beforeUpload"
+      />
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">

@@ -55,24 +55,24 @@ defineExpose({
 </script>
 
 <template>
-	<div v-show="visible" class="upload-status-wrapper">
-		<div class="upload-status">
-			<el-icon :size="24" :class="type">
-				<component :is="icon" />
-			</el-icon>
-			<h2 class="title" v-text="title" />
-			<el-icon v-if="showClose" class="close-btn" @click.stop="close">
-				<Close />
-			</el-icon>
-		</div>
-		<el-progress
-			v-if="type === 'uploading'"
-			class="progress"
-			:percentage="uploadPercentage"
-			:stroke-width="4"
-			:show-text="false"
-		/>
-	</div>
+  <div v-show="visible" class="upload-status-wrapper">
+    <div class="upload-status">
+      <el-icon :size="24" :class="type">
+        <component :is="icon" />
+      </el-icon>
+      <h2 class="title" v-text="title" />
+      <el-icon v-if="showClose" class="close-btn" @click.stop="close">
+        <Close />
+      </el-icon>
+    </div>
+    <el-progress
+      v-if="type === 'uploading'"
+      class="progress"
+      :percentage="uploadPercentage"
+      :stroke-width="4"
+      :show-text="false"
+    />
+  </div>
 </template>
 
 <style scoped lang="scss">
