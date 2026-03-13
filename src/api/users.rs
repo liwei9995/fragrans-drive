@@ -12,18 +12,21 @@ use chrono::Utc;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use mongodb::bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateUserDto {
     pub email: String,
     pub password: String,
     #[serde(rename = "firstName")]
+    #[schema(example = "John")]
     pub first_name: String,
     #[serde(rename = "lastName")]
+    #[schema(example = "Doe")]
     pub last_name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateUserDto {
     #[serde(rename = "firstName")]
     pub first_name: Option<String>,
@@ -34,24 +37,34 @@ pub struct UpdateUserDto {
     pub avatar: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdatePasswordDto {
     pub password: String,
     #[serde(rename = "changePassword")]
     pub change_password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LoginDto {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct LoginResponse {
     pub access_token: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/auth/login",
+    request_body = LoginDto,
+    responses(
+        (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 401, description = "Invalid email or password")
+    ),
+    tag = "auth"
+)]
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginDto>,
@@ -84,6 +97,16 @@ pub async fn login(
     .into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/users",
+    request_body = CreateUserDto,
+    responses(
+        (status = 201, description = "User created successfully"),
+        (status = 400, description = "User already exists")
+    ),
+    tag = "users"
+)]
 pub async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<CreateUserDto>,
@@ -115,6 +138,14 @@ pub async fn create_user(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/users",
+    responses(
+        (status = 200, description = "List all users", body = [User])
+    ),
+    tag = "users"
+)]
 pub async fn get_all_users(State(state): State<AppState>) -> impl IntoResponse {
     let repo = UserRepository::new(&state.db);
     match repo.find_all().await {
@@ -123,6 +154,18 @@ pub async fn get_all_users(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/users/{id}",
+    params(
+        ("id" = String, Path, description = "User database id")
+    ),
+    responses(
+        (status = 200, description = "User found", body = User),
+        (status = 404, description = "User not found")
+    ),
+    tag = "users"
+)]
 pub async fn get_user(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
     let id = match ObjectId::parse_str(&id) {
         Ok(oid) => oid,
@@ -137,6 +180,19 @@ pub async fn get_user(State(state): State<AppState>, Path(id): Path<String>) -> 
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/users/profile/{id}",
+    params(
+        ("id" = String, Path, description = "User database id")
+    ),
+    request_body = UpdateUserDto,
+    responses(
+        (status = 200, description = "Profile updated successfully", body = User),
+        (status = 404, description = "User not found")
+    ),
+    tag = "users"
+)]
 pub async fn update_profile(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -172,6 +228,19 @@ pub async fn update_profile(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/users/password",
+    request_body = UpdatePasswordDto,
+    responses(
+        (status = 200, description = "Password updated successfully"),
+        (status = 400, description = "Invalid input or passwords do not match")
+    ),
+    tag = "auth",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn update_password(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -198,6 +267,18 @@ pub async fn update_password(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/v1/users/{id}",
+    params(
+        ("id" = String, Path, description = "User database id")
+    ),
+    responses(
+        (status = 200, description = "User deleted successfully", body = User),
+        (status = 404, description = "User not found")
+    ),
+    tag = "users"
+)]
 pub async fn delete_user(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -214,6 +295,17 @@ pub async fn delete_user(
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
     }
 }
+#[utoipa::path(
+    get,
+    path = "/v1/profile",
+    responses(
+        (status = 200, description = "Current user profile", body = UserContext)
+    ),
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn get_profile(user_ctx: UserContext) -> impl IntoResponse {
     Json(user_ctx).into_response()
 }

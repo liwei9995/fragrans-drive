@@ -2,9 +2,10 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, utoipa::ToSchema)]
 pub struct Storage {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
     pub id: Option<ObjectId>,
     pub name: String,
 

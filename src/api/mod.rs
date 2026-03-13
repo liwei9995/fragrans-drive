@@ -6,11 +6,69 @@ use crate::config::Config;
 use axum::Router;
 use mongodb::Database;
 use std::sync::Arc;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
     pub config: Arc<Config>,
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        users::login,
+        users::create_user,
+        users::get_all_users,
+        users::get_user,
+        users::update_profile,
+        users::update_password,
+        users::delete_user,
+        users::get_profile,
+        storage::upload_file,
+        storage::create_folder,
+        storage::get_files,
+        storage::get_file,
+        storage::move_file,
+        storage::get_download_url,
+        storage::update_file,
+        storage::remove_file,
+        storage::get_path,
+    ),
+    components(
+        schemas(
+            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse,
+            storage::CreateFolderDto, storage::GetFilesDto, storage::MoveFileDto,
+            crate::domain::user::User, crate::domain::storage::Storage,
+            middleware::UserContext
+        )
+    ),
+    modifiers(&SecurityAddon),
+    tags(
+        (name = "auth", description = "Authentication endpoints"),
+        (name = "users", description = "User management endpoints"),
+        (name = "storage", description = "File storage endpoints")
+    )
+)]
+pub struct ApiDoc;
+
+struct SecurityAddon;
+
+impl utoipa::Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer_auth",
+                utoipa::openapi::security::SecurityScheme::Http(
+                    utoipa::openapi::security::HttpBuilder::new()
+                        .scheme(utoipa::openapi::security::HttpAuthScheme::Bearer)
+                        .bearer_format("JWT")
+                        .build(),
+                ),
+            )
+        }
+    }
 }
 
 pub fn router(db: Database, config: Config) -> Router {
@@ -74,5 +132,8 @@ pub fn router(db: Database, config: Config) -> Router {
         )
         .with_state(state.clone());
 
-    Router::new().nest("/v1", v1).with_state(state)
+    Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .nest("/v1", v1)
+        .with_state(state)
 }

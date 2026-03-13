@@ -16,7 +16,7 @@ pub struct Claims {
     pub exp: usize,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct UserContext {
     pub user_id: String,
 }

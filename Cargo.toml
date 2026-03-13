@@ -29,3 +29,6 @@ aes = "0.8"
 ctr = "0.9"
 cipher = "0.4"
 rand = "0.8"
+utoipa = { version = "5.4", features = ["axum_extras", "chrono"] }
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+utoipa-axum = "0.2"

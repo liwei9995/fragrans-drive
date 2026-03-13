@@ -14,9 +14,10 @@ use axum::{
 use chrono::Utc;
 use mongodb::bson::{Document, doc, oid::ObjectId};
 use serde::Deserialize;
+use utoipa::ToSchema;
 use std::path::Path as StdPath;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateFolderDto {
     pub name: String,
     #[serde(rename = "parentId")]
@@ -25,14 +26,15 @@ pub struct CreateFolderDto {
     pub r#type: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct GetFilesDto {
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub query: Document,
     // pagination ignored for now, simple Vec
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct MoveFileDto {
     #[serde(rename = "fileId")]
     pub file_id: String,
@@ -40,6 +42,18 @@ pub struct MoveFileDto {
     pub parent_id: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/storage/upload",
+    request_body(content = Vec<u8>, content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Files uploaded successfully", body = [String])
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn upload_file(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -148,6 +162,18 @@ pub async fn upload_file(
     Json(uploaded_ids).into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/storage/folder",
+    request_body = CreateFolderDto,
+    responses(
+        (status = 200, description = "Folder created or existing returned", body = Storage)
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn create_folder(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -186,6 +212,18 @@ pub async fn create_folder(
     Json(res).into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/storage/list",
+    request_body = GetFilesDto,
+    responses(
+        (status = 200, description = "List of files", body = [Storage])
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn get_files(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -202,6 +240,19 @@ pub async fn get_files(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/storage/{id}",
+    params(
+        ("id" = String, Path, description = "File storage id"),
+        ("token" = Option<String>, Query, description = "Access token for public download")
+    ),
+    responses(
+        (status = 200, description = "File content stream", body = Vec<u8>),
+        (status = 404, description = "File not found")
+    ),
+    tag = "storage"
+)]
 pub async fn get_file(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -241,6 +292,18 @@ pub async fn get_file(
     StatusCode::NOT_FOUND.into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/storage/move",
+    request_body = MoveFileDto,
+    responses(
+        (status = 200, description = "File moved successfully")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn move_file(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -258,6 +321,18 @@ pub async fn move_file(
     StatusCode::OK.into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/storage/download/url",
+    request_body(content = Object, description = "JSON with fileId"),
+    responses(
+        (status = 200, description = "Download URL generated", body = String)
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn get_download_url(
     State(state): State<AppState>,
     _user_ctx: UserContext,
@@ -269,6 +344,21 @@ pub async fn get_download_url(
     format!("{}/v1/storage/{}?token={}", domain, file_id, token).into_response()
 }
 
+#[utoipa::path(
+    put,
+    path = "/v1/storage/{id}",
+    params(
+        ("id" = String, Path, description = "File storage id")
+    ),
+    request_body(content = Object, description = "Updated file properties"),
+    responses(
+        (status = 200, description = "File updated successfully")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn update_file(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -283,6 +373,20 @@ pub async fn update_file(
     StatusCode::OK.into_response()
 }
 
+#[utoipa::path(
+    delete,
+    path = "/v1/storage/{id}",
+    params(
+        ("id" = String, Path, description = "File storage id")
+    ),
+    responses(
+        (status = 200, description = "File removed successfully")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn remove_file(
     State(state): State<AppState>,
     user_ctx: UserContext,
@@ -297,6 +401,18 @@ pub async fn remove_file(
     StatusCode::OK.into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/storage/path",
+    request_body(content = Object),
+    responses(
+        (status = 501, description = "Not implemented")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn get_path(
     State(_state): State<AppState>,
     _user_ctx: UserContext,
