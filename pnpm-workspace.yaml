@@ -1,0 +1,12 @@
+allowBuilds:
+  /: true
+  '@': true
+  '@nestjs/core': true
+  b: true
+  e: true
+  i: true
+  j: true
+  m: true
+  o: true
+  s: true
+  sharp: true
