@@ -31,7 +31,7 @@ services:
     volumes:
       - storage-files:/app/bucket
     ports:
-      - 8085:3847
+      - 8085:3821
     depends_on:
       - mongo
 
