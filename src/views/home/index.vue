@@ -360,7 +360,6 @@ const handleBatchMove = () => {
   // I might need to update Move.vue to handle an array of IDs.
   // But let's keep it simple for now and move only the first one or prompt user.
   // Actually, I'll update Move to handle multiple IDs later.
-  ElMessage.info('暂不支持批量移动，正在升级中...')
 }
 
 const handleBatchDownload = () => {
@@ -384,58 +383,62 @@ const handleUploadChange: UploadProps['onChange'] = (
   isDragging.value = false
   dragCounter = 0
 
-  // Files that are actively being processed by the browser/server
-  const uploadingFiles = uploadFiles.filter((f) => f.status === 'uploading')
-  // Files that are in the queue but haven't started (might be waiting or blocked)
-  const readyFiles = uploadFiles.filter((f) => f.status === 'ready')
+  if (uploadFiles.length === 0) return
 
-  // We are finished ONLY if every file in the list has reached a terminal state (success or fail)
-  // This prevents 'ready' files that might be stuck/rejected from hanging the notification.
-  const isActuallyFinished = uploadFiles.every((f) =>
+  // Strictly identify files that are actively transferring or about to start
+  const activeFiles = uploadFiles.filter((f) =>
+    ['uploading', 'ready'].includes(f.status),
+  )
+
+  // Terminal files (completed in this specific batch)
+  const finishedFiles = uploadFiles.filter((f) =>
     ['success', 'fail'].includes(f.status),
   )
 
-  if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) return
+  // A batch is "actually finished" if there are no active (uploading/ready) files left
+  const isActuallyFinished = activeFiles.length === 0
 
-  // Manage cumulative finished files counts using UIDs for deduplication
-  const allFinishedFiles = [...uploadedFiles.value, ...uploadFiles].filter(
-    (f) => ['success', 'fail'].includes(f.status),
-  )
+  // Calculate cumulative session counts
+  // We combine historical 'uploadedFiles' with the current batch's results
+  const allHistorical = uploadedFiles.value
+  const combined = [...allHistorical]
 
-  const uniqueFinished = new Map()
-  for (const f of allFinishedFiles) {
-    const key = f.uid || f.name || Math.random()
-    uniqueFinished.set(key, f)
+  // Update or add finished files to combined list by UID
+  for (const f of finishedFiles) {
+    const idx = combined.findIndex((h) => h.uid === f.uid)
+    if (idx > -1) combined[idx] = f
+    else combined.push(f)
   }
 
-  const finishedList = Array.from(uniqueFinished.values())
-  const successCount = finishedList.filter((f) => f.status === 'success').length
-  const failCount = finishedList.filter((f) => f.status === 'fail').length
-
-  const activeCount = uploadingFiles.length + readyFiles.length
+  const successCount = combined.filter((f) => f.status === 'success').length
+  const failCount = combined.filter((f) => f.status === 'fail').length
 
   const title = !isActuallyFinished
-    ? `正在上传 ∙ 剩余${activeCount}项`
+    ? `正在上传 ∙ 剩余${activeFiles.length}项`
     : failCount > 0
       ? `上传完成 ∙ 成功${successCount}项 失败${failCount}项`
       : `上传完成 ∙ 共${successCount}项`
 
   const type = !isActuallyFinished ? 'uploading' : 'success'
 
-  ElNotification.closeAll()
-  uploadStatusRef.value?.show()
+  // Update UI
   notificationTitle.value = title
   notificationType.value = type
+  uploadStatusRef.value?.show()
 
   if (type === 'success') {
     uploadPercentage.value = 0
   }
 
-  // Finalize the batch only when all files in the current list have reached a terminal state
-  if (isActuallyFinished && uploadFiles.length > 0) {
-    uploadedFiles.value = finishedList
+  // Handle session finalization
+  if (isActuallyFinished) {
+    uploadedFiles.value = combined
 
-    // Use a delay before clearing to ensure the Success state is visible
+    // Auto-refresh the file list
+    fetchFiles(parentId.value)
+
+    // Clear the component's internal list after a short delay
+    // This allows the user to see the "Success" state
     setTimeout(() => {
       emitter.emit(UploadEventEnum.CLEAR_FILES)
       fetchFiles(parentId.value)
