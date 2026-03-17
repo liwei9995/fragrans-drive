@@ -59,6 +59,14 @@
    ```
    服务默认监听端口：`3821`
 
+4. **开发时自动重新编译（可选）**
+   安装 [cargo-watch](https://github.com/watchexec/cargo-watch) 后，可在代码修改时自动重新编译并运行：
+   ```bash
+   cargo install cargo-watch
+   cargo watch -x run
+   ```
+   仅检查编译不运行：`cargo watch -x check`
+
 ### 运行测试
 
 ```bash

@@ -1,7 +1,7 @@
 services:
 
   mongo:
-    image: mongo
+    image: mongo:8
     restart: always
     ports:
       - 25018:27017

@@ -1,6 +1,6 @@
 use crate::api::AppState;
 use crate::api::middleware::UserContext;
-use crate::domain::user::User;
+use crate::domain::user::{User, UserResponse};
 use crate::infrastructure::db::user_repo::UserRepository;
 use crate::utils::crypto::{hash_password, verify_password};
 use axum::{
@@ -10,7 +10,7 @@ use axum::{
 };
 use chrono::Utc;
 use jsonwebtoken::{EncodingKey, Header, encode};
-use mongodb::bson::{doc, oid::ObjectId};
+use mongodb::bson::{doc, oid::ObjectId, Bson, DateTime as BsonDateTime};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -142,14 +142,14 @@ pub async fn create_user(
     get,
     path = "/v1/users",
     responses(
-        (status = 200, description = "List all users", body = [User])
+        (status = 200, description = "List all users", body = [UserResponse])
     ),
     tag = "users"
 )]
 pub async fn get_all_users(State(state): State<AppState>) -> impl IntoResponse {
     let repo = UserRepository::new(&state.db);
     match repo.find_all().await {
-        Ok(users) => Json(users).into_response(),
+        Ok(users) => Json(users.into_iter().map(UserResponse::from).collect::<Vec<_>>()).into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch users").into_response(),
     }
 }
@@ -161,7 +161,7 @@ pub async fn get_all_users(State(state): State<AppState>) -> impl IntoResponse {
         ("id" = String, Path, description = "User database id")
     ),
     responses(
-        (status = 200, description = "User found", body = User),
+        (status = 200, description = "User found", body = UserResponse),
         (status = 404, description = "User not found")
     ),
     tag = "users"
@@ -174,7 +174,7 @@ pub async fn get_user(State(state): State<AppState>, Path(id): Path<String>) -> 
 
     let repo = UserRepository::new(&state.db);
     match repo.find_by_id(id).await {
-        Ok(Some(user)) => Json(user).into_response(),
+        Ok(Some(user)) => Json(UserResponse::from(user)).into_response(),
         Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
     }
@@ -188,7 +188,7 @@ pub async fn get_user(State(state): State<AppState>, Path(id): Path<String>) -> 
     ),
     request_body = UpdateUserDto,
     responses(
-        (status = 200, description = "Profile updated successfully", body = User),
+        (status = 200, description = "Profile updated successfully", body = UserResponse),
         (status = 404, description = "User not found")
     ),
     tag = "users"
@@ -203,7 +203,7 @@ pub async fn update_profile(
         Err(_) => return (StatusCode::BAD_REQUEST, "Invalid ID").into_response(),
     };
 
-    let mut update = doc! { "updatedAt": Utc::now() };
+    let mut update = doc! { "updatedAt": Bson::DateTime(BsonDateTime::from_chrono(Utc::now())) };
     if let Some(f) = payload.first_name {
         update.insert("firstName", f);
     }
@@ -222,9 +222,12 @@ pub async fn update_profile(
 
     let repo = UserRepository::new(&state.db);
     match repo.update_profile(id, update).await {
-        Ok(Some(user)) => Json(user).into_response(),
+        Ok(Some(user)) => Json(UserResponse::from(user)).into_response(),
         Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
+        Err(e) => {
+            tracing::error!("update_profile db error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
     }
 }
 
@@ -274,7 +277,7 @@ pub async fn update_password(
         ("id" = String, Path, description = "User database id")
     ),
     responses(
-        (status = 200, description = "User deleted successfully", body = User),
+        (status = 200, description = "User deleted successfully", body = UserResponse),
         (status = 404, description = "User not found")
     ),
     tag = "users"
@@ -290,7 +293,7 @@ pub async fn delete_user(
 
     let repo = UserRepository::new(&state.db);
     match repo.delete_one(id).await {
-        Ok(Some(user)) => Json(user).into_response(),
+        Ok(Some(user)) => Json(UserResponse::from(user)).into_response(),
         Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
     }
@@ -299,13 +302,29 @@ pub async fn delete_user(
     get,
     path = "/v1/profile",
     responses(
-        (status = 200, description = "Current user profile", body = UserContext)
+        (status = 200, description = "Current user profile", body = UserResponse),
+        (status = 404, description = "User not found")
     ),
     tag = "users",
     security(
         ("bearer_auth" = [])
     )
 )]
-pub async fn get_profile(user_ctx: UserContext) -> impl IntoResponse {
-    Json(user_ctx).into_response()
+pub async fn get_profile(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+) -> impl IntoResponse {
+    let id = match ObjectId::parse_str(&user_ctx.user_id) {
+        Ok(oid) => oid,
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid user id").into_response(),
+    };
+    let repo = UserRepository::new(&state.db);
+    match repo.find_by_id(id).await {
+        Ok(Some(user)) => Json(UserResponse::from(user)).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_profile db error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
 }

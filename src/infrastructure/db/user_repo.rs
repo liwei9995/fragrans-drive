@@ -43,9 +43,14 @@ impl UserRepository {
         id: ObjectId,
         update: mongodb::bson::Document,
     ) -> Result<Option<User>, mongodb::error::Error> {
-        self.collection
-            .find_one_and_update(doc! { "_id": id }, doc! { "$set": update })
-            .await
+        let result = self
+            .collection
+            .update_one(doc! { "_id": id }, doc! { "$set": update })
+            .await?;
+        if result.matched_count == 0 {
+            return Ok(None)
+        }
+        self.collection.find_one(doc! { "_id": id }).await
     }
 
     pub async fn update_password(

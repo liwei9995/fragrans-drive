@@ -40,7 +40,7 @@ pub struct AppState {
         schemas(
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse,
             storage::CreateFolderDto, storage::GetFilesDto, storage::MoveFileDto,
-            crate::domain::user::User, crate::domain::storage::Storage,
+            crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage,
             middleware::UserContext
         )
     ),
@@ -81,11 +81,13 @@ pub fn router(db: Database, config: Config) -> Router {
         .route("/login", axum::routing::post(users::login))
         .with_state(state.clone());
 
-    let user_routes = Router::new()
-        .route(
-            "/",
-            axum::routing::get(users::get_all_users).post(users::create_user),
-        )
+    // 创建用户（注册）无需登录，其余用户接口需 JWT
+    let user_routes_public = Router::new()
+        .route("/", axum::routing::post(users::create_user))
+        .with_state(state.clone());
+
+    let user_routes_protected = Router::new()
+        .route("/", axum::routing::get(users::get_all_users))
         .route(
             "/{id}",
             axum::routing::get(users::get_user).delete(users::delete_user),
@@ -97,6 +99,8 @@ pub fn router(db: Database, config: Config) -> Router {
             middleware::auth_guard,
         ))
         .with_state(state.clone());
+
+    let user_routes = user_routes_public.merge(user_routes_protected);
 
     let storage_routes = Router::new()
         .route("/upload", axum::routing::post(storage::upload_file))
