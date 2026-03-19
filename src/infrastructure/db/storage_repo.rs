@@ -2,7 +2,7 @@ use crate::domain::storage::Storage;
 use futures_util::stream::StreamExt;
 use mongodb::{
     Collection, Database,
-    bson::{Document, doc, oid::ObjectId},
+    bson::{Bson, Document, doc, oid::ObjectId},
 };
 
 pub struct StorageRepository {
@@ -32,13 +32,52 @@ impl StorageRepository {
         self.collection.find_one(doc! { "MD5Hash": hash }).await
     }
 
+    #[allow(dead_code)]
     pub async fn find_many(&self, query: Document) -> Result<Vec<Storage>, mongodb::error::Error> {
-        let mut cursor = self.collection.find(query).await?;
+        let mut cursor = self.collection.find(query.clone()).await?;
         let mut results = Vec::new();
         while let Some(item) = cursor.next().await {
             results.push(item?);
         }
         Ok(results)
+    }
+
+    /// 返回在给定 query 下所有作为 thumbnail 被引用的 _id（用于列表接口排除缩略图单独成条）。
+    pub async fn thumbnail_object_ids(&self, query: Document) -> Result<Vec<ObjectId>, mongodb::error::Error> {
+        let values = self.collection.distinct("thumbnail", query).await?;
+        let mut ids = Vec::new();
+        for v in values {
+            let s = match v {
+                Bson::String(x) if !x.is_empty() => x,
+                _ => continue,
+            };
+            if let Ok(oid) = ObjectId::parse_str(&s) {
+                ids.push(oid);
+            }
+        }
+        Ok(ids)
+    }
+
+    /// 分页查询：返回 (当前页条目, 总条数)。
+    pub async fn find_many_paginated(
+        &self,
+        query: Document,
+        page: u64,
+        limit: u64,
+    ) -> Result<(Vec<Storage>, u64), mongodb::error::Error> {
+        let total = self.collection.count_documents(query.clone()).await?;
+        let skip = (page.saturating_sub(1)) * limit;
+        let mut cursor = self
+            .collection
+            .find(query)
+            .skip(skip)
+            .limit(limit as i64)
+            .await?;
+        let mut results = Vec::new();
+        while let Some(item) = cursor.next().await {
+            results.push(item?);
+        }
+        Ok((results, total))
     }
 
     pub async fn create(&self, item: Storage) -> Result<ObjectId, mongodb::error::Error> {

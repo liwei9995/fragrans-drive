@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// API 返回用，不包含 password。JSON 中 _id 为 hex 字符串，createdAt/updatedAt 为毫秒时间戳字符串。
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UserResponse {
-    #[serde(rename = "_id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
     #[schema(value_type = String)]
     pub id: Option<ObjectId>,
     pub email: String,

@@ -1,6 +1,6 @@
 use crate::api::AppState;
-use crate::api::middleware::UserContext;
-use crate::domain::storage::Storage;
+use crate::api::middleware::{UserContext, Claims};
+use crate::domain::storage::{Storage, StorageListResponse, StorageListPaginatedResponse, StoragePathNode};
 use crate::infrastructure::db::storage_repo::StorageRepository;
 use crate::infrastructure::image::thumbnail::generate_thumbnail;
 use crate::infrastructure::storage::local::LocalStorage;
@@ -12,6 +12,7 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::Utc;
+use jsonwebtoken::{EncodingKey, Header, encode};
 use mongodb::bson::{Document, doc, oid::ObjectId};
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -31,8 +32,14 @@ pub struct GetFilesDto {
     #[serde(default)]
     #[schema(value_type = Object)]
     pub query: Document,
-    // pagination ignored for now, simple Vec
+    #[serde(default = "default_page")]
+    pub page: u64,
+    #[serde(default = "default_limit")]
+    pub limit: u64,
 }
+
+fn default_page() -> u64 { 1 }
+fn default_limit() -> u64 { 100 }
 
 #[derive(Deserialize, ToSchema)]
 pub struct MoveFileDto {
@@ -40,6 +47,13 @@ pub struct MoveFileDto {
     pub file_id: String,
     #[serde(rename = "parentId")]
     pub parent_id: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct GetPathDto {
+    /// 文件或文件夹 id；也接受 body 中的 fileId（兼容 NestJS）。
+    #[serde(alias = "fileId")]
+    pub id: String,
 }
 
 #[utoipa::path(
@@ -62,9 +76,28 @@ pub async fn upload_file(
     let mut uploaded_ids = Vec::new();
     let repo = StorageRepository::new(&state.db);
     let storage = LocalStorage::new();
+    let mut parent_id = "root".to_string();
 
     while let Ok(Some(field)) = multipart.next_field().await {
-        let name = field.file_name().unwrap_or("unnamed").to_string();
+        // 表单项 parentId：当前上传目录，列表接口会按 parentId 查，未传则用 root
+        if field.name().is_some_and(|n| n == "parentId") {
+            if let Ok(bytes) = field.bytes().await {
+                let s = String::from_utf8_lossy(&bytes).trim().to_string();
+                if !s.is_empty() {
+                    parent_id = s;
+                }
+            }
+            continue;
+        }
+
+        let name = match field.file_name() {
+            Some(n) => n.trim().to_string(),
+            None => continue,
+        };
+        // 跳过无有效文件名的 part，避免列表出现非用户上传的 unnamed 等
+        if name.is_empty() || name.eq_ignore_ascii_case("unnamed") {
+            continue;
+        }
         let content_type = field
             .content_type()
             .unwrap_or("application/octet-stream")
@@ -74,9 +107,15 @@ pub async fn upload_file(
         let hash = hash_buffer(&data);
         let iv = get_iv();
 
-        // De-duplication check
+        // 仅在同一父目录下按 hash 去重：同文件上传到不同文件夹会各有一条记录，列表能按 parentId 查到
         let existing = repo
-            .find_one(doc! { "MD5Hash": &hash, "userId": &user_ctx.user_id })
+            .find_one(doc! {
+                "MD5Hash": &hash,
+                "userId": &user_ctx.user_id,
+                "parentId": &parent_id,
+                "type": "file",
+                "trashed": false,
+            })
             .await
             .unwrap();
 
@@ -84,6 +123,16 @@ pub async fn upload_file(
             uploaded_ids.push(doc.id.unwrap().to_hex());
             continue;
         }
+
+        // 物理存储按 hash 单路径，解密用 (hash, iv)。同文件再传若用新 iv 会覆盖磁盘导致旧链接失效，故复用已有文档的 iv 且不再写盘
+        let (iv_to_use, need_store) = match repo
+            .find_one(doc! { "MD5Hash": &hash, "userId": &user_ctx.user_id, "type": "file" })
+            .await
+            .unwrap()
+        {
+            Some(ref d) if d.iv.is_some() => (d.iv.as_deref().unwrap().to_string(), false),
+            _ => (iv.clone(), true),
+        };
 
         let mut storage_item = Storage {
             id: None,
@@ -107,8 +156,8 @@ pub async fn upload_file(
             encoding: None,
             size: Some(data.len() as i64),
             md5_hash: Some(hash.clone()),
-            iv: Some(iv.clone()),
-            parent_id: "root".to_string(), // Simplified for now, should get from body
+            iv: Some(iv_to_use.clone()),
+            parent_id: parent_id.clone(),
             r#type: "file".to_string(),
             user_id: user_ctx.user_id.clone(),
             thumbnail: None,
@@ -117,11 +166,19 @@ pub async fn upload_file(
             updated_at: Some(Utc::now()),
         };
 
-        // Thumbnail?
-        if content_type.starts_with("image/") {
+        // Thumbnail：仅对栅格图生成（image 库不支持 SVG 等矢量格式）
+        let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
+        if is_raster_image {
             if let Ok(thumb_data) = generate_thumbnail(&data) {
                 let thumb_hash = hash_buffer(&thumb_data);
-                let thumb_iv = get_iv();
+                let (thumb_iv_to_use, thumb_need_store) = match repo
+                    .find_one(doc! { "MD5Hash": &thumb_hash, "userId": &user_ctx.user_id, "type": "thumbnail" })
+                    .await
+                    .unwrap()
+                {
+                    Some(ref d) if d.iv.is_some() => (d.iv.as_deref().unwrap().to_string(), false),
+                    _ => (get_iv(), true),
+                };
 
                 let thumb_item = Storage {
                     id: None,
@@ -132,8 +189,8 @@ pub async fn upload_file(
                     encoding: None,
                     size: Some(thumb_data.len() as i64),
                     md5_hash: Some(thumb_hash.clone()),
-                    iv: Some(thumb_iv.clone()),
-                    parent_id: "root".to_string(),
+                    iv: Some(thumb_iv_to_use.clone()),
+                    parent_id: parent_id.clone(),
                     r#type: "thumbnail".to_string(),
                     user_id: user_ctx.user_id.clone(),
                     thumbnail: None,
@@ -143,19 +200,23 @@ pub async fn upload_file(
                 };
 
                 let thumb_id = repo.create(thumb_item).await.unwrap();
-                storage
-                    .store(&thumb_hash, thumb_data, Some(&thumb_iv))
-                    .await
-                    .unwrap();
+                if thumb_need_store {
+                    storage
+                        .store(&thumb_hash, thumb_data, Some(&thumb_iv_to_use))
+                        .await
+                        .unwrap();
+                }
                 storage_item.thumbnail = Some(thumb_id.to_hex());
             }
         }
 
         let id = repo.create(storage_item).await.unwrap();
-        storage
-            .store(&hash, data.to_vec(), Some(&iv))
-            .await
-            .unwrap();
+        if need_store {
+            storage
+                .store(&hash, data.to_vec(), Some(&iv_to_use))
+                .await
+                .unwrap();
+        }
         uploaded_ids.push(id.to_hex());
     }
 
@@ -167,7 +228,7 @@ pub async fn upload_file(
     path = "/v1/storage/folder",
     request_body = CreateFolderDto,
     responses(
-        (status = 200, description = "Folder created or existing returned", body = Storage)
+        (status = 200, description = "Folder created or existing returned (no iv/MD5Hash/userId, id as hex)", body = StorageListResponse)
     ),
     tag = "storage",
     security(
@@ -181,10 +242,19 @@ pub async fn create_folder(
 ) -> impl IntoResponse {
     let repo = StorageRepository::new(&state.db);
 
-    // Check if exists
-    let existing = repo.find_one(doc! { "name": &payload.name, "parentId": &payload.parent_id, "userId": &user_ctx.user_id, "type": "folder" }).await.unwrap();
+    // 只认为「未删除」的同名文件夹为已存在，避免返回之前删除过的同名文件夹（列表接口只查 trashed: false）
+    let existing = repo
+        .find_one(doc! {
+            "name": &payload.name,
+            "parentId": &payload.parent_id,
+            "userId": &user_ctx.user_id,
+            "type": "folder",
+            "trashed": false,
+        })
+        .await
+        .unwrap();
     if let Some(doc) = existing {
-        return Json(doc).into_response();
+        return Json(StorageListResponse::from(doc)).into_response();
     }
 
     let folder = Storage {
@@ -209,7 +279,7 @@ pub async fn create_folder(
     let id = repo.create(folder.clone()).await.unwrap();
     let mut res = folder;
     res.id = Some(id);
-    Json(res).into_response()
+    Json(StorageListResponse::from(res)).into_response()
 }
 
 #[utoipa::path(
@@ -217,7 +287,7 @@ pub async fn create_folder(
     path = "/v1/storage/list",
     request_body = GetFilesDto,
     responses(
-        (status = 200, description = "List of files", body = [Storage])
+        (status = 200, description = "Paginated list { docs, total, limit, page, pages }", body = StorageListPaginatedResponse)
     ),
     tag = "storage",
     security(
@@ -233,9 +303,45 @@ pub async fn get_files(
     let mut query = payload.query;
     query.insert("userId", &user_ctx.user_id);
     query.insert("trashed", false);
+    // 只返回文件/文件夹，不把 type=thumbnail 的文档当独立行返回（缩略图仅作为主文件的 thumbnail 字段）
+    query.insert("type", doc! { "$in": ["file", "folder"] });
 
-    match repo.find_many(query).await {
-        Ok(files) => Json(files).into_response(),
+    let page = payload.page.max(1);
+    let limit = payload.limit.min(1000).max(1);
+
+    // 排除“仅作为缩略图”的文档，列表里只显示主文件/文件夹，图片的 thumbnail 作为字段带在对应文件上
+    if let Ok(thumbnail_ids) = repo.thumbnail_object_ids(query.clone()).await {
+        if !thumbnail_ids.is_empty() {
+            query.insert("_id", doc! { "$nin": thumbnail_ids });
+        }
+    }
+
+    match repo.find_many_paginated(query, page, limit).await {
+        Ok((files, total)) => {
+            let token = encode(
+                &Header::default(),
+                &Claims {
+                    user_id: user_ctx.user_id.clone(),
+                    exp: (Utc::now().timestamp() + 900) as usize, // 15 min for url/thumbnail links
+                },
+                &EncodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+            )
+            .unwrap_or_default();
+            let base_url = state.config.domain.as_str();
+            let docs: Vec<StorageListResponse> = files
+                .into_iter()
+                .map(|s| StorageListResponse::from_storage_with_urls(s, base_url, &token))
+                .collect();
+            let pages = if total == 0 { 1 } else { (total + limit - 1) / limit };
+            Json(StorageListPaginatedResponse {
+                docs,
+                total,
+                limit,
+                page,
+                pages,
+            })
+            .into_response()
+        }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
@@ -404,9 +510,11 @@ pub async fn remove_file(
 #[utoipa::path(
     post,
     path = "/v1/storage/path",
-    request_body(content = Object),
+    request_body = GetPathDto,
     responses(
-        (status = 501, description = "Not implemented")
+        (status = 200, description = "Path from root to the given file/folder", body = [StoragePathNode]),
+        (status = 400, description = "Invalid id"),
+        (status = 404, description = "Not found or not owned by user")
     ),
     tag = "storage",
     security(
@@ -414,10 +522,64 @@ pub async fn remove_file(
     )
 )]
 pub async fn get_path(
-    State(_state): State<AppState>,
-    _user_ctx: UserContext,
-    Json(_payload): Json<Document>,
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Json(payload): Json<GetPathDto>,
 ) -> impl IntoResponse {
-    // Recursive path logic
-    StatusCode::NOT_IMPLEMENTED.into_response()
+    let id = payload.id.trim();
+    if id.is_empty() {
+        return (StatusCode::BAD_REQUEST, "Missing id or fileId").into_response();
+    }
+    let oid = match ObjectId::parse_str(id) {
+        Ok(o) => o,
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid id").into_response(),
+    };
+
+    let repo = StorageRepository::new(&state.db);
+
+    let mut current = match repo.find_by_id(oid).await {
+        Ok(Some(s)) => s,
+        Ok(None) => return (StatusCode::NOT_FOUND, "Not found").into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
+    };
+
+    if current.user_id != user_ctx.user_id || current.trashed {
+        return (StatusCode::NOT_FOUND, "Not found").into_response();
+    }
+
+    let mut path_reversed: Vec<StoragePathNode> = Vec::new();
+    loop {
+        path_reversed.push(StoragePathNode {
+            id: current
+                .id
+                .as_ref()
+                .map(|o| o.to_string())
+                .unwrap_or_else(|| "root".to_string()),
+            name: current.name.clone(),
+            parent_id: current.parent_id.clone(),
+            r#type: current.r#type.clone(),
+        });
+        if current.parent_id == "root" {
+            break;
+        }
+        let parent_oid = match ObjectId::parse_str(&current.parent_id) {
+            Ok(o) => o,
+            Err(_) => break,
+        };
+        let parent = match repo.find_by_id(parent_oid).await {
+            Ok(Some(s)) => s,
+            _ => break,
+        };
+        if parent.user_id != user_ctx.user_id || parent.trashed {
+            break;
+        }
+        current = parent;
+    }
+
+    path_reversed.reverse();
+    let path: Vec<StoragePathNode> = path_reversed
+        .into_iter()
+        .filter(|n| !n.parent_id.is_empty())
+        .collect();
+    Json(path).into_response()
 }

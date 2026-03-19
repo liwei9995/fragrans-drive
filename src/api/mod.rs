@@ -6,6 +6,7 @@ use crate::config::Config;
 use axum::Router;
 use mongodb::Database;
 use std::sync::Arc;
+use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -38,9 +39,9 @@ pub struct AppState {
     ),
     components(
         schemas(
-            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse,
-            storage::CreateFolderDto, storage::GetFilesDto, storage::MoveFileDto,
-            crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage,
+            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::CreateUserResponse,
+            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto,
+            crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode,
             middleware::UserContext
         )
     ),
@@ -139,5 +140,6 @@ pub fn router(db: Database, config: Config) -> Router {
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest("/v1", v1)
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

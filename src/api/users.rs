@@ -55,12 +55,18 @@ pub struct LoginResponse {
     pub access_token: String,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct CreateUserResponse {
+    pub id: String,
+}
+
 #[utoipa::path(
     post,
     path = "/v1/auth/login",
     request_body = LoginDto,
     responses(
         (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 400, description = "Invalid request body (e.g. missing required field 'email' or 'password')"),
         (status = 401, description = "Invalid email or password")
     ),
     tag = "auth"
@@ -102,8 +108,8 @@ pub async fn login(
     path = "/v1/users",
     request_body = CreateUserDto,
     responses(
-        (status = 201, description = "User created successfully"),
-        (status = 400, description = "User already exists")
+        (status = 201, description = "User created successfully", body = CreateUserResponse),
+        (status = 400, description = "User already exists, or invalid body (required: email, password, firstName, lastName)")
     ),
     tag = "users"
 )]
@@ -133,7 +139,11 @@ pub async fn create_user(
     };
 
     match repo.create(user).await {
-        Ok(id) => (StatusCode::CREATED, Json(doc! { "id": id.to_hex() })).into_response(),
+        Ok(id) => (
+            StatusCode::CREATED,
+            Json(CreateUserResponse { id: id.to_hex() }),
+        )
+            .into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user").into_response(),
     }
 }

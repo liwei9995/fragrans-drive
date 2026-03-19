@@ -1,8 +1,6 @@
 # Fragrans
 
-<p align="center">
-  A high-performance file storage service rewritten in <b>Rust</b>.
-</p>
+A high-performance file storage service rewritten in **Rust**.
 
 ## 📖 Description
 
@@ -54,18 +52,43 @@
    ```
 
 3. **运行项目**
+
    ```bash
    cargo run
    ```
+
    服务默认监听端口：`3821`
 
 4. **开发时自动重新编译（可选）**
-   安装 [cargo-watch](https://github.com/watchexec/cargo-watch) 后，可在代码修改时自动重新编译并运行：
+   使用 [Bacon](https://github.com/Canop/bacon)（cargo-watch 的推荐替代）在代码修改时自动检查或运行：
+
    ```bash
-   cargo install cargo-watch
-   cargo watch -x run
+   cargo install --locked bacon
+   bacon
    ```
-   仅检查编译不运行：`cargo watch -x check`
+
+   默认会持续执行 `cargo check`。若需「改代码自动运行服务」，在项目根目录添加 `bacon.toml`：
+
+   ```toml
+   [jobs.run]
+   command = ["cargo", "run"]
+   need_stdout = true
+   allow_warnings = true
+   background = true
+   ```
+
+   然后执行 `bacon run`。
+
+   **若用 Cmd+C 退出后服务仍在后台运行**：Ctrl/Cmd+C 可能只结束 Bacon，其启动的子进程（本服务）未收到信号而继续运行。可先清理再启动：
+
+   ```bash
+   # 按进程名结束残留的 fragrans 进程
+   pkill -f fragrans
+   # 或按端口结束（默认 3821）
+   lsof -ti:3821 | xargs kill
+   ```
+
+   之后若需自动重载，可直接用 `cargo run`，需要重启时再 Cmd+C 后重新执行，这样会一并结束服务。
 
 ### 运行测试
 
