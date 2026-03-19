@@ -1,6 +1,6 @@
 use crate::api::AppState;
 use crate::api::middleware::{UserContext, Claims};
-use crate::domain::storage::{Storage, StorageListResponse, StorageListPaginatedResponse, StoragePathNode};
+use crate::domain::storage::{Storage, StorageListResponse, StorageListPaginatedResponse, StoragePathNode, CreateFolderResponse, UpdateStorageResponse};
 use crate::infrastructure::db::storage_repo::StorageRepository;
 use crate::infrastructure::image::thumbnail::generate_thumbnail;
 use crate::infrastructure::storage::local::LocalStorage;
@@ -228,7 +228,7 @@ pub async fn upload_file(
     path = "/v1/storage/folder",
     request_body = CreateFolderDto,
     responses(
-        (status = 200, description = "Folder created or existing returned (no iv/MD5Hash/userId, id as hex)", body = StorageListResponse)
+        (status = 200, description = "Folder created or existing: id, name, parentId, type, createdAt, updatedAt, exist", body = CreateFolderResponse)
     ),
     tag = "storage",
     security(
@@ -236,11 +236,11 @@ pub async fn upload_file(
     )
 )]
 pub async fn create_folder(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     user_ctx: UserContext,
     Json(payload): Json<CreateFolderDto>,
 ) -> impl IntoResponse {
-    let repo = StorageRepository::new(&state.db);
+    let repo = StorageRepository::new(&_state.db);
 
     // 只认为「未删除」的同名文件夹为已存在，避免返回之前删除过的同名文件夹（列表接口只查 trashed: false）
     let existing = repo
@@ -254,12 +254,21 @@ pub async fn create_folder(
         .await
         .unwrap();
     if let Some(doc) = existing {
-        return Json(StorageListResponse::from(doc)).into_response();
+        return Json(CreateFolderResponse {
+            id: doc.id,
+            name: doc.name,
+            parent_id: doc.parent_id,
+            r#type: doc.r#type,
+            created_at: doc.created_at,
+            updated_at: doc.updated_at,
+            exist: true,
+        }).into_response();
     }
 
+    let now = Utc::now();
     let folder = Storage {
         id: None,
-        name: payload.name,
+        name: payload.name.clone(),
         base_name: None,
         ext_name: None,
         mime_type: None,
@@ -267,19 +276,25 @@ pub async fn create_folder(
         size: None,
         md5_hash: None,
         iv: None,
-        parent_id: payload.parent_id,
+        parent_id: payload.parent_id.clone(),
         r#type: "folder".to_string(),
-        user_id: user_ctx.user_id,
+        user_id: user_ctx.user_id.clone(),
         thumbnail: None,
         trashed: false,
-        created_at: Some(Utc::now()),
-        updated_at: Some(Utc::now()),
+        created_at: Some(now),
+        updated_at: Some(now),
     };
 
-    let id = repo.create(folder.clone()).await.unwrap();
-    let mut res = folder;
-    res.id = Some(id);
-    Json(StorageListResponse::from(res)).into_response()
+    let id = repo.create(folder).await.unwrap();
+    Json(CreateFolderResponse {
+        id: Some(id),
+        name: payload.name,
+        parent_id: payload.parent_id,
+        r#type: "folder".to_string(),
+        created_at: Some(now),
+        updated_at: Some(now),
+        exist: false,
+    }).into_response()
 }
 
 #[utoipa::path(
@@ -441,12 +456,20 @@ pub async fn move_file(
 )]
 pub async fn get_download_url(
     State(state): State<AppState>,
-    _user_ctx: UserContext,
+    user_ctx: UserContext,
     Json(payload): Json<Document>,
 ) -> impl IntoResponse {
     let file_id = payload.get_str("fileId").unwrap_or("");
-    let domain = &state.config.domain;
-    let token = "TODO";
+    let domain = state.config.domain.trim_end_matches('/');
+    let token = encode(
+        &Header::default(),
+        &Claims {
+            user_id: user_ctx.user_id.clone(),
+            exp: (Utc::now().timestamp() + 900) as usize, // 15 min for download link
+        },
+        &EncodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+    )
+    .unwrap_or_default();
     format!("{}/v1/storage/{}?token={}", domain, file_id, token).into_response()
 }
 
@@ -458,7 +481,8 @@ pub async fn get_download_url(
     ),
     request_body(content = Object, description = "Updated file properties"),
     responses(
-        (status = 200, description = "File updated successfully")
+        (status = 200, description = "Updated document: id, name, parentId, type, userId, trashed, createdAt, updatedAt, baseName, extName", body = UpdateStorageResponse),
+        (status = 404, description = "Not found or not owned by user")
     ),
     tag = "storage",
     security(
@@ -471,12 +495,23 @@ pub async fn update_file(
     Path(id): Path<String>,
     Json(payload): Json<Document>,
 ) -> impl IntoResponse {
-    let id_oid = ObjectId::parse_str(&id).unwrap();
+    let id_oid = match ObjectId::parse_str(&id) {
+        Ok(o) => o,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
     let repo = StorageRepository::new(&state.db);
-    repo.update_one(id_oid, &user_ctx.user_id, payload)
-        .await
-        .unwrap();
-    StatusCode::OK.into_response()
+    match repo.update_one(id_oid, &user_ctx.user_id, payload).await {
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Ok(Some(_)) => {
+            match repo.find_by_id(id_oid).await {
+                Ok(Some(doc)) if doc.user_id == user_ctx.user_id => {
+                    Json(UpdateStorageResponse::from(doc)).into_response()
+                }
+                _ => StatusCode::NOT_FOUND.into_response(),
+            }
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }
 
 #[utoipa::path(

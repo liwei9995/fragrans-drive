@@ -32,6 +32,48 @@ pub struct StorageListResponse {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// 创建文件夹接口返回：id, name, parentId, type, createdAt, updatedAt, exist（已存在为 true，新建为 false）。
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct CreateFolderResponse {
+    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[schema(value_type = String)]
+    pub id: Option<ObjectId>,
+    pub name: String,
+    #[serde(rename = "parentId")]
+    pub parent_id: String,
+    #[serde(rename = "type")]
+    pub r#type: String,
+    #[serde(rename = "createdAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    pub created_at: Option<DateTime<Utc>>,
+    #[serde(rename = "updatedAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    pub updated_at: Option<DateTime<Utc>>,
+    pub exist: bool,
+}
+
+/// PUT /storage/:id 返回：id, name, parentId, type, userId, trashed, createdAt, updatedAt, baseName, extName。
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct UpdateStorageResponse {
+    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[schema(value_type = String)]
+    pub id: Option<ObjectId>,
+    pub name: String,
+    #[serde(rename = "parentId")]
+    pub parent_id: String,
+    #[serde(rename = "type")]
+    pub r#type: String,
+    #[serde(rename = "userId")]
+    pub user_id: String,
+    pub trashed: bool,
+    #[serde(rename = "createdAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    pub created_at: Option<DateTime<Utc>>,
+    #[serde(rename = "updatedAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(rename = "baseName")]
+    pub base_name: Option<String>,
+    #[serde(rename = "extName")]
+    pub ext_name: Option<String>,
+}
+
 /// 路径节点（get_path 返回的从 root 到当前文件/文件夹的每一级）。
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct StoragePathNode {
@@ -103,6 +145,28 @@ impl From<Storage> for StorageListResponse {
             trashed: s.trashed,
             created_at: s.created_at,
             updated_at: s.updated_at,
+        }
+    }
+}
+
+impl From<Storage> for UpdateStorageResponse {
+    fn from(s: Storage) -> Self {
+        let base_name = if s.r#type == "folder" {
+            s.base_name.or(Some(s.name.clone()))
+        } else {
+            s.base_name
+        };
+        Self {
+            id: s.id,
+            name: s.name,
+            parent_id: s.parent_id,
+            r#type: s.r#type,
+            user_id: s.user_id,
+            trashed: s.trashed,
+            created_at: s.created_at,
+            updated_at: s.updated_at,
+            base_name,
+            ext_name: s.ext_name,
         }
     }
 }
