@@ -7,7 +7,7 @@ export interface Result {
 // 登录
 export namespace Login {
   export interface ReqLoginForm {
-    username: string
+    email: string
     password: string
   }
   export interface ResLogin {

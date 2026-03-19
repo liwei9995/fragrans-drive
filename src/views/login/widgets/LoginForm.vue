@@ -13,10 +13,10 @@ const globalStore = GlobalStore()
 type FormInstance = InstanceType<typeof ElForm>
 const loginFormRef = ref<FormInstance>()
 const loginRules = reactive({
-  username: [
+  email: [
     {
       required: true,
-      message: '请输入用户名',
+      message: '请输入邮箱',
       trigger: 'blur',
     },
   ],
@@ -31,7 +31,7 @@ const loginRules = reactive({
 
 // 登录表单数据
 const loginForm = reactive<Login.ReqLoginForm>({
-  username: '',
+  email: '',
   password: '',
 })
 const loading = ref<boolean>(false)
@@ -46,7 +46,7 @@ const login = (formEl: FormInstance | undefined) => {
     loading.value = true
     try {
       const requestLoginForm: Login.ReqLoginForm = {
-        username: loginForm.username,
+        email: loginForm.email,
         password: loginForm.password,
       }
       const res = (await authLogin(requestLoginForm)) as {
@@ -85,8 +85,8 @@ defineExpose({ loginRules, loginFormRef, loginForm, loading, login })
       <small>Sign in if you already have an account.</small>
       <span>
         <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" size="large">
-          <el-form-item prop="username">
-            <el-input v-model="loginForm.username" placeholder="Email">
+          <el-form-item prop="email">
+            <el-input v-model="loginForm.email" placeholder="Email">
               <template #prefix>
                 <el-icon class="el-input__icon"><user /></el-icon>
               </template>

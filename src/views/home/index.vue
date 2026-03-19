@@ -5,7 +5,7 @@ import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   deleteFile,
-  getDownloadUrl,
+  getFile,
   getPath,
   updateFile,
 } from '@/api/modules/storage'
@@ -214,7 +214,7 @@ const handleRenameFile = (name: string) => {
   }).then((res: any) => {
     const {
       exist,
-      _id: id,
+      id: id,
       name,
       baseName,
       extName,
@@ -264,12 +264,24 @@ const handleTapActionItem = (command: string | number | object) => {
   }
 }
 
-const download = async (id: string) => {
+/** 通过带 Authorization 的直连接口下载，不依赖 URL 中的 token */
+const download = async (id: string, filename?: string) => {
   ElMessage.info('文件下载准备中...')
-  const { url } = (await getDownloadUrl(id)) as { url: string }
-
-  // * 在当前页面弹出下载窗口
-  window.open(url, '_self')
+  try {
+    const blob = (await getFile(id)) as Blob
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || id
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    // 不在此处提示「下载成功」：点击后仅唤起保存对话框，用户选择保存位置并确认后才真正完成，无法可靠检测
+  } catch {
+    ElMessage.error('下载失败，请重试')
+  }
 }
 
 const handleTapCardActionItem = async (
@@ -281,7 +293,7 @@ const handleTapCardActionItem = async (
   extName = '',
 ) => {
   if (command === 'download') {
-    download(id)
+    download(id, name)
   } else if (command === 'delete') {
     ElMessageBox.confirm('文件删除后将无法恢复，确定要删除么？', '删除文件', {
       confirmButtonText: '确定删除',
@@ -364,9 +376,11 @@ const handleBatchMove = () => {
 }
 
 const handleBatchDownload = () => {
+  const docs = (listData.value?.docs ?? []) as unknown as Array<{ id: string; name: string }>
   const ids = Array.from(selectedIds.value)
   for (const id of ids) {
-    download(id)
+    const doc = docs.find((d) => d.id === id)
+    download(id, doc?.name)
   }
   handleClearSelection()
 }
@@ -539,10 +553,12 @@ onUnmounted(() => {
             <Breadcrumb :breadcrumb-items="breadcrumbItems" />
           </div>
           <el-scrollbar class="items-wrapper" @end-reached="load">
-            <transition-group name="list" tag="div" class="items">
-              <template v-if="isFetching && listData?.docs.length === 0">
+            <transition name="el-fade-in-linear">
+              <div v-if="isFetching && listData?.docs.length === 0" class="items skeleton-container">
                 <FileSkeleton v-for="i in 10" :key="'skeleton-' + i" />
-              </template>
+              </div>
+            </transition>
+            <transition-group name="list" tag="div" class="items">
               <Card
                 v-for="item in listData?.docs"
                 :id="item.id"

@@ -23,10 +23,10 @@ export const useCreateFolder = (
     parentId,
   })
     .then((res: unknown) => {
-      const { exist, name, _id, parentId } = res as {
+      const { exist, name, id, parentId } = res as {
         exist: boolean
         name: string
-        _id: string
+        id: string
         parentId: string
       }
       ElMessage.closeAll()
@@ -38,7 +38,7 @@ export const useCreateFolder = (
         typeof onSuccess === 'function' &&
           onSuccess({
             name,
-            id: _id,
+            id: id,
             parentId,
           })
       }

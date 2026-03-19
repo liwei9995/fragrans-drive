@@ -23,6 +23,7 @@
 
         .sub-nav-wrapper {
           position: relative;
+          z-index: 10;
           top: auto;
           flex-shrink: 0;
           display: none;
@@ -45,6 +46,15 @@
           box-sizing: border-box;
           padding: 0 10px 0;
           overflow-x: hidden;
+
+          .skeleton-container {
+            position: absolute;
+            top: 0;
+            left: 10px;
+            right: 10px;
+            z-index: 5;
+            pointer-events: none;
+          }
 
           .items {
             display: flex;
@@ -85,6 +95,11 @@
           .items-wrapper {
             height: 0;
             padding: 12px 12px 0;
+            
+            .skeleton-container {
+              left: 12px;
+              right: 12px;
+            }
           }
         }
       }

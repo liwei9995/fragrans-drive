@@ -1,6 +1,6 @@
 <script setup lang="ts" name="move">
 import { ElMessage } from 'element-plus'
-import { onBeforeMount, ref, watch } from 'vue'
+import { computed, onBeforeMount, ref, watch } from 'vue'
 import { getPath, moveFile } from '@/api/modules/storage'
 import type { Item } from '@/hooks/useCreateFolder'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
@@ -63,6 +63,13 @@ watch(
   () => props.id,
   () => (id.value = props.id),
 )
+
+// 排除当前要移动的文件/文件夹，避免选到自己或无效目标
+const filteredDocs = computed(() => {
+  const docs = listData.value?.docs ?? []
+  if (!props.id) return docs
+  return docs.filter((item) => item.id !== props.id)
+})
 
 const handleClose = () => props.onClose?.()
 
@@ -147,7 +154,7 @@ defineExpose({
         :success="handleCreateFolderSuccess"
       />
       <StorageItem
-        v-for="item in listData?.docs"
+        v-for="item in filteredDocs"
         :id="item.id"
         :key="item.id"
         :disabled="item.type !== 'folder'"
@@ -156,7 +163,7 @@ defineExpose({
         :thumb-placeholder="item.thumbPlaceholder"
         :tap="handleTapItem"
       />
-      <div v-if="listData?.docs.length === 0 && !isFetching && !createFolderItemVisible" class="empty">
+      <div v-if="filteredDocs.length === 0 && !isFetching && !createFolderItemVisible" class="empty">
         <el-image
           class="icon"
           src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"

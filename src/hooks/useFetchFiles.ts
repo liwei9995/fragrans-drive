@@ -2,6 +2,7 @@ import axios from 'axios'
 import { format } from 'date-fns'
 import { ref } from 'vue'
 import { getFiles } from '@/api/modules/storage'
+import { toProxyStorageUrl } from '@/utils/storageUrl'
 import { getThumb } from '@/utils/thumb/index'
 
 const getDesc = (dateTime: string) => {
@@ -22,11 +23,11 @@ const getDesc = (dateTime: string) => {
 export const convertItem = (item: Storage) => ({
   ...item,
   desc: getDesc(item.updatedAt),
-  thumb: item.thumbnail ? item.thumbnail : getThumb(item.extName, item.type),
+  thumb: item.thumbnail ? toProxyStorageUrl(item.thumbnail) : getThumb(item.extName, item.type),
   thumbPlaceholder: getThumb(item.extName, item.type),
   previewSrcList:
-    !item.mimeType?.startsWith('video/') && item.url ? [item.url] : [],
-  videoUrl: item.mimeType?.startsWith('video/') ? item.url : '',
+    !item.mimeType?.startsWith('video/') && item.url ? [toProxyStorageUrl(item.url)] : [],
+  videoUrl: item.mimeType?.startsWith('video/') ? toProxyStorageUrl(item.url) : '',
 })
 
 const dateToNumber = (date: string) => +new Date(date)

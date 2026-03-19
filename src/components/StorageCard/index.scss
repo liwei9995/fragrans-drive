@@ -104,39 +104,45 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 70px;
-                height: 70px;
+                width: 90px;
+                height: 90px;
+                overflow: hidden;
+                flex-shrink: 0;
 
                 .icon {
                   display: none;
-                  max-width: 100%;
-                  max-height: 100%;
-                  object-fit: contain;
+                  width: 100%;
+                  height: 100%;
+                  min-width: 0;
+                  overflow: hidden;
+
+                  &:deep(.el-image__inner),
+                  &:deep(img) {
+                    width: 100% !important;
+                    height: 100% !important;
+                    max-width: 100%;
+                    max-height: 100%;
+                    object-fit: contain;
+                  }
 
                   &.show {
                     display: block;
                   }
                 }
 
-                &.thumb {
-                  width: 90px;
-                  height: 90px;
-
-                  .icon {
-                    border: 1px solid rgb(132 133 141 / 16%);
-                    border-radius: 5px;
-                  }
+                &.thumb .icon {
+                  border: 1px solid rgb(132 133 141 / 16%);
+                  border-radius: 5px;
                 }
 
                 .icon-placeholder {
-                  position: relative;
-                  top: 50%;
-                  width: 100%;
-                  height: 100%;
+                  position: absolute;
+                  inset: 0;
+                  width: 90px;
+                  height: 90px;
                   background-repeat: no-repeat;
                   background-position: center;
                   background-size: contain;
-                  transform: translateY(-50%);
                 }
               }
             }
@@ -271,6 +277,28 @@
 
                 .file-icon {
                   height: 84px;
+                }
+              }
+
+              .file-cover {
+                width: 84px;
+                height: 84px;
+
+                .file-icon {
+                  width: 84px;
+                  height: 84px;
+
+                  .icon {
+                    width: 84px;
+                    height: 84px;
+                    min-width: 84px;
+                    min-height: 84px;
+                  }
+
+                  .icon-placeholder {
+                    width: 84px;
+                    height: 84px;
+                  }
                 }
               }
             }
