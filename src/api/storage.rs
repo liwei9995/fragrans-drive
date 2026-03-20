@@ -1,6 +1,9 @@
 use crate::api::AppState;
-use crate::api::middleware::{UserContext, Claims};
-use crate::domain::storage::{Storage, StorageListResponse, StorageListPaginatedResponse, StoragePathNode, CreateFolderResponse, UpdateStorageResponse};
+use crate::api::middleware::{Claims, UserContext};
+use crate::domain::storage::{
+    CreateFolderResponse, Storage, StorageListPaginatedResponse, StorageListResponse,
+    StoragePathNode, TrashCleanupResponse, TrashRestoreResponse, UpdateStorageResponse,
+};
 use crate::infrastructure::db::storage_repo::StorageRepository;
 use crate::infrastructure::image::thumbnail::generate_thumbnail;
 use crate::infrastructure::storage::local::LocalStorage;
@@ -8,15 +11,110 @@ use crate::utils::encryption::get_iv;
 use crate::utils::md5::hash_buffer;
 use axum::{
     extract::{Json, Multipart, Path, Query, State},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::IntoResponse,
 };
 use chrono::Utc;
-use jsonwebtoken::{EncodingKey, Header, encode};
-use mongodb::bson::{Document, doc, oid::ObjectId};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use mongodb::bson::{DateTime as BsonDateTime, Document, doc, oid::ObjectId};
 use serde::Deserialize;
-use utoipa::ToSchema;
+use std::collections::HashSet;
 use std::path::Path as StdPath;
+use utoipa::ToSchema;
+
+async fn collect_related_item_ids(
+    repo: &StorageRepository,
+    user_id: &str,
+    root: &Storage,
+) -> Result<Vec<ObjectId>, mongodb::error::Error> {
+    let mut all_ids = Vec::new();
+    let mut seen = HashSet::new();
+    let mut frontier = match root.id {
+        Some(id) => vec![id],
+        None => return Ok(all_ids),
+    };
+
+    while !frontier.is_empty() {
+        let mut next_frontier = Vec::new();
+        for id in &frontier {
+            if seen.insert(*id) {
+                all_ids.push(*id);
+            }
+        }
+
+        let parent_ids: Vec<String> = frontier.iter().map(|id| id.to_hex()).collect();
+        let children = repo.find_many_by_parent_ids(parent_ids, user_id).await?;
+        for item in children {
+            if let Some(id) = item.id {
+                next_frontier.push(id);
+            }
+            if let Some(thumbnail_id) = item
+                .thumbnail
+                .as_deref()
+                .and_then(|thumb| ObjectId::parse_str(thumb).ok())
+            {
+                if seen.insert(thumbnail_id) {
+                    all_ids.push(thumbnail_id);
+                }
+            }
+        }
+        frontier = next_frontier;
+    }
+
+    if let Some(thumbnail_id) = root
+        .thumbnail
+        .as_deref()
+        .and_then(|thumb| ObjectId::parse_str(thumb).ok())
+    {
+        if seen.insert(thumbnail_id) {
+            all_ids.push(thumbnail_id);
+        }
+    }
+
+    Ok(all_ids)
+}
+
+async fn ensure_restorable_parent(
+    repo: &StorageRepository,
+    user_id: &str,
+    item: &Storage,
+) -> Result<bool, mongodb::error::Error> {
+    if item.parent_id == "root" {
+        return Ok(true);
+    }
+
+    let parent_id = match ObjectId::parse_str(&item.parent_id) {
+        Ok(id) => id,
+        Err(_) => return Ok(false),
+    };
+
+    match repo.find_by_id(parent_id).await? {
+        Some(parent) => Ok(parent.user_id == user_id && !parent.trashed),
+        None => Ok(false),
+    }
+}
+
+async fn can_restore_item(
+    repo: &StorageRepository,
+    user_id: &str,
+    item: &Storage,
+    selected_ids: &HashSet<ObjectId>,
+) -> Result<bool, mongodb::error::Error> {
+    if item.parent_id == "root" {
+        return Ok(true);
+    }
+
+    let parent_id = match ObjectId::parse_str(&item.parent_id) {
+        Ok(id) => id,
+        Err(_) => return Ok(false),
+    };
+
+    if selected_ids.contains(&parent_id) {
+        return Ok(true);
+    }
+
+    ensure_restorable_parent(repo, user_id, item).await
+}
 
 #[derive(Deserialize, ToSchema)]
 pub struct CreateFolderDto {
@@ -32,14 +130,74 @@ pub struct GetFilesDto {
     #[serde(default)]
     #[schema(value_type = Object)]
     pub query: Document,
+    #[serde(default)]
+    pub keyword: Option<String>,
+    #[serde(default)]
+    pub types: Vec<String>,
+    #[serde(rename = "sortBy", default)]
+    pub sort_by: Option<String>,
+    #[serde(rename = "sortOrder", default = "default_sort_order")]
+    pub sort_order: i32,
+    #[serde(rename = "viewMode", default = "default_view_mode")]
+    pub view_mode: String,
     #[serde(default = "default_page")]
     pub page: u64,
     #[serde(default = "default_limit")]
     pub limit: u64,
 }
 
-fn default_page() -> u64 { 1 }
-fn default_limit() -> u64 { 100 }
+#[derive(Deserialize, ToSchema)]
+pub struct RestoreTrashDto {
+    #[serde(rename = "fileIds", default)]
+    pub file_ids: Vec<String>,
+    #[serde(rename = "restoreAll", default)]
+    pub restore_all: bool,
+}
+
+fn default_page() -> u64 {
+    1
+}
+fn default_limit() -> u64 {
+    100
+}
+fn default_sort_order() -> i32 {
+    -1
+}
+fn default_view_mode() -> String {
+    "topLevel".to_string()
+}
+
+fn apply_list_filters(query: &mut Document, payload: &GetFilesDto) {
+    if let Some(keyword) = payload.keyword.as_deref().map(str::trim) {
+        if !keyword.is_empty() {
+            query.insert("name", doc! { "$regex": keyword, "$options": "i" });
+        }
+    }
+
+    if !payload.types.is_empty() {
+        let allowed: Vec<String> = payload
+            .types
+            .iter()
+            .filter(|t| t.as_str() == "file" || t.as_str() == "folder")
+            .cloned()
+            .collect();
+        if !allowed.is_empty() {
+            query.insert("type", doc! { "$in": allowed });
+        }
+    }
+}
+
+fn build_sort(payload: &GetFilesDto) -> Option<Document> {
+    let field = match payload.sort_by.as_deref() {
+        Some("name") => "name",
+        Some("createdAt") => "createdAt",
+        Some("updatedAt") => "updatedAt",
+        Some("size") => "size",
+        Some(_) | None => "updatedAt",
+    };
+    let order = if payload.sort_order >= 0 { 1 } else { -1 };
+    Some(doc! { field: order, "_id": 1 })
+}
 
 #[derive(Deserialize, ToSchema)]
 pub struct MoveFileDto {
@@ -262,7 +420,8 @@ pub async fn create_folder(
             created_at: doc.created_at,
             updated_at: doc.updated_at,
             exist: true,
-        }).into_response();
+        })
+        .into_response();
     }
 
     let now = Utc::now();
@@ -294,7 +453,8 @@ pub async fn create_folder(
         created_at: Some(now),
         updated_at: Some(now),
         exist: false,
-    }).into_response()
+    })
+    .into_response()
 }
 
 #[utoipa::path(
@@ -315,14 +475,16 @@ pub async fn get_files(
     Json(payload): Json<GetFilesDto>,
 ) -> impl IntoResponse {
     let repo = StorageRepository::new(&state.db);
-    let mut query = payload.query;
+    let mut query = payload.query.clone();
     query.insert("userId", &user_ctx.user_id);
     query.insert("trashed", false);
     // 只返回文件/文件夹，不把 type=thumbnail 的文档当独立行返回（缩略图仅作为主文件的 thumbnail 字段）
     query.insert("type", doc! { "$in": ["file", "folder"] });
+    apply_list_filters(&mut query, &payload);
 
     let page = payload.page.max(1);
     let limit = payload.limit.min(1000).max(1);
+    let sort = build_sort(&payload);
 
     // 排除“仅作为缩略图”的文档，列表里只显示主文件/文件夹，图片的 thumbnail 作为字段带在对应文件上
     if let Ok(thumbnail_ids) = repo.thumbnail_object_ids(query.clone()).await {
@@ -331,7 +493,7 @@ pub async fn get_files(
         }
     }
 
-    match repo.find_many_paginated(query, page, limit).await {
+    match repo.find_many_paginated(query, page, limit, sort).await {
         Ok((files, total)) => {
             let token = encode(
                 &Header::default(),
@@ -347,7 +509,77 @@ pub async fn get_files(
                 .into_iter()
                 .map(|s| StorageListResponse::from_storage_with_urls(s, base_url, &token))
                 .collect();
-            let pages = if total == 0 { 1 } else { (total + limit - 1) / limit };
+            let pages = if total == 0 {
+                1
+            } else {
+                (total + limit - 1) / limit
+            };
+            Json(StorageListPaginatedResponse {
+                docs,
+                total,
+                limit,
+                page,
+                pages,
+            })
+            .into_response()
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/trash/list",
+    request_body = GetFilesDto,
+    responses(
+        (status = 200, description = "Paginated trash list { docs, total, limit, page, pages }", body = StorageListPaginatedResponse)
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_trashed_files(
+    State(_state): State<AppState>,
+    user_ctx: UserContext,
+    Json(payload): Json<GetFilesDto>,
+) -> impl IntoResponse {
+    let repo = StorageRepository::new(&_state.db);
+    let mut query = payload.query.clone();
+    query.insert("userId", &user_ctx.user_id);
+    query.insert("trashed", true);
+    query.insert("type", doc! { "$in": ["file", "folder"] });
+    apply_list_filters(&mut query, &payload);
+
+    let page = payload.page.max(1);
+    let limit = payload.limit.min(1000).max(1);
+    let sort = build_sort(&payload);
+
+    if payload.view_mode != "all" {
+        match repo.trashed_folder_ids(&user_ctx.user_id).await {
+            Ok(parent_ids) if !parent_ids.is_empty() => {
+                query.insert("parentId", doc! { "$nin": parent_ids });
+            }
+            Ok(_) => {}
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+
+    if let Ok(thumbnail_ids) = repo.thumbnail_object_ids(query.clone()).await {
+        if !thumbnail_ids.is_empty() {
+            query.insert("_id", doc! { "$nin": thumbnail_ids });
+        }
+    }
+
+    match repo.find_many_paginated(query, page, limit, sort).await {
+        Ok((files, total)) => {
+            let docs: Vec<StorageListResponse> =
+                files.into_iter().map(StorageListResponse::from).collect();
+            let pages = if total == 0 {
+                1
+            } else {
+                (total + limit - 1) / limit
+            };
             Json(StorageListPaginatedResponse {
                 docs,
                 total,
@@ -378,12 +610,27 @@ pub async fn get_file(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Query(params): Query<Document>,
+    headers: axum::http::HeaderMap,
 ) -> impl IntoResponse {
-    // Public download with token
-    let _token = params.get_str("token").unwrap_or("");
-    // Validate token (simplified: in main we decodes it)
-    // For now we assume if id is valid and doc exists, we serve.
-    // Real implementation should check JWT here if it's not handled by middleware.
+    let mut token = params.get_str("token").unwrap_or("").to_string();
+    if token.is_empty() {
+        if let Some(auth_header) = headers.get(axum::http::header::AUTHORIZATION) {
+            if let Ok(auth_str) = auth_header.to_str() {
+                if let Some(stripped) = auth_str.strip_prefix("Bearer ") {
+                    token = stripped.to_string();
+                }
+            }
+        }
+    }
+
+    let claims = match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+        &Validation::default(),
+    ) {
+        Ok(data) => data.claims,
+        Err(_) => return StatusCode::UNAUTHORIZED.into_response(),
+    };
 
     let id_oid = match ObjectId::parse_str(&id) {
         Ok(o) => o,
@@ -394,6 +641,9 @@ pub async fn get_file(
     let doc = repo.find_by_id(id_oid).await.unwrap();
 
     if let Some(item) = doc {
+        if item.user_id != claims.user_id || item.trashed {
+            return StatusCode::NOT_FOUND.into_response();
+        }
         if let Some(hash) = item.md5_hash {
             let storage = LocalStorage::new();
             if let Ok(Some(data)) = storage.fetch(&hash, item.iv.as_deref()).await {
@@ -502,14 +752,12 @@ pub async fn update_file(
     let repo = StorageRepository::new(&state.db);
     match repo.update_one(id_oid, &user_ctx.user_id, payload).await {
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Ok(Some(_)) => {
-            match repo.find_by_id(id_oid).await {
-                Ok(Some(doc)) if doc.user_id == user_ctx.user_id => {
-                    Json(UpdateStorageResponse::from(doc)).into_response()
-                }
-                _ => StatusCode::NOT_FOUND.into_response(),
+        Ok(Some(_)) => match repo.find_by_id(id_oid).await {
+            Ok(Some(doc)) if doc.user_id == user_ctx.user_id => {
+                Json(UpdateStorageResponse::from(doc)).into_response()
             }
-        }
+            _ => StatusCode::NOT_FOUND.into_response(),
+        },
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
@@ -533,13 +781,284 @@ pub async fn remove_file(
     user_ctx: UserContext,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let id_oid = ObjectId::parse_str(&id).unwrap();
     let repo = StorageRepository::new(&state.db);
-    // Legacy: trash first
-    repo.update_one(id_oid, &user_ctx.user_id, doc! { "trashed": true })
+    let id_oid = match ObjectId::parse_str(&id) {
+        Ok(o) => o,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    let root = match repo.find_by_id(id_oid).await {
+        Ok(Some(item)) if item.user_id == user_ctx.user_id => item,
+        Ok(Some(_)) | Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let subtree_ids = match collect_related_item_ids(&repo, &user_ctx.user_id, &root).await {
+        Ok(ids) => ids,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    match repo
+        .update_many_by_ids(
+            subtree_ids,
+            &user_ctx.user_id,
+            doc! { "trashed": true, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
+        )
         .await
-        .unwrap();
-    StatusCode::OK.into_response()
+    {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/{id}/restore",
+    params(
+        ("id" = String, Path, description = "File or folder storage id")
+    ),
+    responses(
+        (status = 200, description = "Restored document", body = UpdateStorageResponse),
+        (status = 400, description = "Invalid id or parent folder is unavailable"),
+        (status = 404, description = "Not found or not owned by user")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn restore_file(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let repo = StorageRepository::new(&state.db);
+    let id_oid = match ObjectId::parse_str(&id) {
+        Ok(o) => o,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    let root = match repo.find_by_id(id_oid).await {
+        Ok(Some(item)) if item.user_id == user_ctx.user_id => item,
+        Ok(Some(_)) | Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let parent_is_restorable = match ensure_restorable_parent(&repo, &user_ctx.user_id, &root).await
+    {
+        Ok(value) => value,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    if !parent_is_restorable {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Parent folder is unavailable or still trashed",
+        )
+            .into_response();
+    }
+
+    let subtree_ids = match collect_related_item_ids(&repo, &user_ctx.user_id, &root).await {
+        Ok(ids) => ids,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    if repo
+        .update_many_by_ids(
+            subtree_ids,
+            &user_ctx.user_id,
+            doc! { "trashed": false, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
+        )
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    match repo.find_by_id(id_oid).await {
+        Ok(Some(doc)) if doc.user_id == user_ctx.user_id => {
+            Json(UpdateStorageResponse::from(doc)).into_response()
+        }
+        Ok(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/trash/restore",
+    request_body = RestoreTrashDto,
+    responses(
+        (status = 200, description = "Restored trashed items", body = TrashRestoreResponse),
+        (status = 400, description = "Invalid request or parent folder is unavailable"),
+        (status = 404, description = "Some requested items were not found in trash")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn restore_trashed_files(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Json(payload): Json<RestoreTrashDto>,
+) -> impl IntoResponse {
+    let repo = StorageRepository::new(&state.db);
+
+    let roots = if payload.restore_all {
+        match repo
+            .find_many(doc! {
+                "userId": &user_ctx.user_id,
+                "trashed": true,
+                "type": { "$in": ["file", "folder"] },
+            })
+            .await
+        {
+            Ok(items) => items,
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    } else {
+        if payload.file_ids.is_empty() {
+            return (StatusCode::BAD_REQUEST, "fileIds cannot be empty").into_response();
+        }
+
+        let mut ids = Vec::new();
+        for id in &payload.file_ids {
+            match ObjectId::parse_str(id) {
+                Ok(oid) => ids.push(oid),
+                Err(_) => return (StatusCode::BAD_REQUEST, "Invalid file id").into_response(),
+            }
+        }
+
+        let requested_count = ids.len();
+        let items = match repo.find_many_by_ids(ids, &user_ctx.user_id).await {
+            Ok(items) => items
+                .into_iter()
+                .filter(|item| item.trashed && (item.r#type == "file" || item.r#type == "folder"))
+                .collect::<Vec<_>>(),
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
+
+        if items.len() != requested_count {
+            return (StatusCode::NOT_FOUND, "Some items were not found in trash").into_response();
+        }
+
+        items
+    };
+
+    if roots.is_empty() {
+        return Json(TrashRestoreResponse {
+            requested_items: 0,
+            restored_docs: 0,
+        })
+        .into_response();
+    }
+
+    let selected_ids: HashSet<ObjectId> = roots.iter().filter_map(|item| item.id).collect();
+    for item in &roots {
+        match can_restore_item(&repo, &user_ctx.user_id, item, &selected_ids).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "Parent folder is unavailable or still trashed",
+                )
+                    .into_response();
+            }
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+
+    let mut ids_to_restore = HashSet::new();
+    for item in &roots {
+        let related_ids = match collect_related_item_ids(&repo, &user_ctx.user_id, item).await {
+            Ok(ids) => ids,
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
+        ids_to_restore.extend(related_ids);
+    }
+
+    let restored_docs = match repo
+        .update_many_by_ids(
+            ids_to_restore.into_iter().collect(),
+            &user_ctx.user_id,
+            doc! { "trashed": false, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
+        )
+        .await
+    {
+        Ok(count) => count,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    Json(TrashRestoreResponse {
+        requested_items: roots.len() as u64,
+        restored_docs,
+    })
+    .into_response()
+}
+
+#[utoipa::path(
+    delete,
+    path = "/v1/storage/trash",
+    responses(
+        (status = 200, description = "Trash emptied and orphaned files garbage-collected", body = TrashCleanupResponse)
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn empty_trash(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+) -> impl IntoResponse {
+    let repo = StorageRepository::new(&state.db);
+    let trashed_items = match repo
+        .find_many(doc! { "userId": &user_ctx.user_id, "trashed": true })
+        .await
+    {
+        Ok(items) => items,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    if trashed_items.is_empty() {
+        return Json(TrashCleanupResponse {
+            deleted_docs: 0,
+            deleted_files: 0,
+        })
+        .into_response();
+    }
+
+    let ids: Vec<ObjectId> = trashed_items.iter().filter_map(|item| item.id).collect();
+    let hashes: HashSet<String> = trashed_items
+        .iter()
+        .filter_map(|item| item.md5_hash.clone())
+        .collect();
+
+    let deleted_docs = match repo.delete_many_by_ids(ids, &user_ctx.user_id).await {
+        Ok(count) => count,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let storage = LocalStorage::new();
+    let mut deleted_files = 0;
+    for hash in hashes {
+        let remaining = match repo.count_by_hash(&hash).await {
+            Ok(count) => count,
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
+        if remaining == 0 {
+            match storage.remove(&hash).await {
+                Ok(()) => deleted_files += 1,
+                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            }
+        }
+    }
+
+    Json(TrashCleanupResponse {
+        deleted_docs,
+        deleted_files,
+    })
+    .into_response()
 }
 
 #[utoipa::path(
