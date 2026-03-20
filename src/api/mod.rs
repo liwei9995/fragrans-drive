@@ -30,18 +30,22 @@ pub struct AppState {
         storage::upload_file,
         storage::create_folder,
         storage::get_files,
+        storage::get_trashed_files,
         storage::get_file,
         storage::move_file,
         storage::get_download_url,
         storage::update_file,
         storage::remove_file,
+        storage::restore_file,
+        storage::restore_trashed_files,
+        storage::empty_trash,
         storage::get_path,
     ),
     components(
         schemas(
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::CreateUserResponse,
-            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto,
-            crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse,
+            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto,
+            crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
         )
     ),
@@ -107,8 +111,17 @@ pub fn router(db: Database, config: Config) -> Router {
         .route("/upload", axum::routing::post(storage::upload_file))
         .route("/folder", axum::routing::post(storage::create_folder))
         .route("/list", axum::routing::post(storage::get_files))
+        .route(
+            "/trash/list",
+            axum::routing::post(storage::get_trashed_files),
+        )
+        .route(
+            "/trash/restore",
+            axum::routing::post(storage::restore_trashed_files),
+        )
         .route("/path", axum::routing::post(storage::get_path))
         .route("/move", axum::routing::post(storage::move_file))
+        .route("/trash", axum::routing::delete(storage::empty_trash))
         .route(
             "/download/url",
             axum::routing::post(storage::get_download_url),
@@ -117,6 +130,7 @@ pub fn router(db: Database, config: Config) -> Router {
             "/{id}",
             axum::routing::put(storage::update_file).delete(storage::remove_file),
         )
+        .route("/{id}/restore", axum::routing::post(storage::restore_file))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::auth_guard,

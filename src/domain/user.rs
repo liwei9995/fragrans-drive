@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 /// API 返回用，不包含 password。JSON 中 _id 为 hex 字符串，createdAt/updatedAt 为毫秒时间戳字符串。
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UserResponse {
-    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[serde(
+        rename = "id",
+        serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex"
+    )]
     #[schema(value_type = String)]
     pub id: Option<ObjectId>,
     pub email: String,
@@ -17,9 +20,15 @@ pub struct UserResponse {
     pub age: Option<i32>,
     pub avatar: Option<String>,
     pub roles: Vec<String>,
-    #[serde(rename = "createdAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_ms_string")]
+    #[serde(
+        rename = "createdAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_ms_string"
+    )]
     pub created_at: Option<DateTime<Utc>>,
-    #[serde(rename = "updatedAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_ms_string")]
+    #[serde(
+        rename = "updatedAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_ms_string"
+    )]
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -61,9 +70,17 @@ pub struct User {
 
     pub roles: Vec<String>,
 
-    #[serde(rename = "createdAt", skip_serializing_if = "Option::is_none", with = "crate::utils::serde_datetime")]
+    #[serde(
+        rename = "createdAt",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
     pub created_at: Option<DateTime<Utc>>,
 
-    #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none", with = "crate::utils::serde_datetime")]
+    #[serde(
+        rename = "updatedAt",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
     pub updated_at: Option<DateTime<Utc>>,
 }

@@ -10,7 +10,7 @@ use axum::{
 };
 use chrono::Utc;
 use jsonwebtoken::{EncodingKey, Header, encode};
-use mongodb::bson::{doc, oid::ObjectId, Bson, DateTime as BsonDateTime};
+use mongodb::bson::{Bson, DateTime as BsonDateTime, doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -159,7 +159,13 @@ pub async fn create_user(
 pub async fn get_all_users(State(state): State<AppState>) -> impl IntoResponse {
     let repo = UserRepository::new(&state.db);
     match repo.find_all().await {
-        Ok(users) => Json(users.into_iter().map(UserResponse::from).collect::<Vec<_>>()).into_response(),
+        Ok(users) => Json(
+            users
+                .into_iter()
+                .map(UserResponse::from)
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch users").into_response(),
     }
 }

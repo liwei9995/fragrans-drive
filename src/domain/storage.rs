@@ -3,9 +3,12 @@ use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
 /// 列表单条：不含敏感字段，id 为 hex，createdAt/updatedAt 为 RFC3339，url/thumbnail 为完整 URL。
-#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StorageListResponse {
-    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[serde(
+        rename = "id",
+        serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex"
+    )]
     #[schema(value_type = String)]
     pub id: Option<ObjectId>,
     pub name: String,
@@ -26,16 +29,25 @@ pub struct StorageListResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     pub trashed: bool,
-    #[serde(rename = "createdAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    #[serde(
+        rename = "createdAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
     pub created_at: Option<DateTime<Utc>>,
-    #[serde(rename = "updatedAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    #[serde(
+        rename = "updatedAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
     pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// 创建文件夹接口返回：id, name, parentId, type, createdAt, updatedAt, exist（已存在为 true，新建为 false）。
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CreateFolderResponse {
-    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[serde(
+        rename = "id",
+        serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex"
+    )]
     #[schema(value_type = String)]
     pub id: Option<ObjectId>,
     pub name: String,
@@ -43,9 +55,15 @@ pub struct CreateFolderResponse {
     pub parent_id: String,
     #[serde(rename = "type")]
     pub r#type: String,
-    #[serde(rename = "createdAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    #[serde(
+        rename = "createdAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
     pub created_at: Option<DateTime<Utc>>,
-    #[serde(rename = "updatedAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    #[serde(
+        rename = "updatedAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
     pub updated_at: Option<DateTime<Utc>>,
     pub exist: bool,
 }
@@ -53,7 +71,10 @@ pub struct CreateFolderResponse {
 /// PUT /storage/:id 返回：id, name, parentId, type, userId, trashed, createdAt, updatedAt, baseName, extName。
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UpdateStorageResponse {
-    #[serde(rename = "id", serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex")]
+    #[serde(
+        rename = "id",
+        serialize_with = "crate::utils::serde_json_response::serialize_object_id_as_hex"
+    )]
     #[schema(value_type = String)]
     pub id: Option<ObjectId>,
     pub name: String,
@@ -64,9 +85,15 @@ pub struct UpdateStorageResponse {
     #[serde(rename = "userId")]
     pub user_id: String,
     pub trashed: bool,
-    #[serde(rename = "createdAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    #[serde(
+        rename = "createdAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
     pub created_at: Option<DateTime<Utc>>,
-    #[serde(rename = "updatedAt", serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339")]
+    #[serde(
+        rename = "updatedAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
     pub updated_at: Option<DateTime<Utc>>,
     #[serde(rename = "baseName")]
     pub base_name: Option<String>,
@@ -86,7 +113,7 @@ pub struct StoragePathNode {
 }
 
 /// 分页列表响应：`{ docs, total, limit, page, pages }`。
-#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StorageListPaginatedResponse {
     pub docs: Vec<StorageListResponse>,
     pub total: u64,
@@ -95,20 +122,38 @@ pub struct StorageListPaginatedResponse {
     pub pages: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TrashCleanupResponse {
+    #[serde(rename = "deletedDocs")]
+    pub deleted_docs: u64,
+    #[serde(rename = "deletedFiles")]
+    pub deleted_files: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TrashRestoreResponse {
+    #[serde(rename = "requestedItems")]
+    pub requested_items: u64,
+    #[serde(rename = "restoredDocs")]
+    pub restored_docs: u64,
+}
+
 impl StorageListResponse {
     /// 从 Storage 构建列表项，并填入 base_url + token 生成的 url/thumbnail 完整 URL（仅文件有 url）。
-    pub fn from_storage_with_urls(
-        s: Storage,
-        base_url: &str,
-        token: &str,
-    ) -> Self {
+    pub fn from_storage_with_urls(s: Storage, base_url: &str, token: &str) -> Self {
         let base = base_url.trim_end_matches('/');
         let url = (s.r#type == "file" && s.id.is_some()).then(|| {
-            format!("{}/v1/storage/{}?token={}", base, s.id.as_ref().unwrap().to_string(), token)
+            format!(
+                "{}/v1/storage/{}?token={}",
+                base,
+                s.id.as_ref().unwrap().to_string(),
+                token
+            )
         });
-        let thumbnail = s.thumbnail.as_ref().map(|thumb_id| {
-            format!("{}/v1/storage/{}?token={}", base, thumb_id, token)
-        });
+        let thumbnail = s
+            .thumbnail
+            .as_ref()
+            .map(|thumb_id| format!("{}/v1/storage/{}?token={}", base, thumb_id, token));
         Self {
             id: s.id,
             name: s.name,
@@ -207,9 +252,17 @@ pub struct Storage {
 
     pub trashed: bool,
 
-    #[serde(rename = "createdAt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "createdAt",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
     pub created_at: Option<DateTime<Utc>>,
 
-    #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "updatedAt",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
     pub updated_at: Option<DateTime<Utc>>,
 }

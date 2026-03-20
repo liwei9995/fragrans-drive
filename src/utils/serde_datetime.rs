@@ -10,9 +10,7 @@ where
     D: Deserializer<'de>,
 {
     let opt = Option::<Bson>::deserialize(deserializer)?;
-    let Some(bson) = opt else {
-        return Ok(None)
-    };
+    let Some(bson) = opt else { return Ok(None) };
     match bson {
         Bson::DateTime(dt) => Ok(Some(dt.to_chrono())),
         Bson::String(s) => s

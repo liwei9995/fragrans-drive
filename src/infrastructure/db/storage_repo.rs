@@ -42,8 +42,52 @@ impl StorageRepository {
         Ok(results)
     }
 
+    pub async fn find_many_by_parent_ids(
+        &self,
+        parent_ids: Vec<String>,
+        user_id: &str,
+    ) -> Result<Vec<Storage>, mongodb::error::Error> {
+        self.find_many(doc! {
+            "parentId": { "$in": parent_ids },
+            "userId": user_id,
+        })
+        .await
+    }
+
+    pub async fn find_many_by_ids(
+        &self,
+        ids: Vec<ObjectId>,
+        user_id: &str,
+    ) -> Result<Vec<Storage>, mongodb::error::Error> {
+        self.find_many(doc! {
+            "_id": { "$in": ids },
+            "userId": user_id,
+        })
+        .await
+    }
+
+    pub async fn trashed_folder_ids(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<String>, mongodb::error::Error> {
+        let folders = self
+            .find_many(doc! {
+                "userId": user_id,
+                "trashed": true,
+                "type": "folder",
+            })
+            .await?;
+        Ok(folders
+            .into_iter()
+            .filter_map(|item| item.id.map(|id| id.to_hex()))
+            .collect())
+    }
+
     /// 返回在给定 query 下所有作为 thumbnail 被引用的 _id（用于列表接口排除缩略图单独成条）。
-    pub async fn thumbnail_object_ids(&self, query: Document) -> Result<Vec<ObjectId>, mongodb::error::Error> {
+    pub async fn thumbnail_object_ids(
+        &self,
+        query: Document,
+    ) -> Result<Vec<ObjectId>, mongodb::error::Error> {
         let values = self.collection.distinct("thumbnail", query).await?;
         let mut ids = Vec::new();
         for v in values {
@@ -64,15 +108,15 @@ impl StorageRepository {
         query: Document,
         page: u64,
         limit: u64,
+        sort: Option<Document>,
     ) -> Result<(Vec<Storage>, u64), mongodb::error::Error> {
         let total = self.collection.count_documents(query.clone()).await?;
         let skip = (page.saturating_sub(1)) * limit;
-        let mut cursor = self
-            .collection
-            .find(query)
-            .skip(skip)
-            .limit(limit as i64)
-            .await?;
+        let mut find = self.collection.find(query).skip(skip).limit(limit as i64);
+        if let Some(sort) = sort {
+            find = find.sort(sort);
+        }
+        let mut cursor = find.await?;
         let mut results = Vec::new();
         while let Some(item) = cursor.next().await {
             results.push(item?);
@@ -96,6 +140,54 @@ impl StorageRepository {
                 doc! { "_id": id, "userId": user_id },
                 doc! { "$set": update },
             )
+            .await
+    }
+
+    pub async fn update_many_by_ids(
+        &self,
+        ids: Vec<ObjectId>,
+        user_id: &str,
+        update: Document,
+    ) -> Result<u64, mongodb::error::Error> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
+        let result = self
+            .collection
+            .update_many(
+                doc! {
+                    "_id": { "$in": ids },
+                    "userId": user_id,
+                },
+                doc! { "$set": update },
+            )
+            .await?;
+        Ok(result.modified_count)
+    }
+
+    pub async fn delete_many_by_ids(
+        &self,
+        ids: Vec<ObjectId>,
+        user_id: &str,
+    ) -> Result<u64, mongodb::error::Error> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
+        let result = self
+            .collection
+            .delete_many(doc! {
+                "_id": { "$in": ids },
+                "userId": user_id,
+            })
+            .await?;
+        Ok(result.deleted_count)
+    }
+
+    pub async fn count_by_hash(&self, hash: &str) -> Result<u64, mongodb::error::Error> {
+        self.collection
+            .count_documents(doc! { "MD5Hash": hash })
             .await
     }
 

@@ -48,7 +48,7 @@ impl UserRepository {
             .update_one(doc! { "_id": id }, doc! { "$set": update })
             .await?;
         if result.matched_count == 0 {
-            return Ok(None)
+            return Ok(None);
         }
         self.collection.find_one(doc! { "_id": id }).await
     }

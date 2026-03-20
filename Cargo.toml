@@ -20,7 +20,7 @@ bcrypt = "0.15"
 md-5 = "0.10"
 hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
-tower = "0.4"
+tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "fs", "limit"] }
 futures = "0.3"
 futures-util = "0.3"
@@ -32,3 +32,8 @@ rand = "0.8"
 utoipa = { version = "5.4", features = ["axum_extras", "chrono"] }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-axum = "0.2"
+
+[dev-dependencies]
+http-body-util = "0.1"
+serial_test = "3.2"
+tempfile = "3.13"
