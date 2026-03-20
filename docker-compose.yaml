@@ -1,9 +1,7 @@
-version: '3.1'
-
 services:
 
   mongo:
-    image: mongo
+    image: mongo:8
     restart: always
     ports:
       - 25018:27017
@@ -31,7 +29,7 @@ services:
     volumes:
       - storage-files:/app/bucket
     ports:
-      - 8085:3847
+      - 8085:3821
     depends_on:
       - mongo
 

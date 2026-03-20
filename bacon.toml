@@ -1,0 +1,9 @@
+# Bacon 配置：代码变更时自动重新编译并运行服务
+# 使用方式：bacon run
+
+[jobs.run]
+command = ["cargo", "run"]
+need_stdout = true
+allow_warnings = true
+background = true
+on_change_strategy = "kill_then_restart"

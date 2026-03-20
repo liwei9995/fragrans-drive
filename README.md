@@ -1,84 +1,154 @@
 # Fragrans
 
-<p align="center">
-  A <a href="http://nodejs.org" target="_blank">Node.js</a> project based on <a href="https://github.com/nestjs/nest" target="_blank">Nest</a> for building file storage service.
-</p>
+A high-performance file storage service rewritten in **Rust**.
 
-## Description
+## 📖 Description
 
-Osmanthus fragrans Lour is my favorite flower, so I named this project fragrans. In my opinion, a distributed file storage system is composed of osmanthus-like files scattered on the ground.
+**Fragrans** (Osmanthus fragrans) 旨在提供一个高效、安全且可扩展的个人文件存储解决方案。本项目已从原有的 Node.js/NestJS 架构完整重写为 Rust，以获得更低的内存占用、更高的并发处理能力以及更小的部署体积。
 
-Fragrans aims to provide users the ability to deploy their own file storage service with efficiency and scalability.
+> "暗淡轻黄体性柔，情疏迹远只香留。" —— 正如桂花般，Fragrans 追求在后台默默且高效地处理您的每一份文件。
 
-## Features
+## ✨ 特性 (Features)
 
-- 用户认证（JWT + Passport）
-- 文件上传 / 下载 / 列表 / 移动 / 软删除
-- MD5 去重、缩略图生成、加密存储
-- Swagger API 文档
-- Docker 部署支持
+- **高性能底层**：基于 Rust + Axum + Tokio，充分利用异步 I/O。
+- **存储优化**：
+  - **MD5 去重**：相同内容的文件在物理存储上仅保留一份。
+  - **文件分片**：采用 `aa/bb/cc/hash` 的分层存储结构，避免单目录文件过多。
+  - **加密存储**：所有物理文件均采用 AES-256-CTR 加密，确保数据落地安全。
+- **图像处理**：自动为上传的图片生成 WebP/JPEG 缩略图。
+- **安全认证**：基于 JWT 的身份验证机制。
+- **极简部署**：提供多阶段构建的 Docker 镜像，体积仅约 30MB。
 
-## Requirements
+## 🛠️ 技术栈 (Tech Stack)
 
-- Node.js >= 18
-- MongoDB 5.x / 6.x / 7.x
-- pnpm（推荐）或 npm
+- **语言**: Rust
+- **Web 框架**: [Axum](https://github.com/tokio-rs/axum)
+- **异步运行时**: [Tokio](https://tokio.rs/)
+- **数据库**: MongoDB (Official Rust Driver)
+- **加密与哈希**: `bcrypt`, `aes`, `ctr`, `md5`
+- **图像处理**: `image` crate
 
-## Quick Start
+## 🚀 快速开始 (Quick Start)
+
+### 环境要求
+
+- Rust 工具链 (1.75+)
+- MongoDB (推荐 5.0+)
+
+### 本地开发
+
+1. **配置环境变量**
+   复制 `.env.example` 为 `.env` 并根据需要修改：
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **启动数据库**
+   使用现有的 Docker Compose 启动 MongoDB：
+
+   ```bash
+   docker-compose up -d mongo
+   ```
+
+3. **运行项目**
+
+   ```bash
+   cargo run
+   ```
+
+   服务默认监听端口：`3821`
+
+4. **开发时自动重新编译（可选）**
+   使用 [Bacon](https://github.com/Canop/bacon)（cargo-watch 的推荐替代）在代码修改时自动检查或运行：
+
+   ```bash
+   cargo install --locked bacon
+   bacon
+   ```
+
+   默认会持续执行 `cargo check`。若需「改代码自动运行服务」，在项目根目录添加 `bacon.toml`：
+
+   ```toml
+   [jobs.run]
+   command = ["cargo", "run"]
+   need_stdout = true
+   allow_warnings = true
+   background = true
+   ```
+
+   然后执行 `bacon run`。
+
+   **若用 Cmd+C 退出后服务仍在后台运行**：Ctrl/Cmd+C 可能只结束 Bacon，其启动的子进程（本服务）未收到信号而继续运行。可先清理再启动：
+
+   ```bash
+   # 按进程名结束残留的 fragrans 进程
+   pkill -f fragrans
+   # 或按端口结束（默认 3821）
+   lsof -ti:3821 | xargs kill
+   ```
+
+   之后若需自动重载，可直接用 `cargo run`，需要重启时再 Cmd+C 后重新执行，这样会一并结束服务。
+
+### 运行测试
 
 ```bash
-# 1. 启动 MongoDB
-pnpm db:up
-# 或: docker-compose -f docker-compose.develop.yaml up -d
-
-# 2. 安装依赖
-pnpm install
-
-# 3. 开发模式
-pnpm dev
+# 运行所有单元测试 (待完善)
+cargo test
+# 检查代码格式
+cargo fmt --all -- --check
+# 运行 Lint 检查
+cargo clippy
 ```
 
-服务运行在 http://localhost:3847，API 文档在 http://localhost:3847/api。
+## 🌐 API 接口文档 (API Documentation)
 
-## Scripts
+目前 API 遵循 RESTful 规范，基础版本为 `/v1`。
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm dev` | 开发模式（watch） |
-| `pnpm build` | 构建 |
-| `pnpm start:prod` | 生产模式 |
-| `pnpm lint` | 代码检查 |
-| `pnpm test` | 单元测试 |
-| `pnpm test:e2e` | E2E 测试 |
-| `pnpm db:up` | 启动 MongoDB |
-| `pnpm db:down` | 停止 MongoDB |
+### 访问方式
 
-## Configuration
+本项目通过 **utoipa** 自动生成 OpenAPI 接口文档，您可以通过交互式 UI 直接测试接口：
 
-复制 `.env.example` 为 `.env` 并配置环境变量。生产环境必须设置 `JWT_SECRET`。
+- **Swagger UI**: [http://localhost:3821/swagger-ui](http://localhost:3821/swagger-ui)
+- **OpenAPI JSON**: `/api-docs/openapi.json`
 
-详见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+主要接口概览：
 
-## Deployment
+| 模块        | 路径                 | 方法     | 描述                       |
+| ----------- | -------------------- | -------- | -------------------------- |
+| **Auth**    | `/v1/auth/login`     | POST     | 用户登录 (获取 Token)      |
+| **Users**   | `/v1/users`          | GET/POST | 用户管理 (需 Token)        |
+| **Storage** | `/v1/storage/upload` | POST     | 文件上传 (需 Token)        |
+| **Storage** | `/v1/storage/list`   | POST     | 获取文件列表 (需 Token)    |
+| **Storage** | `/v1/storage/{id}`   | GET      | 文件下载 (支持 token 验证) |
+
+*提示：在 Swagger UI 中点击 "Authorize" 并输入 Bearer Token 即可测试加密接口。*
+
+## 📦 部署 (Deployment)
+
+### Docker 部署
+
+本项目提供优化后的多阶段构建 Dockerfile：
 
 ```bash
-docker-compose build
+# 构建镜像
+docker build -t fragrans-rust .
+
+# 使用 Docker Compose 一键启动
 docker-compose up -d
 ```
 
-详见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+对外映射端口默认为 `8085`。
 
-## Documentation
+## 📂 目录结构
 
-- [架构说明](docs/ARCHITECTURE.md)
-- [开发指南](docs/DEVELOPMENT.md)
-- [部署指南](docs/DEPLOYMENT.md)
-- [重构优化建议](docs/REFACTORING_GUIDE.md)
+- `src/api/`: API 路由处理器与中间件。
+- `src/domain/`: 领域模型 (User, Storage)。
+- `src/infrastructure/`: 外部服务实现 (DB, Storage I/O, Image processing)。
+- `src/config/`: 配置加载逻辑。
+- `src/utils/`: 通用工具类 (加密、哈希)。
 
-## Stay in touch
+## 🤝 贡献与支持
 
-- Author - [Aaron Li](https://www.oyiyio.com)
-
-## License
-
-Fragrans is [MIT licensed](LICENSE).
+- **作者**: [Aaron Li](https://www.oyiyio.com)
+- **许可证**: MIT
