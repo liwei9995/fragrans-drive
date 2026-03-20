@@ -205,7 +205,8 @@ const handleRenameFile = (name: string) => {
 
   if (!doc) return
 
-  const fullName = doc.extName ? `${name}${doc.extName}` : name
+  const suffix = doc.extName ? (doc.extName.startsWith('.') ? doc.extName : `.${doc.extName}`) : ''
+  const fullName = `${name}${suffix}`
 
   updateFile(fileId, {
     name: fullName,
@@ -320,7 +321,8 @@ const handleTapCardActionItem = async (
     renameDialogFormVisible.value = true
     needToRenameThumb.value = thumb || ''
     needToRenameFileId.value = id
-    needToRenameFileName.value = name.replace(extName, '')
+    const suffix = extName ? (extName.startsWith('.') ? extName : `.${extName}`) : ''
+    needToRenameFileName.value = suffix && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name
   } else if (command === 'move') {
     needToMoveId.value = id
     moveDialogFormVisible.value = true
@@ -558,7 +560,7 @@ onUnmounted(() => {
                 <FileSkeleton v-for="i in 10" :key="'skeleton-' + i" />
               </div>
             </transition>
-            <transition-group name="list" tag="div" class="items">
+            <div class="items">
               <Card
                 v-for="item in listData?.docs"
                 :id="item.id"
@@ -579,7 +581,7 @@ onUnmounted(() => {
                 @toggle-select="handleToggleSelect"
               />
               <div v-for="item in 10" :key="'spacer-' + item" class="empty-card" />
-            </transition-group>
+            </div>
           </el-scrollbar>
           <Empty
               v-if="!isFetching && listData?.docs.length === 0"

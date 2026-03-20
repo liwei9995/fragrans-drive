@@ -5,6 +5,8 @@ import { getPath, moveFile } from '@/api/modules/storage'
 import type { Item } from '@/hooks/useCreateFolder'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
 import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
+import Breadcrumb from '../Breadcrumb/index.vue'
+import FolderCreation from '../FolderCreation/index.vue'
 
 interface MoveProps {
   id?: string

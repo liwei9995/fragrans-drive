@@ -222,22 +222,6 @@ button:focus-visible {
   }
 }
 
-/* Seamless List Transitions */
-.list-move,
-.list-enter-active,
-.list-leave-active {
-  transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1);
-}
-
-.list-enter-from,
-.list-leave-to {
-  opacity: 0;
-  transform: scale(0.9) translateY(20px);
-}
-
-.list-leave-active {
-  position: absolute;
-}
 
 /* Premium Notification & Message Redesign (Capsule Style) */
 .el-notification,
