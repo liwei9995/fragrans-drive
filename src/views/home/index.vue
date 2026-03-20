@@ -3,12 +3,7 @@ import type { UploadFiles, UploadProps } from 'element-plus'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  deleteFile,
-  getFile,
-  getPath,
-  updateFile,
-} from '@/api/modules/storage'
+import { deleteFile, getFile, getPath, updateFile } from '@/api/modules/storage'
 import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import { LOGIN_URL } from '@/config/config'
@@ -205,7 +200,11 @@ const handleRenameFile = (name: string) => {
 
   if (!doc) return
 
-  const suffix = doc.extName ? (doc.extName.startsWith('.') ? doc.extName : `.${doc.extName}`) : ''
+  const suffix = doc.extName
+    ? doc.extName.startsWith('.')
+      ? doc.extName
+      : `.${doc.extName}`
+    : ''
   const fullName = `${name}${suffix}`
 
   updateFile(fileId, {
@@ -213,15 +212,7 @@ const handleRenameFile = (name: string) => {
     parentId: doc?.parentId || 'root',
     type: doc?.type,
   }).then((res: any) => {
-    const {
-      exist,
-      id: id,
-      name,
-      baseName,
-      extName,
-      createdAt,
-      updatedAt,
-    } = res
+    const { exist, id, name, baseName, extName, createdAt, updatedAt } = res
     if (exist) {
       ElMessage.error('已存在同名文件，请修改名称')
     } else {
@@ -321,8 +312,13 @@ const handleTapCardActionItem = async (
     renameDialogFormVisible.value = true
     needToRenameThumb.value = thumb || ''
     needToRenameFileId.value = id
-    const suffix = extName ? (extName.startsWith('.') ? extName : `.${extName}`) : ''
-    needToRenameFileName.value = suffix && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name
+    const suffix = extName
+      ? extName.startsWith('.')
+        ? extName
+        : `.${extName}`
+      : ''
+    needToRenameFileName.value =
+      suffix && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name
   } else if (command === 'move') {
     needToMoveId.value = id
     moveDialogFormVisible.value = true
@@ -378,7 +374,10 @@ const handleBatchMove = () => {
 }
 
 const handleBatchDownload = () => {
-  const docs = (listData.value?.docs ?? []) as unknown as Array<{ id: string; name: string }>
+  const docs = (listData.value?.docs ?? []) as unknown as Array<{
+    id: string
+    name: string
+  }>
   const ids = Array.from(selectedIds.value)
   for (const id of ids) {
     const doc = docs.find((d) => d.id === id)
