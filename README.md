@@ -93,7 +93,7 @@ A high-performance file storage service rewritten in **Rust**.
 ### 运行测试
 
 ```bash
-# 运行所有单元测试 (待完善)
+# 运行所有测试 (已包含单元测试与集成测试，覆盖认证、存储与回收站)
 cargo test
 # 检查代码格式
 cargo fmt --all -- --check
@@ -142,11 +142,13 @@ docker-compose up -d
 
 ## 📂 目录结构
 
-- `src/api/`: API 路由处理器与中间件。
+- `src/api/`: API 路由处理器与中间件，负责 HTTP 请求与响应。
+- `src/service/`: 核心业务逻辑层，负责串联领域模型与基础设施。
 - `src/domain/`: 领域模型 (User, Storage)。
 - `src/infrastructure/`: 外部服务实现 (DB, Storage I/O, Image processing)。
 - `src/config/`: 配置加载逻辑。
 - `src/utils/`: 通用工具类 (加密、哈希)。
+- `tests/`: 完整的集成测试套件。
 
 ## 🤝 贡献与支持
 
