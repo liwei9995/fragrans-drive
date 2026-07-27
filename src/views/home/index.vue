@@ -53,7 +53,7 @@ let uploadCleanedUp = false
 const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
-const { fetchFiles, listData, resetListData, isFetching } = useFetchFiles()
+const { fetchFiles, listData, resetListData, isFetching, showSkeleton } = useFetchFiles()
 const parentId = ref((route.params.id as string) || 'root')
 const basicActionItems = [
   {
@@ -555,7 +555,7 @@ onUnmounted(() => {
           </div>
           <el-scrollbar class="items-wrapper" @end-reached="load">
             <transition name="el-fade-in-linear">
-              <div v-if="isFetching && listData?.docs.length === 0" class="items skeleton-container">
+              <div v-if="showSkeleton" class="items skeleton-container">
                 <FileSkeleton v-for="i in 10" :key="'skeleton-' + i" />
               </div>
             </transition>

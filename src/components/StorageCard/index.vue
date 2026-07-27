@@ -152,7 +152,7 @@ const handleLoad = () => (showPlaceholder.value = false)
                     :initial-index="0"
                     preview-teleported
                     hide-on-click-modal
-                    fit="contain"
+                    fit="cover"
                     @close="handleClosePreview"
                     @load="handleLoad"
                   />

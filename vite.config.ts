@@ -27,10 +27,6 @@ export default defineConfig({
       ext: '.gz',
       deleteOriginFile: false,
     }),
-    compression({
-      ext: '.gz',
-      deleteOriginFile: false,
-    }),
   ],
   resolve: {
     alias: {

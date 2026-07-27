@@ -25,7 +25,9 @@ export const convertItem = (item: Storage) => ({
   desc: getDesc(item.updatedAt),
   thumb: item.thumbnail
     ? toProxyStorageUrl(item.thumbnail)
-    : getThumb(item.extName, item.type),
+    : (item.mimeType?.startsWith('image/') && item.url && (item.mimeType === 'image/svg+xml' || (item.size && item.size < 500 * 1024)))
+      ? toProxyStorageUrl(item.url)
+      : getThumb(item.extName, item.type),
   thumbPlaceholder: getThumb(item.extName, item.type),
   previewSrcList:
     !item.mimeType?.startsWith('video/') && item.url
@@ -69,6 +71,8 @@ export const useFetchFiles = () => {
   }
   const listData = ref(initialData)
   const isFetching = ref(false)
+  const showSkeleton = ref(false)
+  let skeletonTimer: ReturnType<typeof setTimeout> | null = null
 
   const resetListData = () => (listData.value = initialData)
 
@@ -77,6 +81,11 @@ export const useFetchFiles = () => {
 
     if (init) {
       listData.value = initialData
+      if (skeletonTimer) clearTimeout(skeletonTimer)
+      showSkeleton.value = false
+      skeletonTimer = setTimeout(() => {
+        if (isFetching.value) showSkeleton.value = true
+      }, 200)
     }
 
     let data: { docs: Storage[]; [key: string]: unknown }
@@ -93,11 +102,19 @@ export const useFetchFiles = () => {
       })) as { docs: Storage[]; [key: string]: unknown }
     } catch (err) {
       isFetching.value = false
+      if (init) {
+        if (skeletonTimer) clearTimeout(skeletonTimer)
+        showSkeleton.value = false
+      }
       if (axios.isCancel(err)) return
       throw err
     }
 
     isFetching.value = false
+    if (init) {
+      if (skeletonTimer) clearTimeout(skeletonTimer)
+      showSkeleton.value = false
+    }
 
     if (Array.isArray(data?.docs)) {
       data.docs = data.docs.map((item: Storage) => convertItem(item))
@@ -117,6 +134,7 @@ export const useFetchFiles = () => {
   return {
     fetchFiles,
     isFetching,
+    showSkeleton,
     listData,
     resetListData,
   }

@@ -29,7 +29,13 @@ router.beforeEach(async (to, _from) => {
       return { path: HOME_URL }
     }
     try {
-      const { roles } = (await authProfile()) as { roles: string[] }
+      let roles = (globalStore.userInfo as any)?.roles as string[]
+      if (!roles || roles.length === 0) {
+        const profile = (await authProfile()) as { roles: string[] }
+        roles = profile.roles
+        globalStore.setUserInfo(profile)
+      }
+      
       const staticRouter = [HOME_URL]
       const roleList = ([] as string[]).concat(roles)
       const routerList = roleList.includes('admin')

@@ -6,7 +6,7 @@ import {
   UploadFilled,
   WarningFilled,
 } from '@element-plus/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 interface UploadStatusProps {
   type?: string
@@ -39,12 +39,37 @@ const uploadPercentage = computed(() =>
   props.type === 'uploading' ? props.percentage : 0,
 )
 
-const show = () => (visible.value = true)
+let timer: ReturnType<typeof setTimeout> | null = null
+
+const show = () => {
+  visible.value = true
+}
 
 const close = () => {
   visible.value = false
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
   props.onClose?.()
 }
+
+watch(
+  () => props.type,
+  (newType) => {
+    if (newType === 'success' || newType === 'error') {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        close()
+      }, 3000)
+    } else {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+    }
+  }
+)
 
 defineExpose({
   show,

@@ -1,5 +1,4 @@
 // element plus
-import ElementPlus from 'element-plus'
 import { createApp } from 'vue'
 import App from './App.vue'
 // reset style sheet
@@ -9,7 +8,10 @@ import './style.css'
 // element icons
 import * as Icons from '@element-plus/icons-vue'
 // element css
-import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/el-message-box.css'
+import 'element-plus/theme-chalk/el-message.css'
+import 'element-plus/theme-chalk/el-notification.css'
+import 'element-plus/theme-chalk/el-overlay.css'
 // element dark(内置暗黑模式)
 import 'element-plus/theme-chalk/dark/css-vars.css'
 // element 基于断点的隐藏类
@@ -26,4 +28,4 @@ for (const [key, component] of Object.entries(Icons)) {
   app.component(key, component)
 }
 
-app.use(router).use(pinia).use(ElementPlus).mount('#app')
+app.use(router).use(pinia).mount('#app')

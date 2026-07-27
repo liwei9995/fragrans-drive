@@ -28,3 +28,8 @@ dist-ssr
 src/auto-imports.d.ts
 src/components.d.ts
 .biomeignore
+
+# Playwright
+playwright-report/
+test-results/
+*.png
