@@ -1,3 +1,4 @@
+pub mod error;
 pub mod middleware;
 pub mod storage;
 pub mod users;

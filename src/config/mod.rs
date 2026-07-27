@@ -8,6 +8,12 @@ pub struct Config {
     pub domain: String,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Config {
     pub fn new() -> Self {
         let mongo_uri = env::var("MONGO_URI")

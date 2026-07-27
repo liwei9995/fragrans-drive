@@ -2,6 +2,14 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageType {
+    File,
+    Folder,
+    Thumbnail,
+}
+
 /// 列表单条：不含敏感字段，id 为 hex，createdAt/updatedAt 为 RFC3339，url/thumbnail 为完整 URL。
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StorageListResponse {
@@ -23,7 +31,7 @@ pub struct StorageListResponse {
     #[serde(rename = "parentId")]
     pub parent_id: String,
     #[serde(rename = "type")]
-    pub r#type: String,
+    pub r#type: StorageType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thumbnail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,7 +62,7 @@ pub struct CreateFolderResponse {
     #[serde(rename = "parentId")]
     pub parent_id: String,
     #[serde(rename = "type")]
-    pub r#type: String,
+    pub r#type: StorageType,
     #[serde(
         rename = "createdAt",
         serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
@@ -81,7 +89,7 @@ pub struct UpdateStorageResponse {
     #[serde(rename = "parentId")]
     pub parent_id: String,
     #[serde(rename = "type")]
-    pub r#type: String,
+    pub r#type: StorageType,
     #[serde(rename = "userId")]
     pub user_id: String,
     pub trashed: bool,
@@ -109,7 +117,7 @@ pub struct StoragePathNode {
     #[serde(rename = "parentId")]
     pub parent_id: String,
     #[serde(rename = "type")]
-    pub r#type: String,
+    pub r#type: StorageType,
 }
 
 /// 分页列表响应：`{ docs, total, limit, page, pages }`。
@@ -142,11 +150,11 @@ impl StorageListResponse {
     /// 从 Storage 构建列表项，并填入 base_url + token 生成的 url/thumbnail 完整 URL（仅文件有 url）。
     pub fn from_storage_with_urls(s: Storage, base_url: &str, token: &str) -> Self {
         let base = base_url.trim_end_matches('/');
-        let url = (s.r#type == "file" && s.id.is_some()).then(|| {
+        let url = (s.r#type == StorageType::File && s.id.is_some()).then(|| {
             format!(
                 "{}/v1/storage/{}?token={}",
                 base,
-                s.id.as_ref().unwrap().to_string(),
+                s.id.as_ref().unwrap(),
                 token
             )
         });
@@ -196,7 +204,7 @@ impl From<Storage> for StorageListResponse {
 
 impl From<Storage> for UpdateStorageResponse {
     fn from(s: Storage) -> Self {
-        let base_name = if s.r#type == "folder" {
+        let base_name = if s.r#type == StorageType::Folder {
             s.base_name.or(Some(s.name.clone()))
         } else {
             s.base_name
@@ -243,7 +251,8 @@ pub struct Storage {
     #[serde(rename = "parentId")]
     pub parent_id: String,
 
-    pub r#type: String, // "file" or "folder"
+    #[serde(rename = "type")]
+    pub r#type: StorageType,
 
     #[serde(rename = "userId")]
     pub user_id: String,

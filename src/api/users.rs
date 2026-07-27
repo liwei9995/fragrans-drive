@@ -8,6 +8,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use crate::api::error::AppError;
 use chrono::Utc;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use mongodb::bson::{Bson, DateTime as BsonDateTime, doc, oid::ObjectId};
@@ -74,19 +75,19 @@ pub struct CreateUserResponse {
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginDto>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let repo = UserRepository::new(&state.db);
-    let user = match repo.find_by_email(&payload.email).await {
-        Ok(Some(u)) => u,
-        _ => return (StatusCode::UNAUTHORIZED, "Invalid email or password").into_response(),
+    let user = match repo.find_by_email(&payload.email).await? {
+        Some(u) => u,
+        None => return Err(AppError::Unauthorized("Invalid email or password".to_string())),
     };
 
     if !verify_password(&payload.password, &user.password) {
-        return (StatusCode::UNAUTHORIZED, "Invalid email or password").into_response();
+        return Err(AppError::Unauthorized("Invalid email or password".to_string()));
     }
 
     let claims = crate::api::middleware::Claims {
-        user_id: user.id.unwrap().to_hex(),
+        user_id: user.id.ok_or_else(|| AppError::DatabaseError(mongodb::error::Error::custom("missing id")))?.to_hex(),
         exp: (Utc::now().timestamp() + 3600 * 24 * 7) as usize, // 1 week
     };
 
@@ -94,13 +95,11 @@ pub async fn login(
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(state.config.jwt_secret.as_bytes()),
-    )
-    .unwrap();
+    )?;
 
-    Json(LoginResponse {
+    Ok(Json(LoginResponse {
         access_token: token,
-    })
-    .into_response()
+    }))
 }
 
 #[utoipa::path(
@@ -116,12 +115,12 @@ pub async fn login(
 pub async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<CreateUserDto>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let repo = UserRepository::new(&state.db);
 
     // Check if user exists
-    if let Ok(Some(_)) = repo.find_by_email(&payload.email).await {
-        return (StatusCode::BAD_REQUEST, "User already exists").into_response();
+    if let Some(_) = repo.find_by_email(&payload.email).await? {
+        return Err(AppError::BadRequest("User already exists".to_string()));
     }
 
     let user = User {
@@ -138,14 +137,11 @@ pub async fn create_user(
         updated_at: Some(Utc::now()),
     };
 
-    match repo.create(user).await {
-        Ok(id) => (
-            StatusCode::CREATED,
-            Json(CreateUserResponse { id: id.to_hex() }),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user").into_response(),
-    }
+    let id = repo.create(user).await?;
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateUserResponse { id: id.to_hex() }),
+    ))
 }
 
 #[utoipa::path(
@@ -264,26 +260,20 @@ pub async fn update_password(
     State(state): State<AppState>,
     user_ctx: UserContext,
     Json(payload): Json<UpdatePasswordDto>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     if payload.password.len() < 6 {
-        return (
-            StatusCode::BAD_REQUEST,
-            "Password must be at least 6 characters",
-        )
-            .into_response();
+        return Err(AppError::BadRequest("Password must be at least 6 characters".to_string()));
     }
     if payload.password != payload.change_password {
-        return (StatusCode::BAD_REQUEST, "Passwords do not match").into_response();
+        return Err(AppError::BadRequest("Passwords do not match".to_string()));
     }
 
-    let id = ObjectId::parse_str(&user_ctx.user_id).unwrap();
+    let id = ObjectId::parse_str(&user_ctx.user_id).map_err(|_| AppError::BadRequest("Invalid user ID".to_string()))?;
     let hashed = hash_password(&payload.password);
 
     let repo = UserRepository::new(&state.db);
-    match repo.update_password(id, &hashed).await {
-        Ok(_) => (StatusCode::OK, "Password updated").into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
-    }
+    repo.update_password(id, &hashed).await?;
+    Ok((StatusCode::OK, "Password updated"))
 }
 
 #[utoipa::path(

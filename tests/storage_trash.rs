@@ -8,7 +8,7 @@ use fragrans::{
     config::Config,
     domain::{
         storage::{
-            Storage, StorageListPaginatedResponse, TrashCleanupResponse, TrashRestoreResponse,
+            Storage, StorageListPaginatedResponse, TrashCleanupResponse, TrashRestoreResponse, StorageType,
         },
         user::User,
     },
@@ -26,133 +26,8 @@ use std::{
 use tempfile::TempDir;
 use tower::util::ServiceExt;
 
-struct TestContext {
-    app: axum::Router,
-    db: Database,
-    storage_dir: TempDir,
-    user_id: String,
-    auth_token: String,
-    download_token: String,
-}
-
-impl TestContext {
-    async fn teardown(self) {
-        let _ = self.db.drop().await;
-    }
-}
-
-async fn setup() -> Option<TestContext> {
-    let mongo_uri = env::var("TEST_MONGO_URI")
-        .or_else(|_| env::var("MONGO_URI"))
-        .unwrap_or_else(|_| "mongodb://test:nest@127.0.0.1:25018/?authSource=admin".to_string());
-
-    let mut options = ClientOptions::parse(&mongo_uri).await.ok()?;
-    options.server_selection_timeout = Some(Duration::from_secs(1));
-    options.connect_timeout = Some(Duration::from_secs(1));
-    let client = Client::with_options(options).ok()?;
-
-    let db_name = format!(
-        "fragrans_test_{}",
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .ok()?
-            .as_nanos()
-    );
-    let db = client.database(&db_name);
-    if db.run_command(doc! { "ping": 1 }).await.is_err() {
-        eprintln!("Skipping storage integration tests: MongoDB is unavailable");
-        return None;
-    }
-
-    let storage_dir = TempDir::new().ok()?;
-    unsafe {
-        env::set_var("STORAGE_DESTINATION", storage_dir.path());
-    }
-
-    let jwt_secret = "test-secret-key-that-is-long-enough".to_string();
-    let config = Config {
-        mongo_uri: mongo_uri.clone(),
-        jwt_secret: jwt_secret.clone(),
-        port: 3821,
-        domain: "http://localhost:3821".to_string(),
-    };
-    let app = api::router(db.clone(), config);
-
-    let user = User {
-        id: None,
-        email: format!("user-{}@example.com", db_name),
-        password: hash_password("password123"),
-        first_name: "Test".to_string(),
-        last_name: "User".to_string(),
-        gender: None,
-        age: None,
-        avatar: None,
-        roles: vec!["user".to_string()],
-        created_at: Some(Utc::now()),
-        updated_at: Some(Utc::now()),
-    };
-    let inserted = db
-        .collection::<User>("users")
-        .insert_one(user)
-        .await
-        .ok()?
-        .inserted_id
-        .as_object_id()?;
-    let user_id = inserted.to_hex();
-
-    let claims = Claims {
-        user_id: user_id.clone(),
-        exp: (Utc::now().timestamp() + 3600) as usize,
-    };
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(jwt_secret.as_bytes()),
-    )
-    .ok()?;
-
-    Some(TestContext {
-        app,
-        db,
-        storage_dir,
-        user_id,
-        auth_token: token.clone(),
-        download_token: token,
-    })
-}
-
-fn auth_request(method: &str, uri: &str, token: &str) -> Request<Body> {
-    Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
-        .body(Body::empty())
-        .expect("request")
-}
-
-async fn response_bytes(response: axum::response::Response) -> bytes::Bytes {
-    response
-        .into_body()
-        .collect()
-        .await
-        .expect("read body")
-        .to_bytes()
-}
-
-fn json_auth_request(
-    method: &str,
-    uri: &str,
-    token: &str,
-    body: serde_json::Value,
-) -> Request<Body> {
-    Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(body.to_string()))
-        .expect("json request")
-}
+mod common;
+use common::*;
 
 #[tokio::test]
 #[serial]
@@ -175,7 +50,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             md5_hash: None,
             iv: None,
             parent_id: "root".to_string(),
-            r#type: "folder".to_string(),
+            r#type: StorageType::Folder,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: false,
@@ -199,7 +74,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             md5_hash: Some(thumb_hash.clone()),
             iv: Some(thumb_iv.clone()),
             parent_id: folder_id.to_hex(),
-            r#type: "thumbnail".to_string(),
+            r#type: StorageType::Thumbnail,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: false,
@@ -223,7 +98,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             md5_hash: Some(file_hash.clone()),
             iv: Some(file_iv.clone()),
             parent_id: folder_id.to_hex(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: Some(thumb_id.to_hex()),
             trashed: false,
@@ -371,7 +246,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             md5_hash: Some(orphan_hash.clone()),
             iv: Some(orphan_iv.clone()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -393,7 +268,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             md5_hash: Some(shared_hash.clone()),
             iv: Some(shared_iv.clone()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -415,7 +290,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             md5_hash: Some(shared_hash.clone()),
             iv: Some(shared_iv.clone()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: false,
@@ -495,7 +370,7 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
             md5_hash: Some("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string()),
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
-            r#type: "thumbnail".to_string(),
+            r#type: StorageType::Thumbnail,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -521,7 +396,7 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
             }),
             iv: (!is_folder).then(get_iv),
             parent_id: "root".to_string(),
-            r#type: if is_folder { "folder" } else { "file" }.to_string(),
+            r#type: if is_folder { StorageType::Folder } else { StorageType::File },
             user_id: ctx.user_id.clone(),
             thumbnail: (name == "a.txt").then(|| thumb_id.to_hex()),
             trashed: true,
@@ -559,7 +434,7 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
     assert_eq!(payload.limit, 5);
     assert_eq!(payload.pages, 1);
     assert_eq!(payload.docs.len(), 2);
-    assert!(payload.docs.iter().all(|doc| doc.r#type != "thumbnail"));
+    assert!(payload.docs.iter().all(|doc| doc.r#type != StorageType::Thumbnail));
     assert_eq!(payload.docs[0].name, "b.txt");
     assert_eq!(payload.docs[1].name, "a.txt");
 
@@ -588,7 +463,7 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
             md5_hash: None,
             iv: None,
             parent_id: "root".to_string(),
-            r#type: "folder".to_string(),
+            r#type: StorageType::Folder,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -609,7 +484,7 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
         md5_hash: Some("77777777777777777777777777777777".to_string()),
         iv: Some(get_iv()),
         parent_id: folder_id.to_hex(),
-        r#type: "file".to_string(),
+        r#type: StorageType::File,
         user_id: ctx.user_id.clone(),
         thumbnail: None,
         trashed: true,
@@ -681,7 +556,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             md5_hash: Some("22222222222222222222222222222222".to_string()),
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -703,7 +578,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             md5_hash: Some("33333333333333333333333333333333".to_string()),
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -724,7 +599,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             md5_hash: Some("44444444444444444444444444444444".to_string()),
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -746,7 +621,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             md5_hash: Some("55555555555555555555555555555555".to_string()),
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,
@@ -767,7 +642,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             md5_hash: Some("66666666666666666666666666666666".to_string()),
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
-            r#type: "file".to_string(),
+            r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
             thumbnail: None,
             trashed: true,

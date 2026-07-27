@@ -8,6 +8,12 @@ pub struct LocalStorage {
     root_path: PathBuf,
 }
 
+impl Default for LocalStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LocalStorage {
     pub fn new() -> Self {
         let root = env::var("STORAGE_DESTINATION").unwrap_or_else(|_| "bucket/storage".to_string());
@@ -59,6 +65,44 @@ impl LocalStorage {
 
         let mut file = fs::File::create(path).await?;
         file.write_all(&data).await?;
+        Ok(())
+    }
+
+    
+    pub async fn store_from_file(
+        &self,
+        id: &str,
+        temp_file_path: &PathBuf,
+        iv: Option<&str>,
+    ) -> Result<(), std::io::Error> {
+        let path = self.get_path(id);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        let mut in_file = fs::File::open(temp_file_path).await?;
+        let mut out_file = fs::File::create(path).await?;
+        
+        if let Some(iv_hex) = iv {
+            let iv_bytes = hex::decode(iv_hex)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            
+            use ctr::cipher::{KeyIvInit, StreamCipher};
+            type Aes256Ctr64BE = ctr::Ctr128BE<aes::Aes256>;
+            
+            let mut cipher = Aes256Ctr64BE::new(id.as_bytes().into(), iv_bytes.as_slice().into());
+            
+            let mut buffer = [0u8; 8192];
+            loop {
+                let n = in_file.read(&mut buffer).await?;
+                if n == 0 { break; }
+                cipher.apply_keystream(&mut buffer[..n]);
+                out_file.write_all(&buffer[..n]).await?;
+            }
+        } else {
+            tokio::io::copy(&mut in_file, &mut out_file).await?;
+        }
+        
         Ok(())
     }
 
