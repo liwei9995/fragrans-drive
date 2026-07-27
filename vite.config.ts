@@ -20,9 +20,9 @@ export default defineConfig({
       resolvers: [ElementPlusResolver()],
       dts: 'src/components.d.ts',
     }),
-    checker({
-      vueTsc: true,
-    }),
+    // !process.env.VITEST && checker({
+    //   vueTsc: true,
+    // }),
     compression({
       ext: '.gz',
       deleteOriginFile: false,

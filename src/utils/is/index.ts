@@ -47,10 +47,9 @@ export const isAsyncFunction = <T = unknown>(val: unknown): val is Promise<T> =>
  * @description:  是否为promise
  */
 export const isPromise = <T = unknown>(val: unknown): val is Promise<T> =>
-  is(val, 'Promise') &&
-  isObject(val) &&
-  isFunction(val.then) &&
-  isFunction(val.catch)
+  typeof val === 'object' && val !== null &&
+  typeof (val as any).then === 'function' &&
+  typeof (val as any).catch === 'function'
 
 /**
  * @description:  是否为字符串
@@ -77,10 +76,10 @@ export const isClient = () => typeof window !== 'undefined'
  * @description: 是否为浏览器
  */
 export const isWindow = (val: unknown): val is Window =>
-  typeof window !== 'undefined' && is(val, 'Window')
+  typeof window !== 'undefined' && val !== null && val === window
 
 export const isElement = (val: unknown): val is Element =>
-  isObject(val) && !!val.tagName
+  typeof val === 'object' && val !== null && !!(val as any).tagName
 
 export const isServer = typeof window === 'undefined'
 

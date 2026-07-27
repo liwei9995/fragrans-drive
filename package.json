@@ -12,7 +12,9 @@
     "lint": "biome lint .",
     "prepare": "husky",
     "release": "standard-version",
-    "commit": "git pull && git add -A && git-cz && git push"
+    "commit": "git pull && git add -A && git-cz && git push",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -31,13 +33,17 @@
     "@biomejs/biome": "^2.4.8",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
+    "@pinia/testing": "^2.0.1",
     "@types/node": "^25.5.0",
     "@types/qs": "^6.15.0",
     "@vitejs/plugin-vue": "^6.0.5",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vue/test-utils": "^2.4.11",
     "commitizen": "^4.3.1",
     "cz-git": "^1.12.0",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
     "postcss": "^8.5.8",
     "postcss-html": "^1.8.1",
@@ -50,6 +56,7 @@
     "vite": "^8.0.1",
     "vite-plugin-checker": "^0.12.0",
     "vite-plugin-compression": "^0.5.1",
+    "vitest": "^4.1.10",
     "vue-tsc": "^3.2.6"
   },
   "engines": {
