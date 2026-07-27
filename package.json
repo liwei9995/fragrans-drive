@@ -69,10 +69,5 @@
     "commitizen": {
       "path": "node_modules/cz-git"
     }
-  },
-  "pnpm": {
-    "allowBuilds": [
-      "@parcel/watcher"
-    ]
   }
 }
