@@ -159,7 +159,13 @@ pub async fn upload_file(
     let service = StorageService::new(repo);
     let mut parent_id = "root".to_string();
 
-    while let Ok(Some(mut field)) = multipart.next_field().await {
+    while let Some(mut field) = multipart.next_field().await.map_err(|e| {
+        if e.to_string().contains("payload too large") || e.to_string().contains("length limit exceeded") {
+            AppError::PayloadTooLarge(e.to_string())
+        } else {
+            AppError::BadRequest(e.to_string())
+        }
+    })? {
         if field.name().is_some_and(|n| n == "parentId") {
             if let Ok(bytes) = field.bytes().await {
                 let s = String::from_utf8_lossy(&bytes).trim().to_string();
@@ -190,10 +196,21 @@ pub async fn upload_file(
         use md5::Digest;
         let mut size = 0i64;
 
-        while let Some(chunk) = field.chunk().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
+        const MAX_FILE_SIZE: i64 = 10 * 1024 * 1024; // 10MB
+        while let Some(chunk) = field.chunk().await.map_err(|e| {
+            if e.to_string().contains("payload too large") || e.to_string().contains("length limit exceeded") {
+                AppError::PayloadTooLarge(e.to_string())
+            } else {
+                AppError::BadRequest(e.to_string())
+            }
+        })? {
             hasher.update(&chunk);
             tokio::io::AsyncWriteExt::write_all(&mut temp_file, &chunk).await?;
             size += chunk.len() as i64;
+            if size > MAX_FILE_SIZE {
+                tokio::fs::remove_file(&temp_file_path).await.ok();
+                return Err(AppError::PayloadTooLarge("File exceeds 10MB limit".into()));
+            }
         }
         tokio::io::AsyncWriteExt::flush(&mut temp_file).await?;
         let hash = hex::encode(hasher.finalize());

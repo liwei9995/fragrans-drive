@@ -101,6 +101,7 @@ pub fn router(db: Database, config: Config) -> Router {
 
     let storage_routes = Router::new()
         .route("/upload", axum::routing::post(storage::upload_file))
+        .layer(axum::extract::DefaultBodyLimit::disable())
         .route("/folder", axum::routing::post(storage::create_folder))
         .route("/list", axum::routing::post(storage::get_files))
         .route(

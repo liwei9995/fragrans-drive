@@ -26,6 +26,9 @@ pub enum AppError {
     #[error("Not Found: {0}")]
     NotFound(String),
 
+    #[error("Payload Too Large: {0}")]
+    PayloadTooLarge(String),
+
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 }
@@ -51,6 +54,7 @@ impl IntoResponse for AppError {
             }
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            AppError::PayloadTooLarge(msg) => (StatusCode::PAYLOAD_TOO_LARGE, msg),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
         };
 
