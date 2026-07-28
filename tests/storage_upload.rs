@@ -91,9 +91,7 @@ fn multipart_upload_request(
 #[tokio::test]
 #[serial]
 async fn test_single_chunk_upload() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let file_content = b"Hello from integration test!";
     let req = multipart_upload_request(
@@ -145,9 +143,7 @@ async fn test_single_chunk_upload() {
 #[tokio::test]
 #[serial]
 async fn test_multiple_files_upload() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let boundary = "------------------------Boundary1234567890";
     let mut body = Vec::new();

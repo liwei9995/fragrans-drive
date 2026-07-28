@@ -33,30 +33,29 @@ impl TestContext {
     }
 }
 
-pub async fn setup() -> Option<TestContext> {
+pub async fn setup() -> TestContext {
     let mongo_uri = env::var("TEST_MONGO_URI")
         .or_else(|_| env::var("MONGO_URI"))
         .unwrap_or_else(|_| "mongodb://test:nest@127.0.0.1:25018/?authSource=admin".to_string());
 
-    let mut options = ClientOptions::parse(&mongo_uri).await.ok()?;
+    let mut options = ClientOptions::parse(&mongo_uri).await.expect("Failed to parse mongo URI");
     options.server_selection_timeout = Some(Duration::from_secs(1));
     options.connect_timeout = Some(Duration::from_secs(1));
-    let client = Client::with_options(options).ok()?;
+    let client = Client::with_options(options).expect("Failed to create mongo client");
 
     let db_name = format!(
         "fragrans_test_{}",
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .ok()?
+            .expect("Time went backwards")
             .as_nanos()
     );
     let db = client.database(&db_name);
-    if db.run_command(doc! { "ping": 1 }).await.is_err() {
-        eprintln!("Skipping integration tests: MongoDB is unavailable");
-        return None;
+    if let Err(e) = db.run_command(doc! { "ping": 1 }).await {
+        panic!("Skipping integration tests: MongoDB is unavailable: {}", e);
     }
 
-    let storage_dir = TempDir::new().ok()?;
+    let storage_dir = TempDir::new().expect("Failed to create temp dir");
     unsafe {
         env::set_var("STORAGE_DESTINATION", storage_dir.path());
     }
@@ -87,9 +86,10 @@ pub async fn setup() -> Option<TestContext> {
         .collection::<User>("users")
         .insert_one(user)
         .await
-        .ok()?
+        .expect("Failed to insert user")
         .inserted_id
-        .as_object_id()?;
+        .as_object_id()
+        .expect("Inserted ID is not ObjectId");
     let user_id = inserted.to_hex();
 
     let claims = Claims {
@@ -101,16 +101,16 @@ pub async fn setup() -> Option<TestContext> {
         &claims,
         &EncodingKey::from_secret(jwt_secret.as_bytes()),
     )
-    .ok()?;
+    .expect("Failed to encode token");
 
-    Some(TestContext {
+    TestContext {
         app,
         db,
         storage_dir,
         user_id,
         auth_token: token.clone(),
         download_token: token,
-    })
+    }
 }
 
 pub fn auth_request(method: &str, uri: &str, token: &str) -> Request<Body> {

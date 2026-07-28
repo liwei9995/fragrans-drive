@@ -32,9 +32,7 @@ use common::*;
 #[tokio::test]
 #[serial]
 async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let repo = StorageRepository::new(&ctx.db);
     let now = Utc::now();
@@ -222,9 +220,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
 #[tokio::test]
 #[serial]
 async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let repo = StorageRepository::new(&ctx.db);
     let now = Utc::now();
@@ -351,9 +347,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
 #[tokio::test]
 #[serial]
 async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let repo = StorageRepository::new(&ctx.db);
     let now = Utc::now();
@@ -444,9 +438,7 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
 #[tokio::test]
 #[serial]
 async fn trash_list_defaults_to_top_level_and_can_include_children() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let repo = StorageRepository::new(&ctx.db);
     let now = Utc::now();
@@ -537,9 +529,7 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
 #[tokio::test]
 #[serial]
 async fn trash_restore_supports_single_batch_and_all_modes() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     let repo = StorageRepository::new(&ctx.db);
     let now = Utc::now();

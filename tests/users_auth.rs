@@ -8,9 +8,7 @@ use tower::util::ServiceExt;
 #[tokio::test]
 #[serial]
 async fn test_user_registration_and_login() {
-    let Some(ctx) = setup().await else {
-        return;
-    };
+    let ctx = setup().await;
 
     // 1. Create a new user
     let email = "newuser@example.com";
