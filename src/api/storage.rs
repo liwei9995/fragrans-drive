@@ -1,7 +1,7 @@
 use crate::api::AppState;
 use crate::api::middleware::{Claims, UserContext};
 use crate::domain::storage::{
-    CreateFolderResponse, Storage, StorageListPaginatedResponse, StorageListResponse,
+    CreateFolderResponse, StorageListPaginatedResponse, StorageListResponse,
     StoragePathNode, TrashCleanupResponse, TrashRestoreResponse, UpdateStorageResponse,
 };
 use crate::infrastructure::db::storage_repo::StorageRepository;
@@ -14,9 +14,8 @@ use axum::{
 use crate::api::error::AppError;
 use chrono::Utc;
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use mongodb::bson::{Document, doc, oid::ObjectId};
+use mongodb::bson::{Document, doc};
 use serde::Deserialize;
-use std::collections::HashSet;
 use utoipa::ToSchema;
 
 
@@ -154,10 +153,20 @@ pub async fn upload_file(
     user_ctx: UserContext,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AppError> {
-    let mut uploaded_ids = Vec::new();
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let mut parent_id = "root".to_string();
+    let max_file_size = state.config.max_upload_bytes as i64;
+
+    struct UploadedFile {
+        name: String,
+        content_type: String,
+        temp_file: tempfile::NamedTempFile,
+        hash: String,
+        size: i64,
+    }
+
+    let mut uploaded_files = Vec::new();
 
     while let Some(mut field) = multipart.next_field().await.map_err(|e| {
         if e.to_string().contains("payload too large") || e.to_string().contains("length limit exceeded") {
@@ -181,22 +190,21 @@ pub async fn upload_file(
             None => continue,
         };
         if name.is_empty() || name.eq_ignore_ascii_case("unnamed") {
-            continue;
+            return Err(AppError::BadRequest("Filename cannot be empty".to_string()));
         }
         let content_type = field
             .content_type()
             .unwrap_or("application/octet-stream")
             .to_string();
 
-        let temp_dir = std::env::temp_dir();
-        let temp_file_path = temp_dir.join(format!("{}.tmp", uuid::Uuid::new_v4()));
-        let mut temp_file = tokio::fs::File::create(&temp_file_path).await?;
+        let temp_file = tempfile::NamedTempFile::new().map_err(|e| AppError::InternalError(e.to_string()))?;
+        let std_file = temp_file.as_file().try_clone().map_err(|e| AppError::InternalError(e.to_string()))?;
+        let mut async_file = tokio::fs::File::from_std(std_file);
         
-        let mut hasher = md5::Md5::new();
-        use md5::Digest;
+        let mut hasher = sha2::Sha256::new();
+        use sha2::Digest;
         let mut size = 0i64;
 
-        const MAX_FILE_SIZE: i64 = 10 * 1024 * 1024; // 10MB
         while let Some(chunk) = field.chunk().await.map_err(|e| {
             if e.to_string().contains("payload too large") || e.to_string().contains("length limit exceeded") {
                 AppError::PayloadTooLarge(e.to_string())
@@ -205,21 +213,44 @@ pub async fn upload_file(
             }
         })? {
             hasher.update(&chunk);
-            tokio::io::AsyncWriteExt::write_all(&mut temp_file, &chunk).await?;
+            tokio::io::AsyncWriteExt::write_all(&mut async_file, &chunk).await.map_err(|e| AppError::InternalError(e.to_string()))?;
             size += chunk.len() as i64;
-            if size > MAX_FILE_SIZE {
-                tokio::fs::remove_file(&temp_file_path).await.ok();
-                return Err(AppError::PayloadTooLarge("File exceeds 10MB limit".into()));
+            if size > max_file_size {
+                return Err(AppError::PayloadTooLarge(format!("File exceeds limit of {} bytes", max_file_size)));
             }
         }
-        tokio::io::AsyncWriteExt::flush(&mut temp_file).await?;
+        tokio::io::AsyncWriteExt::flush(&mut async_file).await.map_err(|e| AppError::InternalError(e.to_string()))?;
         let hash = hex::encode(hasher.finalize());
 
-        match service.upload_file_chunk(&user_ctx.user_id, &parent_id, &name, &content_type, &temp_file_path, &hash, size).await {
+        uploaded_files.push(UploadedFile {
+            name,
+            content_type,
+            temp_file,
+            hash,
+            size,
+        });
+    }
+
+    if uploaded_files.is_empty() {
+        return Err(AppError::BadRequest("No files uploaded".to_string()));
+    }
+
+    let mut uploaded_ids = Vec::new();
+    for uf in uploaded_files {
+        match service.upload_file_chunk(
+            &user_ctx.user_id,
+            &parent_id,
+            &uf.name,
+            &uf.content_type,
+            &uf.temp_file.path().to_path_buf(),
+            &uf.hash,
+            uf.size,
+        ).await {
             Ok(id) => uploaded_ids.push(id),
-            Err(e) => tracing::error!("Upload chunk failed: {}", e),
+            Err(e) => {
+                return Err(e);
+            }
         }
-        tokio::fs::remove_file(&temp_file_path).await.ok();
     }
 
     Ok(Json(uploaded_ids))
@@ -243,7 +274,7 @@ pub async fn create_folder(
     Json(payload): Json<CreateFolderDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let response = service
         .create_folder(payload.name, payload.parent_id, user_ctx.user_id)
         .await?;
@@ -268,7 +299,7 @@ pub async fn get_files(
     Json(payload): Json<GetFilesDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let mut query = Document::new();
     if let Some(ref pid) = payload.query.parent_id {
         query.insert("parentId", pid);
@@ -325,7 +356,7 @@ pub async fn get_trashed_files(
     Json(payload): Json<GetFilesDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let mut query = Document::new();
     if let Some(ref pid) = payload.query.parent_id {
         query.insert("parentId", pid);
@@ -387,7 +418,7 @@ pub async fn get_file(
     };
 
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
 
     let (mime_type, data) = service.get_file_content(&id, &claims.user_id).await?;
     Ok(([(header::CONTENT_TYPE, mime_type)], data))
@@ -411,7 +442,7 @@ pub async fn move_file(
     Json(payload): Json<MoveFileDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     service.move_file(&payload.file_id, &payload.parent_id, &user_ctx.user_id).await?;
     Ok(StatusCode::OK)
 }
@@ -470,7 +501,7 @@ pub async fn update_file(
     Json(payload): Json<UpdateStorageDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let response = service.update_file(&id, &user_ctx.user_id, payload.name).await?;
     Ok(Json(response))
 }
@@ -495,7 +526,7 @@ pub async fn remove_file(
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     service.remove_file(&id, &user_ctx.user_id).await?;
     Ok(StatusCode::OK)
 }
@@ -522,7 +553,7 @@ pub async fn restore_file(
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let response = service.restore_file(&id, &user_ctx.user_id).await?;
     Ok(Json(response))
 }
@@ -547,7 +578,7 @@ pub async fn restore_trashed_files(
     Json(payload): Json<RestoreTrashDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let response = service.restore_trashed_files(&user_ctx.user_id, payload.file_ids, payload.restore_all).await?;
     Ok(Json(response))
 }
@@ -568,7 +599,7 @@ pub async fn empty_trash(
     user_ctx: UserContext,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let response = service.empty_trash(&user_ctx.user_id).await?;
     Ok(Json(response))
 }
@@ -597,7 +628,7 @@ pub async fn get_path(
         return Err(AppError::BadRequest("Missing id or fileId".into()));
     }
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo);
+    let service = StorageService::new(repo, state.local_storage.clone());
     let path = service.get_path(id, &user_ctx.user_id).await?;
     Ok(Json(path))
 }

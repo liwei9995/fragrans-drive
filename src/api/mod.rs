@@ -4,7 +4,7 @@ pub mod storage;
 pub mod users;
 
 use crate::config::Config;
-use axum::Router;
+use axum::{Router, extract::State};
 use mongodb::Database;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -15,6 +15,7 @@ use utoipa_swagger_ui::SwaggerUi;
 pub struct AppState {
     pub db: Database,
     pub config: Arc<Config>,
+    pub local_storage: crate::infrastructure::storage::local::LocalStorage,
 }
 
 #[derive(OpenApi)]
@@ -75,9 +76,15 @@ impl utoipa::Modify for SecurityAddon {
 }
 
 pub fn router(db: Database, config: Config) -> Router {
+    let local_storage = crate::infrastructure::storage::local::LocalStorage::new(
+        config.storage_destination.clone(),
+        config.storage_master_key,
+    ).expect("Failed to initialize local storage");
+
     let state = AppState {
         db,
         config: Arc::new(config),
+        local_storage,
     };
 
     let auth_routes = Router::new()
@@ -101,7 +108,7 @@ pub fn router(db: Database, config: Config) -> Router {
 
     let storage_routes = Router::new()
         .route("/upload", axum::routing::post(storage::upload_file))
-        .layer(axum::extract::DefaultBodyLimit::disable())
+        .layer(axum::extract::DefaultBodyLimit::max(state.config.max_upload_bytes as usize))
         .route("/folder", axum::routing::post(storage::create_folder))
         .route("/list", axum::routing::post(storage::get_files))
         .route(
@@ -146,8 +153,32 @@ pub fn router(db: Database, config: Config) -> Router {
         )
         .with_state(state.clone());
 
+    let health_routes = Router::new()
+        .route("/live", axum::routing::get(|| async { "OK" }))
+        .route("/ready", axum::routing::get(
+            |State(state): State<AppState>| async move {
+                // Ping mongo
+                if let Err(e) = state.db.run_command(mongodb::bson::doc! { "ping": 1 }).await {
+                    tracing::error!("Health check failed (mongo ping): {}", e);
+                    return axum::http::StatusCode::SERVICE_UNAVAILABLE;
+                }
+                
+                // Check if storage destination is writable
+                let test_file = state.config.storage_destination.join(".healthcheck");
+                if let Err(e) = std::fs::write(&test_file, b"ok") {
+                    tracing::error!("Health check failed (storage write): {}", e);
+                    return axum::http::StatusCode::SERVICE_UNAVAILABLE;
+                }
+                let _ = std::fs::remove_file(&test_file);
+                
+                axum::http::StatusCode::OK
+            }
+        ))
+        .with_state(state.clone());
+
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .nest("/health", health_routes)
         .nest("/v1", v1)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
