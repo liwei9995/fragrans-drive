@@ -30,11 +30,30 @@ pub struct CreateFolderDto {
     pub r#type: String,
 }
 
+#[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StorageQueryDto {
+    #[serde(rename = "parentId")]
+    pub parent_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateStorageDto {
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GetDownloadUrlDto {
+    #[serde(rename = "fileId")]
+    pub file_id: String,
+}
+
 #[derive(Deserialize, ToSchema)]
 pub struct GetFilesDto {
     #[serde(default)]
-    #[schema(value_type = Object)]
-    pub query: Document,
+    pub query: StorageQueryDto,
     #[serde(default)]
     pub keyword: Option<String>,
     #[serde(default)]
@@ -233,7 +252,10 @@ pub async fn get_files(
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
     let service = StorageService::new(repo);
-    let mut query = payload.query.clone();
+    let mut query = Document::new();
+    if let Some(ref pid) = payload.query.parent_id {
+        query.insert("parentId", pid);
+    }
     apply_list_filters(&mut query, &payload);
 
     let page = payload.page.max(1);
@@ -287,7 +309,10 @@ pub async fn get_trashed_files(
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
     let service = StorageService::new(repo);
-    let mut query = payload.query.clone();
+    let mut query = Document::new();
+    if let Some(ref pid) = payload.query.parent_id {
+        query.insert("parentId", pid);
+    }
     apply_list_filters(&mut query, &payload);
 
     let page = payload.page.max(1);
@@ -389,9 +414,9 @@ pub async fn move_file(
 pub async fn get_download_url(
     State(state): State<AppState>,
     user_ctx: UserContext,
-    Json(payload): Json<Document>,
+    Json(payload): Json<GetDownloadUrlDto>,
 ) -> impl IntoResponse {
-    let file_id = payload.get_str("fileId").unwrap_or("");
+    let file_id = &payload.file_id;
     let domain = state.config.domain.trim_end_matches('/');
     let token = encode(
         &Header::default(),
@@ -425,11 +450,11 @@ pub async fn update_file(
     State(state): State<AppState>,
     user_ctx: UserContext,
     Path(id): Path<String>,
-    Json(payload): Json<Document>,
+    Json(payload): Json<UpdateStorageDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
     let service = StorageService::new(repo);
-    let response = service.update_file(&id, &user_ctx.user_id, payload).await?;
+    let response = service.update_file(&id, &user_ctx.user_id, payload.name).await?;
     Ok(Json(response))
 }
 

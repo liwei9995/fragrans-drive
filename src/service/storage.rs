@@ -22,6 +22,54 @@ impl StorageService {
         Self { repo }
     }
 
+    fn validate_name(&self, name: &str) -> Result<String, AppError> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > 255 || name == "." || name == ".." || name.contains('\0') {
+            return Err(AppError::BadRequest("Invalid name".into()));
+        }
+        Ok(name.to_string())
+    }
+
+    async fn validate_parent(
+        &self,
+        parent_id: &str,
+        user_id: &str,
+        item_id: Option<&str>,
+    ) -> Result<(), AppError> {
+        if parent_id == "root" {
+            return Ok(());
+        }
+        if Some(parent_id) == item_id {
+            return Err(AppError::BadRequest("Cannot move item into itself".into()));
+        }
+        let oid = ObjectId::parse_str(parent_id).map_err(|_| AppError::BadRequest("Invalid parent ID".into()))?;
+        let parent = self.repo.find_by_id(oid).await?.ok_or_else(|| AppError::BadRequest("Parent not found".into()))?;
+        if parent.user_id != user_id || parent.trashed || parent.r#type != StorageType::Folder {
+            return Err(AppError::BadRequest("Invalid parent folder".into()));
+        }
+        
+        if let Some(item_id) = item_id {
+            // Check if parent_id is a descendant of item_id
+            let item_oid = ObjectId::parse_str(item_id).map_err(|_| AppError::BadRequest("Invalid item ID".into()))?;
+            let mut current_parent_oid = oid;
+            let mut seen = HashSet::new();
+            loop {
+                if current_parent_oid == item_oid {
+                    return Err(AppError::BadRequest("Cannot move folder into its descendant".into()));
+                }
+                if !seen.insert(current_parent_oid) {
+                    return Err(AppError::BadRequest("Cycle detected in parent chain".into()));
+                }
+                let current_parent = self.repo.find_by_id(current_parent_oid).await?.ok_or_else(|| AppError::BadRequest("Dangling parent".into()))?;
+                if current_parent.parent_id == "root" {
+                    break;
+                }
+                current_parent_oid = ObjectId::parse_str(&current_parent.parent_id).map_err(|_| AppError::BadRequest("Invalid parent ID in DB".into()))?;
+            }
+        }
+        Ok(())
+    }
+
     async fn collect_related_item_ids(
         &self,
         user_id: &str,
@@ -118,6 +166,9 @@ impl StorageService {
         parent_id: String,
         user_id: String,
     ) -> Result<CreateFolderResponse, AppError> {
+        let name = self.validate_name(&name)?;
+        self.validate_parent(&parent_id, &user_id, None).await?;
+
         let existing = self
             .repo
             .find_one(doc! {
@@ -368,6 +419,7 @@ impl StorageService {
         parent_id: &str,
         user_id: &str,
     ) -> Result<(), AppError> {
+        self.validate_parent(parent_id, user_id, Some(file_id)).await?;
         let id_oid = ObjectId::parse_str(file_id)
             .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
         self.repo.update_one(id_oid, user_id, doc! { "parentId": parent_id }).await?;
@@ -378,11 +430,27 @@ impl StorageService {
         &self,
         file_id: &str,
         user_id: &str,
-        payload: Document,
+        name: String,
     ) -> Result<UpdateStorageResponse, AppError> {
+        let name = self.validate_name(&name)?;
         let id_oid = ObjectId::parse_str(file_id)
             .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
         
+        let ext_name = StdPath::new(&name)
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        
+        let base_name = StdPath::new(&name)
+            .file_stem()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_string();
+
+        let payload = doc! { "name": name, "baseName": base_name, "extName": ext_name, "updatedAt": BsonDateTime::from_chrono(Utc::now()) };
+
         match self.repo.update_one(id_oid, user_id, payload).await? {
             None => Err(AppError::NotFound("Not found".into())),
             Some(_) => {
@@ -554,7 +622,15 @@ impl StorageService {
         }
 
         let mut path_reversed: Vec<StoragePathNode> = Vec::new();
+        let mut seen = HashSet::new();
+
         loop {
+            let oid = current.id.unwrap_or_else(ObjectId::new);
+            if !seen.insert(oid) {
+                tracing::error!("Cycle detected in storage hierarchy for item: {}", oid);
+                return Err(AppError::BadRequest("Cycle detected in storage hierarchy".into()));
+            }
+
             path_reversed.push(StoragePathNode {
                 id: current.id.as_ref().map(|o| o.to_string()).unwrap_or_else(|| "root".to_string()),
                 name: current.name.clone(),
@@ -564,11 +640,11 @@ impl StorageService {
             if current.parent_id == "root" { break; }
             let parent_oid = match ObjectId::parse_str(&current.parent_id) {
                 Ok(o) => o,
-                Err(_) => break,
+                Err(e) => return Err(AppError::BadRequest(format!("Invalid parent ID in DB: {}", e))),
             };
             let parent = match self.repo.find_by_id(parent_oid).await {
                 Ok(Some(s)) => s,
-                _ => break,
+                _ => return Err(AppError::BadRequest("Dangling parent".into())),
             };
             if parent.user_id != user_id || parent.trashed { break; }
             current = parent;
