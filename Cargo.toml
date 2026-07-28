@@ -36,6 +36,7 @@ utoipa-axum = "0.2"
 thiserror = "2.0.19"
 uuid = { version = "1.24.0", features = ["v4"] }
 tempfile = "3.13"
+regex = "1"
 
 [dev-dependencies]
 assert_cmd = "2.2.2"

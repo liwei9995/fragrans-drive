@@ -1,21 +1,19 @@
+#![allow(dead_code)]
+
 use axum::{
     body::Body,
     http::{Request, header},
 };
 use chrono::Utc;
 use fragrans::{
-    api::{self, middleware::Claims},
+    api::{self},
     config::Config,
     domain::user::User,
-    utils::{crypto::hash_password},
+    utils::crypto::hash_password,
 };
 use http_body_util::BodyExt;
-use jsonwebtoken::{EncodingKey, Header, encode};
 use mongodb::{Client, Database, bson::doc, options::ClientOptions};
-use std::{
-    env,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{env, time::Duration};
 use tempfile::TempDir;
 
 pub struct TestContext {
@@ -38,27 +36,23 @@ pub async fn setup() -> TestContext {
         .or_else(|_| env::var("MONGO_URI"))
         .unwrap_or_else(|_| "mongodb://test:nest@127.0.0.1:25018/?authSource=admin".to_string());
 
-    let mut options = ClientOptions::parse(&mongo_uri).await.expect("Failed to parse mongo URI");
+    let mut options = ClientOptions::parse(&mongo_uri)
+        .await
+        .expect("Failed to parse mongo URI");
     options.server_selection_timeout = Some(Duration::from_secs(1));
     options.connect_timeout = Some(Duration::from_secs(1));
     let client = Client::with_options(options).expect("Failed to create mongo client");
 
-    let db_name = format!(
-        "fragrans_test_{}",
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_nanos()
-    );
+    let db_name = format!("fragrans_test_{}", uuid::Uuid::new_v4());
     let db = client.database(&db_name);
     if let Err(e) = db.run_command(doc! { "ping": 1 }).await {
         panic!("Skipping integration tests: MongoDB is unavailable: {}", e);
     }
 
     let storage_dir = TempDir::new().expect("Failed to create temp dir");
-    unsafe {
-        env::set_var("STORAGE_DESTINATION", storage_dir.path());
-    }
+    fragrans::infrastructure::db::ensure_indexes(&db)
+        .await
+        .expect("create indexes");
 
     let jwt_secret = "test-secret-key-that-is-long-enough".to_string();
     let config = Config {
@@ -66,6 +60,9 @@ pub async fn setup() -> TestContext {
         jwt_secret: jwt_secret.clone(),
         port: 3821,
         domain: "http://localhost:3821".to_string(),
+        storage_destination: storage_dir.path().to_path_buf(),
+        storage_master_key: [0u8; 32],
+        max_upload_bytes: 10 * 1024 * 1024,
     };
     let app = api::router(db.clone(), config);
 
@@ -92,14 +89,21 @@ pub async fn setup() -> TestContext {
         .expect("Inserted ID is not ObjectId");
     let user_id = inserted.to_hex();
 
-    let claims = Claims {
-        user_id: user_id.clone(),
-        exp: (Utc::now().timestamp() + 3600) as usize,
-    };
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(jwt_secret.as_bytes()),
+    let token = api::middleware::create_token(
+        &jwt_secret,
+        &user_id,
+        api::middleware::TokenPurpose::Access,
+        None,
+        (chrono::Utc::now().timestamp() + 3600) as usize,
+    )
+    .expect("Failed to encode token");
+
+    let download_token = api::middleware::create_token(
+        &jwt_secret,
+        &user_id,
+        api::middleware::TokenPurpose::Download,
+        Some("dummy_file_id".to_string()),
+        (chrono::Utc::now().timestamp() + 3600) as usize,
     )
     .expect("Failed to encode token");
 
@@ -109,7 +113,7 @@ pub async fn setup() -> TestContext {
         storage_dir,
         user_id,
         auth_token: token.clone(),
-        download_token: token,
+        download_token,
     }
 }
 

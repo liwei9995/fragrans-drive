@@ -1,16 +1,15 @@
 use crate::api::AppState;
+use crate::api::error::AppError;
 use crate::api::middleware::UserContext;
 use crate::domain::user::{User, UserResponse};
 use crate::infrastructure::db::user_repo::UserRepository;
 use crate::utils::crypto::{hash_password, verify_password};
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Json, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use crate::api::error::AppError;
 use chrono::Utc;
-use jsonwebtoken::{EncodingKey, Header, encode};
 use mongodb::bson::{Bson, DateTime as BsonDateTime, doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -79,22 +78,28 @@ pub async fn login(
     let repo = UserRepository::new(&state.db);
     let user = match repo.find_by_email(&payload.email).await? {
         Some(u) => u,
-        None => return Err(AppError::Unauthorized("Invalid email or password".to_string())),
+        None => {
+            return Err(AppError::Unauthorized(
+                "Invalid email or password".to_string(),
+            ));
+        }
     };
 
     if !verify_password(&payload.password, &user.password) {
-        return Err(AppError::Unauthorized("Invalid email or password".to_string()));
+        return Err(AppError::Unauthorized(
+            "Invalid email or password".to_string(),
+        ));
     }
 
-    let claims = crate::api::middleware::Claims {
-        user_id: user.id.ok_or_else(|| AppError::DatabaseError(mongodb::error::Error::custom("missing id")))?.to_hex(),
-        exp: (Utc::now().timestamp() + 3600 * 24 * 7) as usize, // 1 week
-    };
-
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+    let token = crate::api::middleware::create_token(
+        &state.config.jwt_secret,
+        &user
+            .id
+            .ok_or_else(|| AppError::DatabaseError(mongodb::error::Error::custom("missing id")))?
+            .to_hex(),
+        crate::api::middleware::TokenPurpose::Access,
+        None,
+        (Utc::now().timestamp() + 3600 * 24 * 7) as usize,
     )?;
 
     Ok(Json(LoginResponse {
@@ -119,7 +124,7 @@ pub async fn create_user(
     let repo = UserRepository::new(&state.db);
 
     // Check if user exists
-    if let Some(_) = repo.find_by_email(&payload.email).await? {
+    if repo.find_by_email(&payload.email).await?.is_some() {
         return Err(AppError::BadRequest("User already exists".to_string()));
     }
 
@@ -143,7 +148,6 @@ pub async fn create_user(
         Json(CreateUserResponse { id: id.to_hex() }),
     ))
 }
-
 
 #[utoipa::path(
     patch,
@@ -240,13 +244,16 @@ pub async fn update_password(
     Json(payload): Json<UpdatePasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
     if payload.password.len() < 6 {
-        return Err(AppError::BadRequest("Password must be at least 6 characters".to_string()));
+        return Err(AppError::BadRequest(
+            "Password must be at least 6 characters".to_string(),
+        ));
     }
     if payload.password != payload.change_password {
         return Err(AppError::BadRequest("Passwords do not match".to_string()));
     }
 
-    let id = ObjectId::parse_str(&user_ctx.user_id).map_err(|_| AppError::BadRequest("Invalid user ID".to_string()))?;
+    let id = ObjectId::parse_str(&user_ctx.user_id)
+        .map_err(|_| AppError::BadRequest("Invalid user ID".to_string()))?;
     let hashed = hash_password(&payload.password);
 
     let repo = UserRepository::new(&state.db);

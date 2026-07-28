@@ -976,6 +976,7 @@ dependencies = [
  "md-5",
  "mongodb",
  "rand 0.8.5",
+ "regex",
  "serde",
  "serde_json",
  "serial_test",

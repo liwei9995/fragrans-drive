@@ -131,3 +131,299 @@ async fn test_folder_creation_and_listing() {
 
     ctx.teardown().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn types_file_returns_only_files() {
+    let ctx = setup().await;
+    let folder_payload = serde_json::json!({ "name": "F1", "parentId": "root", "type": "folder" });
+    let _ = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await;
+
+    let repo = fragrans::infrastructure::db::storage_repo::StorageRepository::new(&ctx.db);
+    repo.create(fragrans::domain::storage::Storage {
+        id: None,
+        name: "test.txt".to_string(),
+        base_name: Some("test".to_string()),
+        ext_name: Some("txt".to_string()),
+        mime_type: Some("text/plain".to_string()),
+        encoding: None,
+        size: Some(1),
+        md5_hash: Some("abc".to_string()),
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
+        iv: Some("000000000000000000000000".to_string()),
+        parent_id: "root".to_string(),
+        r#type: fragrans::domain::storage::StorageType::File,
+        user_id: ctx.user_id.clone(),
+        thumbnail: None,
+        trashed: false,
+        created_at: Some(chrono::Utc::now()),
+        updated_at: Some(chrono::Utc::now()),
+    })
+    .await
+    .unwrap();
+
+    let list_payload = serde_json::json!({
+        "types": ["file"]
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    let data: serde_json::Value = serde_json::from_slice(&response_bytes(list_res).await).unwrap();
+    assert!(data["total"].as_u64().unwrap() > 0);
+    for doc in data["docs"].as_array().unwrap() {
+        assert_eq!(doc["type"].as_str().unwrap(), "file");
+    }
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn types_folder_returns_only_folders() {
+    let ctx = setup().await;
+    let folder_payload = serde_json::json!({ "name": "F1", "parentId": "root", "type": "folder" });
+    let _ = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await;
+
+    let repo = fragrans::infrastructure::db::storage_repo::StorageRepository::new(&ctx.db);
+    repo.create(fragrans::domain::storage::Storage {
+        id: None,
+        name: "test.txt".to_string(),
+        base_name: Some("test".to_string()),
+        ext_name: Some("txt".to_string()),
+        mime_type: Some("text/plain".to_string()),
+        encoding: None,
+        size: Some(1),
+        md5_hash: Some("abc".to_string()),
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
+        iv: Some("000000000000000000000000".to_string()),
+        parent_id: "root".to_string(),
+        r#type: fragrans::domain::storage::StorageType::File,
+        user_id: ctx.user_id.clone(),
+        thumbnail: None,
+        trashed: false,
+        created_at: Some(chrono::Utc::now()),
+        updated_at: Some(chrono::Utc::now()),
+    })
+    .await
+    .unwrap();
+
+    let list_payload = serde_json::json!({
+        "types": ["folder"]
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    let data: serde_json::Value = serde_json::from_slice(&response_bytes(list_res).await).unwrap();
+    assert!(data["total"].as_u64().unwrap() > 0);
+    for doc in data["docs"].as_array().unwrap() {
+        assert_eq!(doc["type"].as_str().unwrap(), "folder");
+    }
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn keyword_is_literal_not_regex() {
+    let ctx = setup().await;
+    let folder_payload =
+        serde_json::json!({ "name": "test.*", "parentId": "root", "type": "folder" });
+    let _ = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await;
+
+    let folder_payload =
+        serde_json::json!({ "name": "test12", "parentId": "root", "type": "folder" });
+    let _ = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await;
+
+    let list_payload = serde_json::json!({
+        "keyword": "test.*"
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    let data: serde_json::Value = serde_json::from_slice(&response_bytes(list_res).await).unwrap();
+    assert_eq!(data["total"].as_u64().unwrap(), 1);
+    assert_eq!(data["docs"][0]["name"].as_str().unwrap(), "test.*");
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn long_unicode_keyword_does_not_panic() {
+    let ctx = setup().await;
+    let list_payload = serde_json::json!({
+        "keyword": "香".repeat(101)
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(list_res.status(), StatusCode::OK);
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn unknown_type_returns_empty_or_400_consistently() {
+    let ctx = setup().await;
+    let list_payload = serde_json::json!({
+        "types": ["magic"]
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(list_res.status(), StatusCode::BAD_REQUEST);
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn sort_uses_id_as_stable_tiebreaker() {
+    let ctx = setup().await;
+    for _i in 0..5 {
+        let folder_payload =
+            serde_json::json!({ "name": "SameName", "parentId": "root", "type": "folder" });
+        let _ = ctx
+            .app
+            .clone()
+            .oneshot(json_auth_request(
+                "POST",
+                "/v1/storage/folder",
+                &ctx.auth_token,
+                folder_payload,
+            ))
+            .await;
+    }
+    let list_payload = serde_json::json!({
+        "sortBy": "name",
+        "sortOrder": 1
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload.clone(),
+        ))
+        .await
+        .unwrap();
+    let data: serde_json::Value = serde_json::from_slice(&response_bytes(list_res).await).unwrap();
+
+    // Fetch again and ensure order is identical
+    let list_res2 = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    let data2: serde_json::Value =
+        serde_json::from_slice(&response_bytes(list_res2).await).unwrap();
+
+    assert_eq!(data, data2);
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn raw_mongo_operators_are_rejected_by_deserialization() {
+    let ctx = setup().await;
+    let list_payload = serde_json::json!({
+        "query": { "parentId": { "$gt": "" } }
+    });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(list_res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    ctx.teardown().await;
+}

@@ -23,12 +23,7 @@ async fn test_user_registration_and_login() {
     let register_res = ctx
         .app
         .clone()
-        .oneshot(json_auth_request(
-            "POST",
-            "/v1/users",
-            "",
-            register_payload,
-        ))
+        .oneshot(json_auth_request("POST", "/v1/users", "", register_payload))
         .await
         .expect("register request");
 
@@ -59,7 +54,10 @@ async fn test_user_registration_and_login() {
     assert_eq!(login_res.status(), StatusCode::OK);
     let login_data: serde_json::Value =
         serde_json::from_slice(&response_bytes(login_res).await).expect("parse login");
-    let token = login_data["access_token"].as_str().expect("token exists").to_string();
+    let token = login_data["access_token"]
+        .as_str()
+        .expect("token exists")
+        .to_string();
     assert!(!token.is_empty());
 
     // 3. Get profile using the token
@@ -86,8 +84,8 @@ async fn test_user_registration_and_login() {
         .app
         .clone()
         .oneshot(json_auth_request(
-            "POST",
-            &format!("/v1/users/profile/{}", user_id),
+            "PATCH",
+            "/v1/profile",
             &token,
             update_payload,
         ))

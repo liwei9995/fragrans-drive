@@ -19,3 +19,5 @@ README.md
 .prettierrc
 .prettierignore
 .gitignore
+target/
+.env

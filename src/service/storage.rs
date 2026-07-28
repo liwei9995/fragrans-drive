@@ -1,11 +1,11 @@
 use crate::api::error::AppError;
 use crate::domain::storage::{
-    CreateFolderResponse, Storage,
-    StoragePathNode, StorageType, TrashCleanupResponse, TrashRestoreResponse, UpdateStorageResponse,
+    CreateFolderResponse, Storage, StoragePathNode, StorageType, TrashCleanupResponse,
+    TrashRestoreResponse, UpdateStorageResponse,
 };
 use crate::infrastructure::db::storage_repo::StorageRepository;
-use crate::infrastructure::storage::local::LocalStorage;
 use crate::infrastructure::image::thumbnail::generate_thumbnail;
+use crate::infrastructure::storage::local::{LocalStorage, StorageStream, legacy::LegacyReader};
 use chrono::Utc;
 use mongodb::bson::{DateTime as BsonDateTime, Document, doc, oid::ObjectId};
 use std::collections::HashSet;
@@ -18,12 +18,20 @@ pub struct StorageService {
 
 impl StorageService {
     pub fn new(repo: StorageRepository, local_storage: LocalStorage) -> Self {
-        Self { repo, local_storage }
+        Self {
+            repo,
+            local_storage,
+        }
     }
 
     fn validate_name(&self, name: &str) -> Result<String, AppError> {
         let name = name.trim();
-        if name.is_empty() || name.chars().count() > 255 || name == "." || name == ".." || name.contains('\0') {
+        if name.is_empty()
+            || name.chars().count() > 255
+            || name == "."
+            || name == ".."
+            || name.contains('\0')
+        {
             return Err(AppError::BadRequest("Invalid name".into()));
         }
         Ok(name.to_string())
@@ -41,29 +49,44 @@ impl StorageService {
         if Some(parent_id) == item_id {
             return Err(AppError::BadRequest("Cannot move item into itself".into()));
         }
-        let oid = ObjectId::parse_str(parent_id).map_err(|_| AppError::BadRequest("Invalid parent ID".into()))?;
-        let parent = self.repo.find_by_id(oid).await?.ok_or_else(|| AppError::BadRequest("Parent not found".into()))?;
+        let oid = ObjectId::parse_str(parent_id)
+            .map_err(|_| AppError::BadRequest("Invalid parent ID".into()))?;
+        let parent = self
+            .repo
+            .find_by_id(oid)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("Parent not found".into()))?;
         if parent.user_id != user_id || parent.trashed || parent.r#type != StorageType::Folder {
             return Err(AppError::BadRequest("Invalid parent folder".into()));
         }
-        
+
         if let Some(item_id) = item_id {
             // Check if parent_id is a descendant of item_id
-            let item_oid = ObjectId::parse_str(item_id).map_err(|_| AppError::BadRequest("Invalid item ID".into()))?;
+            let item_oid = ObjectId::parse_str(item_id)
+                .map_err(|_| AppError::BadRequest("Invalid item ID".into()))?;
             let mut current_parent_oid = oid;
             let mut seen = HashSet::new();
             loop {
                 if current_parent_oid == item_oid {
-                    return Err(AppError::BadRequest("Cannot move folder into its descendant".into()));
+                    return Err(AppError::BadRequest(
+                        "Cannot move folder into its descendant".into(),
+                    ));
                 }
                 if !seen.insert(current_parent_oid) {
-                    return Err(AppError::BadRequest("Cycle detected in parent chain".into()));
+                    return Err(AppError::BadRequest(
+                        "Cycle detected in parent chain".into(),
+                    ));
                 }
-                let current_parent = self.repo.find_by_id(current_parent_oid).await?.ok_or_else(|| AppError::BadRequest("Dangling parent".into()))?;
+                let current_parent = self
+                    .repo
+                    .find_by_id(current_parent_oid)
+                    .await?
+                    .ok_or_else(|| AppError::BadRequest("Dangling parent".into()))?;
                 if current_parent.parent_id == "root" {
                     break;
                 }
-                current_parent_oid = ObjectId::parse_str(&current_parent.parent_id).map_err(|_| AppError::BadRequest("Invalid parent ID in DB".into()))?;
+                current_parent_oid = ObjectId::parse_str(&current_parent.parent_id)
+                    .map_err(|_| AppError::BadRequest("Invalid parent ID in DB".into()))?;
             }
         }
         Ok(())
@@ -90,7 +113,10 @@ impl StorageService {
             }
 
             let parent_ids: Vec<String> = frontier.iter().map(|id| id.to_hex()).collect();
-            let children = self.repo.find_many_by_parent_ids(parent_ids, user_id).await?;
+            let children = self
+                .repo
+                .find_many_by_parent_ids(parent_ids, user_id)
+                .await?;
             for item in children {
                 if let Some(id) = item.id {
                     next_frontier.push(id);
@@ -99,9 +125,10 @@ impl StorageService {
                     .thumbnail
                     .as_deref()
                     .and_then(|thumb| ObjectId::parse_str(thumb).ok())
-                    && seen.insert(thumbnail_id) {
-                        all_ids.push(thumbnail_id);
-                    }
+                    && seen.insert(thumbnail_id)
+                {
+                    all_ids.push(thumbnail_id);
+                }
             }
             frontier = next_frontier;
         }
@@ -110,9 +137,10 @@ impl StorageService {
             .thumbnail
             .as_deref()
             .and_then(|thumb| ObjectId::parse_str(thumb).ok())
-            && seen.insert(thumbnail_id) {
-                all_ids.push(thumbnail_id);
-            }
+            && seen.insert(thumbnail_id)
+        {
+            all_ids.push(thumbnail_id);
+        }
 
         Ok(all_ids)
     }
@@ -178,7 +206,7 @@ impl StorageService {
                 "trashed": false,
             })
             .await?;
-        
+
         if let Some(doc) = existing {
             return Ok(CreateFolderResponse {
                 id: doc.id,
@@ -226,6 +254,7 @@ impl StorageService {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn upload_file_chunk(
         &self,
         user_id: &str,
@@ -236,8 +265,10 @@ impl StorageService {
         hash: &str,
         size: i64,
     ) -> Result<String, AppError> {
+        let name = self.validate_name(name)?;
         self.validate_parent(parent_id, user_id, None).await?;
-        let existing = self.repo
+        let existing = self
+            .repo
             .find_one(doc! {
                 "contentHash": hash,
                 "userId": user_id,
@@ -248,16 +279,22 @@ impl StorageService {
             .await?;
 
         if let Some(doc) = existing {
-            return doc.id.map(|id| id.to_hex()).ok_or_else(|| AppError::DatabaseError(mongodb::error::Error::custom("missing id")));
+            return doc.id.map(|id| id.to_hex()).ok_or_else(|| {
+                AppError::DatabaseError(mongodb::error::Error::custom("missing id"))
+            });
         }
 
-        let need_store = !self.local_storage.exists(user_id, hash).await.unwrap_or(false);
+        let need_store = !self
+            .local_storage
+            .exists(user_id, hash)
+            .await
+            .map_err(|error| AppError::InternalError(error.to_string()))?;
 
         let mut storage_item = Storage {
             id: None,
-            name: name.to_string(),
+            name: name.clone(),
             base_name: Some(
-                StdPath::new(name)
+                StdPath::new(&name)
                     .file_stem()
                     .unwrap_or_default()
                     .to_str()
@@ -265,7 +302,7 @@ impl StorageService {
                     .to_string(),
             ),
             ext_name: Some(
-                StdPath::new(name)
+                StdPath::new(&name)
                     .extension()
                     .and_then(|s| s.to_str())
                     .unwrap_or("")
@@ -289,18 +326,23 @@ impl StorageService {
         };
 
         let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
+        let mut thumbnail_item = None;
         if is_raster_image {
             let data = tokio::fs::read(temp_file_path).await?;
             let thumb_data = tokio::task::spawn_blocking(move || generate_thumbnail(&data))
                 .await
                 .map_err(|_| AppError::BadRequest("Thumbnail task failed".into()))??;
-            
+
             use sha2::Digest;
             let mut hasher = sha2::Sha256::new();
             hasher.update(&thumb_data);
             let thumb_hash = hex::encode(hasher.finalize());
-            
-            let thumb_need_store = !self.local_storage.exists(user_id, &thumb_hash).await.unwrap_or(false);
+
+            let thumb_need_store = !self
+                .local_storage
+                .exists(user_id, &thumb_hash)
+                .await
+                .map_err(|error| AppError::InternalError(error.to_string()))?;
 
             let thumb_item = Storage {
                 id: None,
@@ -324,22 +366,46 @@ impl StorageService {
                 updated_at: Some(Utc::now()),
             };
 
-            let thumb_id = self.repo.create(thumb_item).await?;
             if thumb_need_store {
-                let temp_dir = std::env::temp_dir();
-                let thumb_temp = temp_dir.join(format!("{}_thumb.tmp", uuid::Uuid::new_v4()));
-                tokio::fs::write(&thumb_temp, &thumb_data).await?;
-                self.local_storage.store_from_file(user_id, &thumb_hash, &thumb_temp).await.map_err(|e| AppError::InternalError(e.to_string()))?;
-                tokio::fs::remove_file(&thumb_temp).await.ok();
+                let thumb_temp = tempfile::NamedTempFile::new()
+                    .map_err(|error| AppError::InternalError(error.to_string()))?;
+                tokio::fs::write(thumb_temp.path(), &thumb_data).await?;
+                self.local_storage
+                    .store_from_file(user_id, &thumb_hash, thumb_temp.path())
+                    .await
+                    .map_err(|error| AppError::InternalError(error.to_string()))?;
             }
-            storage_item.thumbnail = Some(thumb_id.to_hex());
+            thumbnail_item = Some(thumb_item);
         }
 
-        let id = self.repo.create(storage_item).await?;
         if need_store {
-            self.local_storage.store_from_file(user_id, hash, temp_file_path).await.map_err(|e| AppError::InternalError(e.to_string()))?;
+            self.local_storage
+                .store_from_file(user_id, hash, temp_file_path)
+                .await
+                .map_err(|error| AppError::InternalError(error.to_string()))?;
         }
-        Ok(id.to_hex())
+
+        let thumbnail_id = match thumbnail_item {
+            Some(item) => Some(self.repo.create(item).await?),
+            None => None,
+        };
+        storage_item.thumbnail = thumbnail_id.map(|id| id.to_hex());
+
+        match self.repo.create(storage_item).await {
+            Ok(id) => Ok(id.to_hex()),
+            Err(error) => {
+                if let Some(thumbnail_id) = thumbnail_id
+                    && let Err(cleanup_error) = self.repo.delete_one(thumbnail_id, user_id).await
+                {
+                    tracing::error!(
+                        thumbnail_id = %thumbnail_id,
+                        error = %cleanup_error,
+                        "failed to roll back thumbnail metadata"
+                    );
+                }
+                Err(AppError::DatabaseError(error))
+            }
+        }
     }
 
     pub async fn get_files(
@@ -352,14 +418,11 @@ impl StorageService {
     ) -> Result<(Vec<Storage>, u64), AppError> {
         query.insert("userId", user_id);
         query.insert("trashed", false);
-        query.insert("type", doc! { "$in": ["file", "folder"] });
 
-        if let Ok(thumbnail_ids) = self.repo.thumbnail_object_ids(query.clone()).await
-            && !thumbnail_ids.is_empty() {
-                query.insert("_id", doc! { "$nin": thumbnail_ids });
-            }
-
-        let (files, total) = self.repo.find_many_paginated(query, page, limit, sort).await?;
+        let (files, total) = self
+            .repo
+            .find_many_paginated(query, page, limit, sort)
+            .await?;
         Ok((files, total))
     }
 
@@ -374,46 +437,68 @@ impl StorageService {
     ) -> Result<(Vec<Storage>, u64), AppError> {
         query.insert("userId", user_id);
         query.insert("trashed", true);
-        query.insert("type", doc! { "$in": ["file", "folder"] });
 
-        if view_mode != "all"
-            && let Ok(parent_ids) = self.repo.trashed_folder_ids(user_id).await
-                && !parent_ids.is_empty() {
-                    query.insert("parentId", doc! { "$nin": parent_ids });
-                }
-
-        if let Ok(thumbnail_ids) = self.repo.thumbnail_object_ids(query.clone()).await
-            && !thumbnail_ids.is_empty() {
-                query.insert("_id", doc! { "$nin": thumbnail_ids });
+        if view_mode != "all" {
+            let parent_ids = self.repo.trashed_folder_ids(user_id).await?;
+            if !parent_ids.is_empty() {
+                query.insert("parentId", doc! { "$nin": parent_ids });
             }
+        }
 
-        let (files, total) = self.repo.find_many_paginated(query, page, limit, sort).await?;
+        let (files, total) = self
+            .repo
+            .find_many_paginated(query, page, limit, sort)
+            .await?;
         Ok((files, total))
     }
 
-    pub async fn get_file_content(
+    pub async fn stream_file_content(
         &self,
-        file_id: &str,
-        user_id: &str,
-    ) -> Result<(String, Vec<u8>), AppError> {
-        let id_oid = ObjectId::parse_str(file_id)
-            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+        file_id: String,
+        user_id: String,
+    ) -> Result<(String, String, u64, StorageStream), AppError> {
+        let id_oid =
+            ObjectId::parse_str(&file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
 
         let doc = self.repo.find_by_id(id_oid).await?;
         if let Some(item) = doc {
             if item.user_id != user_id || item.trashed {
                 return Err(AppError::NotFound("File not found".into()));
             }
+            let filename = item.name;
+            let mime = item
+                .mime_type
+                .unwrap_or_else(|| "application/octet-stream".to_string());
             if let Some(hash) = item.content_hash {
-                if let Ok(data) = self.local_storage.read_all(&item.user_id, &hash).await {
-                    let mime = item.mime_type.unwrap_or("application/octet-stream".to_string());
-                    return Ok((mime, data));
+                let (len, stream) = self
+                    .local_storage
+                    .stream_content(item.user_id, hash)
+                    .await
+                    .map_err(|e| AppError::InternalError(e.to_string()))?;
+                return Ok((filename, mime, len, stream));
+            } else if let Some(md5_hash) = item.md5_hash {
+                // Deprecated compatibility path. Legacy files are bounded in memory and should
+                // be migrated to v1 as soon as possible.
+                let data = LegacyReader::new(&self.local_storage)
+                    .fetch(&md5_hash, item.iv.as_deref(), Some(100 * 1024 * 1024))
+                    .await
+                    .map_err(|error| AppError::InternalError(error.to_string()))?
+                    .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+
+                use md5::Digest;
+                let mut hasher = md5::Md5::new();
+                hasher.update(&data);
+                if hex::encode(hasher.finalize()) != md5_hash {
+                    return Err(AppError::InternalError(
+                        "Legacy object failed integrity verification".into(),
+                    ));
                 }
-            } else if let Some(_hash) = item.md5_hash {
-                // Task 5: if it has md5_hash, it is a legacy V0 item. We do not support reading V0 directly 
-                // in Task 5 (it will be supported in Task 6 migration, or we can just fail).
-                // Returning not found for legacy for now, the verification will check V1 objects.
-                return Err(AppError::InternalError("Legacy V0 items are not yet readable".into()));
+
+                let len = data.len() as u64;
+                let stream: StorageStream = Box::pin(futures::stream::once(async move {
+                    Ok(axum::body::Bytes::from(data))
+                }));
+                return Ok((filename, mime, len, stream));
             }
         }
         Err(AppError::NotFound("File not found".into()))
@@ -425,10 +510,22 @@ impl StorageService {
         parent_id: &str,
         user_id: &str,
     ) -> Result<(), AppError> {
-        self.validate_parent(parent_id, user_id, Some(file_id)).await?;
-        let id_oid = ObjectId::parse_str(file_id)
-            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
-        self.repo.update_one(id_oid, user_id, doc! { "parentId": parent_id }).await?;
+        let id_oid =
+            ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+        let item = self
+            .repo
+            .find_by_id(id_oid)
+            .await?
+            .filter(|item| item.user_id == user_id && !item.trashed)
+            .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+
+        let cycle_check_id = (item.r#type == StorageType::Folder).then_some(file_id);
+        self.validate_parent(parent_id, user_id, cycle_check_id)
+            .await?;
+        self.repo
+            .update_one(id_oid, user_id, doc! { "parentId": parent_id })
+            .await?
+            .ok_or_else(|| AppError::NotFound("File not found".into()))?;
         Ok(())
     }
 
@@ -439,15 +536,15 @@ impl StorageService {
         name: String,
     ) -> Result<UpdateStorageResponse, AppError> {
         let name = self.validate_name(&name)?;
-        let id_oid = ObjectId::parse_str(file_id)
-            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
-        
+        let id_oid =
+            ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+
         let ext_name = StdPath::new(&name)
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_string();
-        
+
         let base_name = StdPath::new(&name)
             .file_stem()
             .unwrap_or_default()
@@ -460,7 +557,10 @@ impl StorageService {
         match self.repo.update_one(id_oid, user_id, payload).await? {
             None => Err(AppError::NotFound("Not found".into())),
             Some(_) => {
-                let doc = self.repo.find_by_id(id_oid).await?
+                let doc = self
+                    .repo
+                    .find_by_id(id_oid)
+                    .await?
                     .ok_or_else(|| AppError::NotFound("Not found".into()))?;
                 if doc.user_id == user_id {
                     Ok(UpdateStorageResponse::from(doc))
@@ -471,28 +571,29 @@ impl StorageService {
         }
     }
 
-    pub async fn remove_file(
-        &self,
-        file_id: &str,
-        user_id: &str,
-    ) -> Result<(), AppError> {
-        let id_oid = ObjectId::parse_str(file_id)
-            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+    pub async fn remove_file(&self, file_id: &str, user_id: &str) -> Result<(), AppError> {
+        let id_oid =
+            ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
 
-        let root = self.repo.find_by_id(id_oid).await?
+        let root = self
+            .repo
+            .find_by_id(id_oid)
+            .await?
             .ok_or_else(|| AppError::NotFound("Not found".into()))?;
-        
+
         if root.user_id != user_id {
             return Err(AppError::NotFound("Not found".into()));
         }
 
         let subtree_ids = self.collect_related_item_ids(user_id, &root).await?;
-        
-        self.repo.update_many_by_ids(
-            subtree_ids,
-            user_id,
-            doc! { "trashed": true, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
-        ).await?;
+
+        self.repo
+            .update_many_by_ids(
+                subtree_ids,
+                user_id,
+                doc! { "trashed": true, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
+            )
+            .await?;
 
         Ok(())
     }
@@ -502,27 +603,34 @@ impl StorageService {
         file_id: &str,
         user_id: &str,
     ) -> Result<UpdateStorageResponse, AppError> {
-        let id_oid = ObjectId::parse_str(file_id)
-            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+        let id_oid =
+            ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
 
-        let root = self.repo.find_by_id(id_oid).await?
+        let root = self
+            .repo
+            .find_by_id(id_oid)
+            .await?
             .ok_or_else(|| AppError::NotFound("Not found".into()))?;
-        
+
         if root.user_id != user_id {
             return Err(AppError::NotFound("Not found".into()));
         }
 
         if !self.ensure_restorable_parent(user_id, &root).await? {
-            return Err(AppError::BadRequest("Parent folder is unavailable or still trashed".into()));
+            return Err(AppError::BadRequest(
+                "Parent folder is unavailable or still trashed".into(),
+            ));
         }
 
         let subtree_ids = self.collect_related_item_ids(user_id, &root).await?;
-        
-        self.repo.update_many_by_ids(
-            subtree_ids,
-            user_id,
-            doc! { "trashed": false, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
-        ).await?;
+
+        self.repo
+            .update_many_by_ids(
+                subtree_ids,
+                user_id,
+                doc! { "trashed": false, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
+            )
+            .await?;
 
         let doc = self.repo.find_by_id(id_oid).await?.unwrap();
         Ok(UpdateStorageResponse::from(doc))
@@ -535,38 +643,56 @@ impl StorageService {
         restore_all: bool,
     ) -> Result<TrashRestoreResponse, AppError> {
         let roots = if restore_all {
-            self.repo.find_many(doc! {
-                "userId": user_id,
-                "trashed": true,
-                "type": { "$in": ["file", "folder"] },
-            }).await?
+            self.repo
+                .find_many(doc! {
+                    "userId": user_id,
+                    "trashed": true,
+                    "type": { "$in": ["file", "folder"] },
+                })
+                .await?
         } else {
             if file_ids.is_empty() {
                 return Err(AppError::BadRequest("fileIds cannot be empty".into()));
             }
             let mut ids = Vec::new();
             for id in &file_ids {
-                ids.push(ObjectId::parse_str(id).map_err(|_| AppError::BadRequest("Invalid id".into()))?);
+                ids.push(
+                    ObjectId::parse_str(id)
+                        .map_err(|_| AppError::BadRequest("Invalid id".into()))?,
+                );
             }
             let requested_count = ids.len();
-            let items = self.repo.find_many_by_ids(ids, user_id).await?
+            let items = self
+                .repo
+                .find_many_by_ids(ids, user_id)
+                .await?
                 .into_iter()
-                .filter(|item| item.trashed && (item.r#type == StorageType::File || item.r#type == StorageType::Folder))
+                .filter(|item| {
+                    item.trashed
+                        && (item.r#type == StorageType::File || item.r#type == StorageType::Folder)
+                })
                 .collect::<Vec<_>>();
             if items.len() != requested_count {
-                return Err(AppError::NotFound("Some items were not found in trash".into()));
+                return Err(AppError::NotFound(
+                    "Some items were not found in trash".into(),
+                ));
             }
             items
         };
 
         if roots.is_empty() {
-            return Ok(TrashRestoreResponse { requested_items: 0, restored_docs: 0 });
+            return Ok(TrashRestoreResponse {
+                requested_items: 0,
+                restored_docs: 0,
+            });
         }
 
         let selected_ids: HashSet<ObjectId> = roots.iter().filter_map(|item| item.id).collect();
         for item in &roots {
             if !self.can_restore_item(user_id, item, &selected_ids).await? {
-                return Err(AppError::BadRequest("Parent folder is unavailable or still trashed".into()));
+                return Err(AppError::BadRequest(
+                    "Parent folder is unavailable or still trashed".into(),
+                ));
             }
         }
 
@@ -575,11 +701,14 @@ impl StorageService {
             ids_to_restore.extend(self.collect_related_item_ids(user_id, item).await?);
         }
 
-        let restored_docs = self.repo.update_many_by_ids(
-            ids_to_restore.into_iter().collect(),
-            user_id,
-            doc! { "trashed": false, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
-        ).await?;
+        let restored_docs = self
+            .repo
+            .update_many_by_ids(
+                ids_to_restore.into_iter().collect(),
+                user_id,
+                doc! { "trashed": false, "updatedAt": BsonDateTime::from_chrono(Utc::now()) },
+            )
+            .await?;
 
         Ok(TrashRestoreResponse {
             requested_items: roots.len() as u64,
@@ -587,30 +716,42 @@ impl StorageService {
         })
     }
 
-    pub async fn empty_trash(
-        &self,
-        user_id: &str,
-    ) -> Result<TrashCleanupResponse, AppError> {
-        let trashed_items = self.repo.find_many(doc! { "userId": user_id, "trashed": true }).await?;
+    pub async fn empty_trash(&self, user_id: &str) -> Result<TrashCleanupResponse, AppError> {
+        let trashed_items = self
+            .repo
+            .find_many(doc! { "userId": user_id, "trashed": true })
+            .await?;
         if trashed_items.is_empty() {
-            return Ok(TrashCleanupResponse { deleted_docs: 0, deleted_files: 0 });
+            return Ok(TrashCleanupResponse {
+                deleted_docs: 0,
+                deleted_files: 0,
+            });
         }
 
         let ids: Vec<ObjectId> = trashed_items.iter().filter_map(|item| item.id).collect();
-        let hashes: HashSet<String> = trashed_items.iter().filter_map(|item| item.content_hash.clone()).collect();
-        
+        let hashes: HashSet<String> = trashed_items
+            .iter()
+            .filter_map(|item| item.content_hash.clone())
+            .collect();
+
         let deleted_docs = self.repo.delete_many_by_ids(ids, user_id).await?;
         let mut deleted_files = 0;
 
         for hash in hashes {
             let remaining = self.repo.count_by_user_content_hash(user_id, &hash).await?;
-            if remaining == 0
-                && self.local_storage.remove(user_id, &hash).await.is_ok() {
-                    deleted_files += 1;
-                }
+            if remaining == 0 {
+                self.local_storage
+                    .remove(user_id, &hash)
+                    .await
+                    .map_err(|error| AppError::InternalError(error.to_string()))?;
+                deleted_files += 1;
+            }
         }
 
-        Ok(TrashCleanupResponse { deleted_docs, deleted_files })
+        Ok(TrashCleanupResponse {
+            deleted_docs,
+            deleted_files,
+        })
     }
 
     pub async fn get_path(
@@ -618,8 +759,12 @@ impl StorageService {
         file_id: &str,
         user_id: &str,
     ) -> Result<Vec<StoragePathNode>, AppError> {
-        let oid = ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
-        let mut current = self.repo.find_by_id(oid).await?
+        let oid =
+            ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+        let mut current = self
+            .repo
+            .find_by_id(oid)
+            .await?
             .ok_or_else(|| AppError::NotFound("Not found".into()))?;
 
         if current.user_id != user_id || current.trashed {
@@ -630,33 +775,54 @@ impl StorageService {
         let mut seen = HashSet::new();
 
         loop {
-            let oid = current.id.unwrap_or_else(ObjectId::new);
+            let oid = current
+                .id
+                .ok_or_else(|| AppError::InternalError("Storage item is missing an id".into()))?;
             if !seen.insert(oid) {
                 tracing::error!("Cycle detected in storage hierarchy for item: {}", oid);
-                return Err(AppError::BadRequest("Cycle detected in storage hierarchy".into()));
+                return Err(AppError::InternalError(
+                    "Cycle detected in storage hierarchy".into(),
+                ));
             }
 
             path_reversed.push(StoragePathNode {
-                id: current.id.as_ref().map(|o| o.to_string()).unwrap_or_else(|| "root".to_string()),
+                id: current
+                    .id
+                    .as_ref()
+                    .map(|o| o.to_string())
+                    .unwrap_or_else(|| "root".to_string()),
                 name: current.name.clone(),
                 parent_id: current.parent_id.clone(),
                 r#type: current.r#type.clone(),
             });
-            if current.parent_id == "root" { break; }
+            if current.parent_id == "root" {
+                break;
+            }
             let parent_oid = match ObjectId::parse_str(&current.parent_id) {
                 Ok(o) => o,
-                Err(e) => return Err(AppError::BadRequest(format!("Invalid parent ID in DB: {}", e))),
+                Err(e) => {
+                    return Err(AppError::BadRequest(format!(
+                        "Invalid parent ID in DB: {}",
+                        e
+                    )));
+                }
             };
-            let parent = match self.repo.find_by_id(parent_oid).await {
-                Ok(Some(s)) => s,
-                _ => return Err(AppError::BadRequest("Dangling parent".into())),
-            };
-            if parent.user_id != user_id || parent.trashed { break; }
+            let parent = self
+                .repo
+                .find_by_id(parent_oid)
+                .await?
+                .ok_or_else(|| AppError::InternalError("Dangling storage parent".into()))?;
+            if parent.user_id != user_id || parent.trashed {
+                break;
+            }
             current = parent;
         }
 
         path_reversed.reverse();
-        let path: Vec<StoragePathNode> = path_reversed.into_iter().filter(|n| !n.parent_id.is_empty()).collect();
+        let path: Vec<StoragePathNode> = path_reversed
+            .into_iter()
+            .filter(|n| !n.parent_id.is_empty())
+            .collect();
         Ok(path)
     }
 }

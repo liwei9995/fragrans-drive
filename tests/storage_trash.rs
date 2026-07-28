@@ -1,29 +1,18 @@
 use axum::{
     body::Body,
-    http::{Request, StatusCode, header},
+    http::{Request, StatusCode},
 };
 use chrono::Utc;
 use fragrans::{
-    api::{self, middleware::Claims},
-    config::Config,
-    domain::{
-        storage::{
-            Storage, StorageListPaginatedResponse, TrashCleanupResponse, TrashRestoreResponse, StorageType,
-        },
-        user::User,
+    api::{self},
+    domain::storage::{
+        Storage, StorageListPaginatedResponse, StorageType, TrashCleanupResponse,
+        TrashRestoreResponse,
     },
     infrastructure::{db::storage_repo::StorageRepository, storage::local::LocalStorage},
-    utils::{crypto::hash_password, encryption::get_iv},
+    utils::encryption::get_iv,
 };
-use http_body_util::BodyExt;
-use jsonwebtoken::{EncodingKey, Header, encode};
-use mongodb::{Client, Database, bson::doc, options::ClientOptions};
 use serial_test::serial;
-use std::{
-    env,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-use tempfile::TempDir;
 use tower::util::ServiceExt;
 
 mod common;
@@ -46,6 +35,9 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             encoding: None,
             size: None,
             md5_hash: None,
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: None,
             parent_id: "root".to_string(),
             r#type: StorageType::Folder,
@@ -58,8 +50,8 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
         .await
         .expect("create folder");
 
-    let thumb_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
-    let thumb_iv = get_iv();
+    let thumb_hash = "d1092d511cd5abf5e7897447fae2fed6d7de884674c8b8036093abc960bf4d25".to_string();
+    let _thumb_iv = get_iv();
     let thumb_id = repo
         .create(Storage {
             id: None,
@@ -70,7 +62,10 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             encoding: None,
             size: Some(3),
             md5_hash: Some(thumb_hash.clone()),
-            iv: Some(thumb_iv.clone()),
+            content_hash: Some(thumb_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
+            iv: None,
             parent_id: folder_id.to_hex(),
             r#type: StorageType::Thumbnail,
             user_id: ctx.user_id.clone(),
@@ -82,8 +77,8 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
         .await
         .expect("create thumbnail");
 
-    let file_hash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
-    let file_iv = get_iv();
+    let file_hash = "3b9c358f36f0a31b6ad3e14f309c7cf198ac9246e8316f9ce543d5b19ac02b80".to_string();
+    let _file_iv = get_iv();
     let file_id = repo
         .create(Storage {
             id: None,
@@ -94,7 +89,10 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             encoding: None,
             size: Some(4),
             md5_hash: Some(file_hash.clone()),
-            iv: Some(file_iv.clone()),
+            content_hash: Some(file_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
+            iv: None,
             parent_id: folder_id.to_hex(),
             r#type: StorageType::File,
             user_id: ctx.user_id.clone(),
@@ -106,15 +104,23 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
         .await
         .expect("create file");
 
-    let storage = LocalStorage::new();
-    storage
-        .store(&file_hash, b"file".to_vec(), Some(&file_iv))
-        .await
-        .expect("store file");
-    storage
-        .store(&thumb_hash, b"thm".to_vec(), Some(&thumb_iv))
-        .await
-        .expect("store thumbnail");
+    let storage = LocalStorage::new(ctx.storage_dir.path().to_path_buf(), [0u8; 32]).unwrap();
+    {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"file").unwrap();
+        storage
+            .store_from_file(&ctx.user_id, &file_hash, temp.path())
+            .await
+            .unwrap();
+    }
+    {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"thm").unwrap();
+        storage
+            .store_from_file(&ctx.user_id, &thumb_hash, temp.path())
+            .await
+            .unwrap();
+    }
 
     let response = ctx
         .app
@@ -125,7 +131,14 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     file_id.to_hex(),
-                    ctx.download_token
+                    api::middleware::create_token(
+                        "test-secret-key-that-is-long-enough",
+                        &ctx.user_id,
+                        api::middleware::TokenPurpose::Download,
+                        Some(file_id.to_hex()),
+                        (chrono::Utc::now().timestamp() + 3600) as usize
+                    )
+                    .unwrap()
                 ))
                 .body(Body::empty())
                 .expect("request"),
@@ -165,7 +178,14 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     file_id.to_hex(),
-                    ctx.download_token
+                    api::middleware::create_token(
+                        "test-secret-key-that-is-long-enough",
+                        &ctx.user_id,
+                        api::middleware::TokenPurpose::Download,
+                        Some(file_id.to_hex()),
+                        (chrono::Utc::now().timestamp() + 3600) as usize
+                    )
+                    .unwrap()
                 ))
                 .body(Body::empty())
                 .expect("request"),
@@ -204,7 +224,14 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     thumb_id.to_hex(),
-                    ctx.download_token
+                    api::middleware::create_token(
+                        "test-secret-key-that-is-long-enough",
+                        &ctx.user_id,
+                        api::middleware::TokenPurpose::Download,
+                        Some(thumb_id.to_hex()),
+                        (chrono::Utc::now().timestamp() + 3600) as usize
+                    )
+                    .unwrap()
                 ))
                 .body(Body::empty())
                 .expect("request"),
@@ -225,8 +252,10 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
     let repo = StorageRepository::new(&ctx.db);
     let now = Utc::now();
 
-    let orphan_hash = "cccccccccccccccccccccccccccccccc".to_string();
-    let shared_hash = "dddddddddddddddddddddddddddddddd".to_string();
+    let orphan_hash =
+        "cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4".to_string();
+    let shared_hash =
+        "247610f4dedd4ab7247d07dbda19c81ca9817f85820742cad49d407ffae9e4ed".to_string();
     let orphan_iv = get_iv();
     let shared_iv = get_iv();
 
@@ -240,6 +269,9 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             encoding: None,
             size: Some(3),
             md5_hash: Some(orphan_hash.clone()),
+            content_hash: Some(orphan_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(orphan_iv.clone()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -262,6 +294,9 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             encoding: None,
             size: Some(3),
             md5_hash: Some(shared_hash.clone()),
+            content_hash: Some(shared_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(shared_iv.clone()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -284,6 +319,9 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             encoding: None,
             size: Some(4),
             md5_hash: Some(shared_hash.clone()),
+            content_hash: Some(shared_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(shared_iv.clone()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -296,15 +334,23 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
         .await
         .expect("create active file");
 
-    let storage = LocalStorage::new();
-    storage
-        .store(&orphan_hash, b"old".to_vec(), Some(&orphan_iv))
-        .await
-        .expect("store orphan hash");
-    storage
-        .store(&shared_hash, b"live".to_vec(), Some(&shared_iv))
-        .await
-        .expect("store shared hash");
+    let storage = LocalStorage::new(ctx.storage_dir.path().to_path_buf(), [0u8; 32]).unwrap();
+    {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"old").unwrap();
+        storage
+            .store_from_file(&ctx.user_id, &orphan_hash, temp.path())
+            .await
+            .unwrap();
+    }
+    {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"live").unwrap();
+        storage
+            .store_from_file(&ctx.user_id, &shared_hash, temp.path())
+            .await
+            .unwrap();
+    }
 
     let response = ctx
         .app
@@ -337,8 +383,20 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             .is_some()
     );
 
-    assert!(!LocalStorage::new().exists(&orphan_hash).await);
-    assert!(LocalStorage::new().exists(&shared_hash).await);
+    assert!(
+        !LocalStorage::new(ctx.storage_dir.path().to_path_buf(), [0u8; 32])
+            .unwrap()
+            .exists(&ctx.user_id, &orphan_hash)
+            .await
+            .unwrap()
+    );
+    assert!(
+        LocalStorage::new(ctx.storage_dir.path().to_path_buf(), [0u8; 32])
+            .unwrap()
+            .exists(&ctx.user_id, &shared_hash)
+            .await
+            .unwrap()
+    );
     assert!(ctx.storage_dir.path().exists());
 
     ctx.teardown().await;
@@ -362,6 +420,9 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
             encoding: None,
             size: Some(3),
             md5_hash: Some("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string()),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::Thumbnail,
@@ -388,9 +449,16 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
                 "a.txt" => "ffffffffffffffffffffffffffffffff".to_string(),
                 _ => "11111111111111111111111111111111".to_string(),
             }),
-            iv: (!is_folder).then(get_iv),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
+            iv: (!is_folder).then(|| "000000000000000000000000".to_string()),
             parent_id: "root".to_string(),
-            r#type: if is_folder { StorageType::Folder } else { StorageType::File },
+            r#type: if is_folder {
+                StorageType::Folder
+            } else {
+                StorageType::File
+            },
             user_id: ctx.user_id.clone(),
             thumbnail: (name == "a.txt").then(|| thumb_id.to_hex()),
             trashed: true,
@@ -428,7 +496,12 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
     assert_eq!(payload.limit, 5);
     assert_eq!(payload.pages, 1);
     assert_eq!(payload.docs.len(), 2);
-    assert!(payload.docs.iter().all(|doc| doc.r#type != StorageType::Thumbnail));
+    assert!(
+        payload
+            .docs
+            .iter()
+            .all(|doc| doc.r#type != StorageType::Thumbnail)
+    );
     assert_eq!(payload.docs[0].name, "b.txt");
     assert_eq!(payload.docs[1].name, "a.txt");
 
@@ -453,6 +526,9 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
             encoding: None,
             size: None,
             md5_hash: None,
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: None,
             parent_id: "root".to_string(),
             r#type: StorageType::Folder,
@@ -474,6 +550,9 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
         encoding: None,
         size: Some(1),
         md5_hash: Some("77777777777777777777777777777777".to_string()),
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
         iv: Some(get_iv()),
         parent_id: folder_id.to_hex(),
         r#type: StorageType::File,
@@ -544,6 +623,9 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             encoding: None,
             size: Some(1),
             md5_hash: Some("22222222222222222222222222222222".to_string()),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -566,6 +648,9 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             encoding: None,
             size: Some(1),
             md5_hash: Some("33333333333333333333333333333333".to_string()),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -587,6 +672,9 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             encoding: None,
             size: Some(1),
             md5_hash: Some("44444444444444444444444444444444".to_string()),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -609,6 +697,9 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             encoding: None,
             size: Some(1),
             md5_hash: Some("55555555555555555555555555555555".to_string()),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -630,6 +721,9 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             encoding: None,
             size: Some(1),
             md5_hash: Some("66666666666666666666666666666666".to_string()),
+            content_hash: None,
+            hash_algorithm: None,
+            encryption_format: None,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -720,6 +814,108 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
                 .trashed
         );
     }
+
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn restore_folder_name_conflict_returns_409_and_leaves_item_trashed() {
+    let ctx = setup().await;
+
+    // Create folder "conflict"
+    let folder_payload =
+        serde_json::json!({ "name": "conflict", "parentId": "root", "type": "folder" });
+    let create_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await
+        .unwrap();
+    let data: serde_json::Value =
+        serde_json::from_slice(&response_bytes(create_res).await).unwrap();
+    let id_to_trash = data["id"].as_str().unwrap().to_string();
+
+    // Trash it
+    let _ = ctx
+        .app
+        .clone()
+        .oneshot(auth_request(
+            "DELETE",
+            &format!("/v1/storage/{}", id_to_trash),
+            &ctx.auth_token,
+        ))
+        .await
+        .unwrap();
+
+    // Create another folder "conflict"
+    let folder_payload =
+        serde_json::json!({ "name": "conflict", "parentId": "root", "type": "folder" });
+    let _ = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await
+        .unwrap();
+
+    // Restore the first one
+    let restore_payload = serde_json::json!({ "fileIds": [id_to_trash] });
+    let restore_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/trash/restore",
+            &ctx.auth_token,
+            restore_payload,
+        ))
+        .await
+        .unwrap();
+
+    let mut cursor = ctx
+        .db
+        .collection::<mongodb::bson::Document>("storage")
+        .find(mongodb::bson::doc! {})
+        .await
+        .unwrap();
+    use futures::stream::StreamExt;
+    while let Some(doc) = cursor.next().await {
+        println!("DB DOC: {:?}", doc);
+    }
+
+    assert_eq!(restore_res.status(), StatusCode::CONFLICT);
+
+    // Verify it's still trashed
+    let list_payload = serde_json::json!({ "query": {} });
+    let list_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/trash/list",
+            &ctx.auth_token,
+            list_payload,
+        ))
+        .await
+        .unwrap();
+    let data: serde_json::Value = serde_json::from_slice(&response_bytes(list_res).await).unwrap();
+    assert!(
+        data["docs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["id"].as_str().unwrap() == id_to_trash)
+    );
 
     ctx.teardown().await;
 }

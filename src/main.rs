@@ -14,8 +14,10 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let config = config::Config::new();
-    let db = infrastructure::db::init_db(&config).await;
+    let config = config::Config::from_env().expect("Invalid configuration");
+    let db = infrastructure::db::init_db(&config)
+        .await
+        .expect("Failed to initialize database");
 
     let app = api::router(db, config.clone());
 

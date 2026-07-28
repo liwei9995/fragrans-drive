@@ -2,7 +2,7 @@ use crate::domain::storage::Storage;
 use futures_util::stream::StreamExt;
 use mongodb::{
     Collection, Database,
-    bson::{Bson, Document, doc, oid::ObjectId},
+    bson::{Document, doc, oid::ObjectId},
 };
 
 pub struct StorageRepository {
@@ -84,24 +84,6 @@ impl StorageRepository {
     }
 
     /// 返回在给定 query 下所有作为 thumbnail 被引用的 _id（用于列表接口排除缩略图单独成条）。
-    pub async fn thumbnail_object_ids(
-        &self,
-        query: Document,
-    ) -> Result<Vec<ObjectId>, mongodb::error::Error> {
-        let values = self.collection.distinct("thumbnail", query).await?;
-        let mut ids = Vec::new();
-        for v in values {
-            let s = match v {
-                Bson::String(x) if !x.is_empty() => x,
-                _ => continue,
-            };
-            if let Ok(oid) = ObjectId::parse_str(&s) {
-                ids.push(oid);
-            }
-        }
-        Ok(ids)
-    }
-
     /// 分页查询：返回 (当前页条目, 总条数)。
     pub async fn find_many_paginated(
         &self,
@@ -166,6 +148,25 @@ impl StorageRepository {
         Ok(result.modified_count)
     }
 
+    pub async fn update_many_by_md5(
+        &self,
+        user_id: &str,
+        md5_hash: &str,
+        update: Document,
+    ) -> Result<u64, mongodb::error::Error> {
+        let result = self
+            .collection
+            .update_many(
+                doc! {
+                    "MD5Hash": md5_hash,
+                    "userId": user_id,
+                },
+                doc! { "$set": update },
+            )
+            .await?;
+        Ok(result.modified_count)
+    }
+
     pub async fn delete_many_by_ids(
         &self,
         ids: Vec<ObjectId>,
@@ -188,6 +189,16 @@ impl StorageRepository {
     pub async fn count_by_hash(&self, hash: &str) -> Result<u64, mongodb::error::Error> {
         self.collection
             .count_documents(doc! { "MD5Hash": hash })
+            .await
+    }
+
+    pub async fn count_by_user_content_hash(
+        &self,
+        user_id: &str,
+        hash: &str,
+    ) -> Result<u64, mongodb::error::Error> {
+        self.collection
+            .count_documents(doc! { "userId": user_id, "contentHash": hash })
             .await
     }
 

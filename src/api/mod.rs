@@ -79,7 +79,8 @@ pub fn router(db: Database, config: Config) -> Router {
     let local_storage = crate::infrastructure::storage::local::LocalStorage::new(
         config.storage_destination.clone(),
         config.storage_master_key,
-    ).expect("Failed to initialize local storage");
+    )
+    .expect("Failed to initialize local storage");
 
     let state = AppState {
         db,
@@ -108,7 +109,9 @@ pub fn router(db: Database, config: Config) -> Router {
 
     let storage_routes = Router::new()
         .route("/upload", axum::routing::post(storage::upload_file))
-        .layer(axum::extract::DefaultBodyLimit::max(state.config.max_upload_bytes as usize))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            state.config.max_upload_bytes,
+        ))
         .route("/folder", axum::routing::post(storage::create_folder))
         .route("/list", axum::routing::post(storage::get_files))
         .route(
@@ -147,39 +150,57 @@ pub fn router(db: Database, config: Config) -> Router {
             axum::routing::get(users::get_profile)
                 .patch(users::update_profile)
                 .layer(axum::middleware::from_fn_with_state(
-                state.clone(),
-                middleware::auth_guard,
-            )),
+                    state.clone(),
+                    middleware::auth_guard,
+                )),
         )
         .with_state(state.clone());
 
     let health_routes = Router::new()
         .route("/live", axum::routing::get(|| async { "OK" }))
-        .route("/ready", axum::routing::get(
-            |State(state): State<AppState>| async move {
+        .route(
+            "/ready",
+            axum::routing::get(|State(state): State<AppState>| async move {
                 // Ping mongo
-                if let Err(e) = state.db.run_command(mongodb::bson::doc! { "ping": 1 }).await {
+                if let Err(e) = state
+                    .db
+                    .run_command(mongodb::bson::doc! { "ping": 1 })
+                    .await
+                {
                     tracing::error!("Health check failed (mongo ping): {}", e);
                     return axum::http::StatusCode::SERVICE_UNAVAILABLE;
                 }
-                
+
                 // Check if storage destination is writable
-                let test_file = state.config.storage_destination.join(".healthcheck");
-                if let Err(e) = std::fs::write(&test_file, b"ok") {
+                let test_file = state
+                    .config
+                    .storage_destination
+                    .join(format!(".healthcheck-{}", uuid::Uuid::new_v4()));
+                let write_result = tokio::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&test_file)
+                    .await;
+                if let Err(e) = write_result {
                     tracing::error!("Health check failed (storage write): {}", e);
                     return axum::http::StatusCode::SERVICE_UNAVAILABLE;
                 }
-                let _ = std::fs::remove_file(&test_file);
-                
+                if let Err(e) = tokio::fs::remove_file(&test_file).await {
+                    tracing::error!("Health check failed (storage cleanup): {}", e);
+                    return axum::http::StatusCode::SERVICE_UNAVAILABLE;
+                }
+
                 axum::http::StatusCode::OK
-            }
-        ))
+            }),
+        )
         .with_state(state.clone());
 
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest("/health", health_routes)
         .nest("/v1", v1)
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
+            tracing::info_span!("http_request", method = %request.method(), uri = %request.uri().path())
+        }))
         .with_state(state)
 }

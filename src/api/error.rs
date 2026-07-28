@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde_json::json;
 use thiserror::Error;
@@ -10,6 +10,9 @@ use thiserror::Error;
 pub enum AppError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] mongodb::error::Error),
+
+    #[error("Internal error: {0}")]
+    InternalError(String),
 
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
@@ -37,16 +40,38 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AppError::DatabaseError(e) => {
-                tracing::error!("Database error: {}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                if e.to_string().contains("E11000 duplicate key error")
+                    || e.to_string().contains("duplicate key error")
+                {
+                    (StatusCode::CONFLICT, "Conflict".to_string())
+                } else {
+                    tracing::error!("Database error: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Internal server error".to_string(),
+                    )
+                }
+            }
+            AppError::InternalError(e) => {
+                tracing::error!("Internal error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             AppError::IoError(e) => {
                 tracing::error!("I/O error: {}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             AppError::ImageError(e) => {
                 tracing::error!("Image error: {}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             AppError::JwtError(e) => {
                 tracing::error!("JWT error: {}", e);

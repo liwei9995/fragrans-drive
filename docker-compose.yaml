@@ -10,6 +10,24 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: test
       MONGO_INITDB_ROOT_PASSWORD: nest
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --host
+        - localhost:27017
+        - --username
+        - test
+        - --password
+        - nest
+        - --authenticationDatabase
+        - admin
+        - --quiet
+        - --eval
+        - "quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)"
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mongo-express:
     image: mongo-express
@@ -30,8 +48,15 @@ services:
       - storage-files:/app/bucket
     ports:
       - 8085:3821
+    environment:
+      MONGO_URI: mongodb://test:nest@mongo:27017/fragrans?authSource=admin
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      STORAGE_MASTER_KEY_HEX: ${STORAGE_MASTER_KEY_HEX}
+      STORAGE_DESTINATION: /app/bucket/storage
+      DRIVE_DOMAIN: ${DRIVE_DOMAIN:-http://localhost:8085}
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
 
 volumes:
   storage-files:

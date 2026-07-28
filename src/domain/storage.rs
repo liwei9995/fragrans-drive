@@ -148,21 +148,45 @@ pub struct TrashRestoreResponse {
 
 impl StorageListResponse {
     /// 从 Storage 构建列表项，并填入 base_url + token 生成的 url/thumbnail 完整 URL（仅文件有 url）。
-    pub fn from_storage_with_urls(s: Storage, base_url: &str, token: &str) -> Self {
+    pub fn from_storage_with_urls(
+        s: Storage,
+        base_url: &str,
+        user_id: &str,
+        secret: &str,
+    ) -> Result<Self, crate::api::error::AppError> {
         let base = base_url.trim_end_matches('/');
-        let url = (s.r#type == StorageType::File && s.id.is_some()).then(|| {
-            format!(
-                "{}/v1/storage/{}?token={}",
-                base,
-                s.id.as_ref().unwrap(),
-                token
-            )
-        });
-        let thumbnail = s
-            .thumbnail
-            .as_ref()
-            .map(|thumb_id| format!("{}/v1/storage/{}?token={}", base, thumb_id, token));
-        Self {
+        let expires_at = (Utc::now().timestamp() + 900) as usize;
+        let url = if s.r#type == StorageType::File {
+            let Some(file_id) = s.id.as_ref().map(|id| id.to_hex()) else {
+                return Err(crate::api::error::AppError::InternalError(
+                    "Stored file is missing an id".into(),
+                ));
+            };
+            let token = crate::api::middleware::create_token(
+                secret,
+                user_id,
+                crate::api::middleware::TokenPurpose::Download,
+                Some(file_id.clone()),
+                expires_at,
+            )?;
+            Some(format!("{base}/v1/storage/{file_id}?token={token}"))
+        } else {
+            None
+        };
+        let thumbnail = match s.thumbnail.as_ref() {
+            Some(thumb_id) => {
+                let token = crate::api::middleware::create_token(
+                    secret,
+                    user_id,
+                    crate::api::middleware::TokenPurpose::Download,
+                    Some(thumb_id.clone()),
+                    expires_at,
+                )?;
+                Some(format!("{base}/v1/storage/{thumb_id}?token={token}"))
+            }
+            None => None,
+        };
+        Ok(Self {
             id: s.id,
             name: s.name,
             base_name: s.base_name,
@@ -177,7 +201,7 @@ impl StorageListResponse {
             trashed: s.trashed,
             created_at: s.created_at,
             updated_at: s.updated_at,
-        }
+        })
     }
 }
 
@@ -247,6 +271,27 @@ pub struct Storage {
     pub md5_hash: Option<String>,
 
     pub iv: Option<String>,
+
+    #[serde(
+        rename = "contentHash",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub content_hash: Option<String>,
+
+    #[serde(
+        rename = "hashAlgorithm",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub hash_algorithm: Option<String>,
+
+    #[serde(
+        rename = "encryptionFormat",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub encryption_format: Option<u8>,
 
     #[serde(rename = "parentId")]
     pub parent_id: String,

@@ -10,10 +10,20 @@ use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Claims {
-    #[serde(rename = "userId")]
     pub user_id: String,
     pub exp: usize,
+    pub purpose: TokenPurpose,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TokenPurpose {
+    Access,
+    Download,
 }
 
 #[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
@@ -40,25 +50,41 @@ where
     }
 }
 
+pub fn create_token(
+    secret: &str,
+    user_id: &str,
+    purpose: TokenPurpose,
+    file_id: Option<String>,
+    exp: usize,
+) -> Result<String, crate::api::error::AppError> {
+    let claims = Claims {
+        user_id: user_id.to_string(),
+        exp,
+        purpose,
+        file_id,
+    };
+    jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(|e| {
+        crate::api::error::AppError::InternalError(format!("Token encoding failed: {}", e))
+    })
+}
+
 pub async fn auth_guard(
     State(state): State<AppState>,
     mut req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    // Some routes passed token in query param for downloads (token=...)
-    let query_token = req.uri().query().and_then(|q| {
-        q.split('&')
-            .find(|pair| pair.starts_with("token="))
-            .map(|pair| &pair[6..])
-    });
-
     let auth_header = req
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "));
 
-    let token = match query_token.or(auth_header) {
+    let token = match auth_header {
         Some(t) => t,
         None => return Err(StatusCode::UNAUTHORIZED),
     };
@@ -70,6 +96,10 @@ pub async fn auth_guard(
     )
     .map_err(|_| StatusCode::UNAUTHORIZED)?
     .claims;
+
+    if claims.purpose != TokenPurpose::Access {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
 
     req.extensions_mut().insert(UserContext {
         user_id: claims.user_id,

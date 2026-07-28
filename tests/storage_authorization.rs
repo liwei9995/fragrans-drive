@@ -34,6 +34,7 @@ async fn put_storage_unknown_field_returns_400() {
         .await
         .expect("request");
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    ctx.teardown().await;
 }
 
 #[tokio::test]
@@ -52,10 +53,33 @@ async fn cannot_mutate_other_user_item() {
         ))
         .await
         .expect("request");
-    
+
     // We'll get 404 because we don't own the item (or it doesn't exist).
     // In this dummy test we use an invalid ID for simplicity, but the test ensures
-    // the payload validation (e.g. deny_unknown_fields) triggers before the 404, or 
+    // the payload validation (e.g. deny_unknown_fields) triggers before the 404, or
     // that the handler restricts by user.
     assert!(res.status() == StatusCode::NOT_FOUND || res.status() == StatusCode::BAD_REQUEST);
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+async fn move_unknown_file_returns_404() {
+    let ctx = setup().await;
+    let res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/move",
+            &ctx.auth_token,
+            json!({
+                "fileId": "000000000000000000000000",
+                "parentId": "root"
+            }),
+        ))
+        .await
+        .expect("request");
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    ctx.teardown().await;
 }
