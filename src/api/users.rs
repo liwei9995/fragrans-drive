@@ -144,92 +144,70 @@ pub async fn create_user(
     ))
 }
 
-#[utoipa::path(
-    get,
-    path = "/v1/users",
-    responses(
-        (status = 200, description = "List all users", body = [UserResponse])
-    ),
-    tag = "users"
-)]
-pub async fn get_all_users(State(state): State<AppState>) -> impl IntoResponse {
-    let repo = UserRepository::new(&state.db);
-    match repo.find_all().await {
-        Ok(users) => Json(
-            users
-                .into_iter()
-                .map(UserResponse::from)
-                .collect::<Vec<_>>(),
-        )
-        .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch users").into_response(),
-    }
-}
 
 #[utoipa::path(
-    get,
-    path = "/v1/users/{id}",
-    params(
-        ("id" = String, Path, description = "User database id")
-    ),
-    responses(
-        (status = 200, description = "User found", body = UserResponse),
-        (status = 404, description = "User not found")
-    ),
-    tag = "users"
-)]
-pub async fn get_user(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
-    let id = match ObjectId::parse_str(&id) {
-        Ok(oid) => oid,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid ID").into_response(),
-    };
-
-    let repo = UserRepository::new(&state.db);
-    match repo.find_by_id(id).await {
-        Ok(Some(user)) => Json(UserResponse::from(user)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
-    }
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/users/profile/{id}",
-    params(
-        ("id" = String, Path, description = "User database id")
-    ),
+    patch,
+    path = "/v1/profile",
     request_body = UpdateUserDto,
     responses(
         (status = 200, description = "Profile updated successfully", body = UserResponse),
         (status = 404, description = "User not found")
     ),
-    tag = "users"
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    )
 )]
 pub async fn update_profile(
     State(state): State<AppState>,
-    Path(id): Path<String>,
+    user_ctx: UserContext,
     Json(payload): Json<UpdateUserDto>,
 ) -> impl IntoResponse {
-    let id = match ObjectId::parse_str(&id) {
+    let id = match ObjectId::parse_str(&user_ctx.user_id) {
         Ok(oid) => oid,
         Err(_) => return (StatusCode::BAD_REQUEST, "Invalid ID").into_response(),
     };
 
     let mut update = doc! { "updatedAt": Bson::DateTime(BsonDateTime::from_chrono(Utc::now())) };
+    let mut has_update = false;
+
     if let Some(f) = payload.first_name {
+        let f = f.trim();
+        if f.is_empty() || f.len() > 100 {
+            return (StatusCode::BAD_REQUEST, "Invalid firstName").into_response();
+        }
         update.insert("firstName", f);
+        has_update = true;
     }
     if let Some(l) = payload.last_name {
+        let l = l.trim();
+        if l.is_empty() || l.len() > 100 {
+            return (StatusCode::BAD_REQUEST, "Invalid lastName").into_response();
+        }
         update.insert("lastName", l);
+        has_update = true;
     }
     if let Some(g) = payload.gender {
         update.insert("gender", g);
+        has_update = true;
     }
     if let Some(a) = payload.age {
+        if !(0..=150).contains(&a) {
+            return (StatusCode::BAD_REQUEST, "Invalid age").into_response();
+        }
         update.insert("age", a);
+        has_update = true;
     }
     if let Some(av) = payload.avatar {
+        if av.len() > 2048 {
+            return (StatusCode::BAD_REQUEST, "Invalid avatar").into_response();
+        }
         update.insert("avatar", av);
+        has_update = true;
+    }
+
+    if !has_update {
+        return (StatusCode::BAD_REQUEST, "No valid fields provided").into_response();
     }
 
     let repo = UserRepository::new(&state.db);
@@ -276,34 +254,6 @@ pub async fn update_password(
     Ok((StatusCode::OK, "Password updated"))
 }
 
-#[utoipa::path(
-    delete,
-    path = "/v1/users/{id}",
-    params(
-        ("id" = String, Path, description = "User database id")
-    ),
-    responses(
-        (status = 200, description = "User deleted successfully", body = UserResponse),
-        (status = 404, description = "User not found")
-    ),
-    tag = "users"
-)]
-pub async fn delete_user(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
-    let id = match ObjectId::parse_str(&id) {
-        Ok(oid) => oid,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid ID").into_response(),
-    };
-
-    let repo = UserRepository::new(&state.db);
-    match repo.delete_one(id).await {
-        Ok(Some(user)) => Json(UserResponse::from(user)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
-    }
-}
 #[utoipa::path(
     get,
     path = "/v1/profile",

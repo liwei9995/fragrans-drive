@@ -1,5 +1,4 @@
 use crate::domain::user::User;
-use futures_util::stream::StreamExt;
 use mongodb::{
     Collection, Database,
     bson::{doc, oid::ObjectId},
@@ -14,15 +13,6 @@ impl UserRepository {
         Self {
             collection: db.collection("users"),
         }
-    }
-
-    pub async fn find_all(&self) -> Result<Vec<User>, mongodb::error::Error> {
-        let mut cursor = self.collection.find(doc! {}).await?;
-        let mut users = Vec::new();
-        while let Some(user) = cursor.next().await {
-            users.push(user?);
-        }
-        Ok(users)
     }
 
     pub async fn find_by_id(&self, id: ObjectId) -> Result<Option<User>, mongodb::error::Error> {
@@ -65,12 +55,6 @@ impl UserRepository {
             )
             .await?;
         Ok(())
-    }
-
-    pub async fn delete_one(&self, id: ObjectId) -> Result<Option<User>, mongodb::error::Error> {
-        self.collection
-            .find_one_and_delete(doc! { "_id": id })
-            .await
     }
 
     #[allow(dead_code)]

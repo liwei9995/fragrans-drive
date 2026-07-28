@@ -22,11 +22,8 @@ pub struct AppState {
     paths(
         users::login,
         users::create_user,
-        users::get_all_users,
-        users::get_user,
-        users::update_profile,
         users::update_password,
-        users::delete_user,
+        users::update_profile,
         users::get_profile,
         storage::upload_file,
         storage::create_folder,
@@ -93,12 +90,6 @@ pub fn router(db: Database, config: Config) -> Router {
         .with_state(state.clone());
 
     let user_routes_protected = Router::new()
-        .route("/", axum::routing::get(users::get_all_users))
-        .route(
-            "/{id}",
-            axum::routing::get(users::get_user).delete(users::delete_user),
-        )
-        .route("/profile/{id}", axum::routing::post(users::update_profile))
         .route("/password", axum::routing::post(users::update_password))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
@@ -145,7 +136,9 @@ pub fn router(db: Database, config: Config) -> Router {
         .nest("/storage", storage_routes)
         .route(
             "/profile",
-            axum::routing::get(users::get_profile).layer(axum::middleware::from_fn_with_state(
+            axum::routing::get(users::get_profile)
+                .patch(users::update_profile)
+                .layer(axum::middleware::from_fn_with_state(
                 state.clone(),
                 middleware::auth_guard,
             )),
