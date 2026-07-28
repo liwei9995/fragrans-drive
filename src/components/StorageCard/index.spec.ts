@@ -1,22 +1,22 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRouter } from 'vue-router'
 import StorageCard from './index.vue'
 
 vi.mock('vue-router', () => ({
   useRouter: vi.fn(),
-  useRoute: vi.fn(() => ({ params: { id: 'root' }, query: {}, path: '/' }))
-}))
-
-vi.mock('@/store', () => ({
-  GlobalStore: vi.fn(() => ({ isMobile: false }))
+  useRoute: vi.fn(() => ({ params: { id: 'root' }, query: {}, path: '/' })),
 }))
 
 describe('StorageCard', () => {
   const pushMock = vi.fn()
-  
+
   beforeEach(() => {
-    vi.mocked(useRouter).mockReturnValue({ push: pushMock, replace: vi.fn(), back: vi.fn() } as any)
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+    } as any)
   })
 
   it('renders correctly for empty state', () => {
@@ -25,9 +25,9 @@ describe('StorageCard', () => {
       global: {
         stubs: {
           More: true,
-          SuccessFilled: true
-        }
-      }
+          SuccessFilled: true,
+        },
+      },
     })
     expect(wrapper.find('.card-wrapper').classes()).toContain('empty')
     expect(wrapper.find('.drop-wrapper').exists()).toBe(false)
@@ -39,14 +39,14 @@ describe('StorageCard', () => {
         id: '1',
         title: 'test.mp4',
         desc: '10MB',
-        mimeType: 'video/mp4'
+        mimeType: 'video/mp4',
       },
       global: {
         stubs: {
           More: true,
-          SuccessFilled: true
-        }
-      }
+          SuccessFilled: true,
+        },
+      },
     })
     expect(wrapper.text()).toContain('test.mp4')
     expect(wrapper.text()).toContain('10MB')
@@ -56,14 +56,14 @@ describe('StorageCard', () => {
     const wrapper = mount(StorageCard, {
       props: {
         id: 'folder123',
-        type: 'folder'
+        type: 'folder',
       },
       global: {
         stubs: {
           More: true,
-          SuccessFilled: true
-        }
-      }
+          SuccessFilled: true,
+        },
+      },
     })
 
     await wrapper.find('.card-container').trigger('click')
@@ -76,11 +76,11 @@ describe('StorageCard', () => {
       global: {
         stubs: {
           More: true,
-          SuccessFilled: true
-        }
-      }
+          SuccessFilled: true,
+        },
+      },
     })
-    
+
     await wrapper.find('.selection-checkbox').trigger('click')
     expect(wrapper.emitted('toggle-select')).toBeTruthy()
     expect(wrapper.emitted('toggle-select')?.[0]).toEqual(['1'])
@@ -93,14 +93,14 @@ describe('StorageCard', () => {
         id: '1',
         mimeType: 'video/mp4',
         videoUrl: 'http://test.mp4',
-        previewVideo: previewVideoMock
+        previewVideo: previewVideoMock,
       },
       global: {
         stubs: {
           More: true,
-          SuccessFilled: true
-        }
-      }
+          SuccessFilled: true,
+        },
+      },
     })
 
     await wrapper.find('.cover').trigger('click')
@@ -114,20 +114,27 @@ describe('StorageCard', () => {
         id: '1',
         title: 'test',
         mimeType: 'text/plain',
-        tapActionItem: tapActionItemMock
+        tapActionItem: tapActionItemMock,
       },
       global: {
         stubs: {
           More: true,
-          SuccessFilled: true
-        }
-      }
+          SuccessFilled: true,
+        },
+      },
     })
 
     // simulate command event on el-dropdown directly if we can't find it easily
     const dropdown = wrapper.findComponent({ name: 'ElDropdown' })
     expect(dropdown.exists()).toBe(true)
     dropdown.vm.$emit('command', 'rename')
-    expect(tapActionItemMock).toHaveBeenCalledWith('rename', '1', 'test', 'text/plain', expect.any(String), expect.any(String))
+    expect(tapActionItemMock).toHaveBeenCalledWith(
+      'rename',
+      '1',
+      'test',
+      'text/plain',
+      expect.any(String),
+      expect.any(String),
+    )
   })
 })

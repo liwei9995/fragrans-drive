@@ -1,4 +1,6 @@
 <script setup lang="ts" name="storage-item">
+import { ref } from 'vue'
+
 interface StorageItemProps {
   id: string
   disabled?: boolean

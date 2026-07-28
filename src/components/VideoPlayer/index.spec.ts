@@ -1,72 +1,39 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import VideoPlayer from './index.vue'
 
-vi.mock('vue3-video-play/dist/style.css', () => ({}))
 vi.mock('element-plus/theme-chalk/base.css', () => ({}))
 
 describe('VideoPlayer', () => {
-  it('renders correctly with default props', () => {
+  it('renders a native video player', () => {
     const wrapper = mount(VideoPlayer, {
+      props: { src: '/video.mp4' },
       global: {
-        stubs: {
-          videoPlay: true,
-          'el-icon': true,
-          Close: true
-        }
-      }
+        stubs: ['el-icon', 'Close'],
+      },
     })
-    expect(wrapper.find('.video-player-wrapper').exists()).toBe(true)
-    const videoPlay = wrapper.findComponent({ name: 'videoPlay' })
-    expect(videoPlay.exists()).toBe(true)
-    // with stubs, properties might be passed as props rather than attributes
-    expect(videoPlay.vm.$props.width || videoPlay.attributes('width')).toBe('100%')
-    expect(videoPlay.vm.$props.height || videoPlay.attributes('height')).toBe('100%')
-    expect(videoPlay.vm.$props.control || videoPlay.attributes('control')).toBe('true')
+
+    const video = wrapper.get('video')
+    expect(video.attributes('src')).toBe('/video.mp4')
+    expect(video.attributes('controls')).toBeDefined()
+    expect(video.attributes('playsinline')).toBeDefined()
   })
 
-  it('calls close prop when close button is clicked', async () => {
-    const closeMock = vi.fn()
+  it('closes from the button and Escape, then removes its listener', async () => {
+    const close = vi.fn()
     const wrapper = mount(VideoPlayer, {
-      props: { close: closeMock },
+      props: { close },
       global: {
-        stubs: ['videoPlay', 'el-icon', 'Close']
-      }
-    })
-    
-    await wrapper.find('.video-player-close-btn').trigger('click')
-    expect(closeMock).toHaveBeenCalled()
-  })
-
-  it('calls close prop when Esc is pressed', () => {
-    const closeMock = vi.fn()
-    const wrapper = mount(VideoPlayer, {
-      props: { close: closeMock },
-      global: {
-        stubs: ['videoPlay', 'el-icon', 'Close']
-      }
+        stubs: ['el-icon', 'Close'],
+      },
     })
 
-    const event = new KeyboardEvent('keydown', { code: 'Escape' })
-    document.dispatchEvent(event)
-    expect(closeMock).toHaveBeenCalled()
-    
+    await wrapper.get('.video-player-close-btn').trigger('click')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(close).toHaveBeenCalledTimes(2)
+
     wrapper.unmount()
-  })
-
-  it('calls close prop when Esc is pressed (alternative code)', () => {
-    const closeMock = vi.fn()
-    const wrapper = mount(VideoPlayer, {
-      props: { close: closeMock },
-      global: {
-        stubs: ['videoPlay', 'el-icon', 'Close']
-      }
-    })
-
-    const event = new KeyboardEvent('keydown', { code: 'Esc' })
-    document.dispatchEvent(event)
-    expect(closeMock).toHaveBeenCalled()
-    
-    wrapper.unmount()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(close).toHaveBeenCalledTimes(2)
   })
 })

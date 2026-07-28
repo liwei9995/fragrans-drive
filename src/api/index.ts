@@ -10,7 +10,6 @@ import { ElMessage } from 'element-plus'
 import { ResultEnum } from '@/enums/httpEnum'
 import router from '@/routers'
 import { GlobalStore } from '@/store'
-import { AxiosCanceler } from './helper/axiosCancel'
 import { checkStatus } from './helper/checkStatus'
 
 /**
@@ -20,8 +19,6 @@ import { checkStatus } from './helper/checkStatus'
  * https://pinia.vuejs.org/core-concepts/outside-component-usage.html#single-page-applications
  */
 // const globalStore = GlobalStore();
-
-const axiosCanceler = new AxiosCanceler()
 
 const config = {
   // 默认地址请求地址，可在 .env 开头文件中修改
@@ -46,8 +43,6 @@ class RequestHttp {
     this.service.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const globalStore = GlobalStore()
-        // * 将当前请求添加到 pending 中
-        axiosCanceler.addPending(config)
         const token: string = globalStore.token
 
         if (token) {
@@ -66,29 +61,7 @@ class RequestHttp {
      */
     this.service.interceptors.response.use(
       (response: AxiosResponse) => {
-        const { data, status: statusCode, config } = response
-        const globalStore = GlobalStore()
-        // * 在请求结束后，移除本次请求，并关闭请求 loading
-        axiosCanceler.removePending(config)
-        // * 登录失败（code == 401）
-        if (statusCode === ResultEnum.UNAUTHORIZED) {
-          ElMessage.error(data.message)
-          globalStore.setToken('')
-          router.replace({
-            path: '/login',
-          })
-
-          return Promise.reject(data)
-        }
-        // * 全局错误信息拦截（防止下载文件得时候返回数据流，没有code，直接报错）
-        if (![ResultEnum.SUCCESS, ResultEnum.CREATED].includes(statusCode)) {
-          ElMessage.error(data.message)
-
-          return Promise.reject(data)
-        }
-
-        // * 成功请求（在页面上除非特殊情况，否则不用处理失败逻辑）
-        return data
+        return response.data
       },
       async (error: AxiosError) => {
         const { response } = error
@@ -96,8 +69,16 @@ class RequestHttp {
         // 请求超时单独判断，因为请求超时没有 response
         if (error.message.indexOf('timeout') !== -1)
           ElMessage.error('请求超时！请您稍后重试')
-        // 根据响应的错误状态码，做不同的处理
-        if (response) checkStatus(response.status)
+        if (response?.status === ResultEnum.UNAUTHORIZED) {
+          GlobalStore().$reset()
+          ElMessage.error('登录失效！请您重新登录')
+          await router.replace({
+            path: '/login',
+            query: { redirect: router.currentRoute.value.fullPath },
+          })
+        } else if (response) {
+          checkStatus(response.status)
+        }
         // 服务器结果都没有返回(可能服务器错误可能客户端断网)，断网处理:可以跳转到断网页面
         if (!window.navigator.onLine) router.replace({ path: '/500' })
 
@@ -108,19 +89,19 @@ class RequestHttp {
 
   // * 常用请求方法封装
   get<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
-    return this.service.get(url, { params, ..._object })
+    return this.service.get<T, T>(url, { params, ..._object })
   }
   post<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
-    return this.service.post(url, params, _object)
+    return this.service.post<T, T>(url, params, _object)
   }
   put<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
-    return this.service.put(url, params, _object)
+    return this.service.put<T, T>(url, params, _object)
   }
   delete<T = unknown>(url: string, params?: unknown, _object = {}): Promise<T> {
-    return this.service.delete(url, { params, ..._object })
+    return this.service.delete<T, T>(url, { params, ..._object })
   }
-  download(url: string, params?: object, _object = {}): Promise<BlobPart> {
-    return this.service.get(url, {
+  download(url: string, params?: object, _object = {}): Promise<Blob> {
+    return this.service.get<Blob, Blob>(url, {
       ...params,
       ..._object,
       responseType: 'blob',

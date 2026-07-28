@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import Header from './index.vue'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-  useRoute: () => ({ params: { id: 'root' }, query: {}, path: '/' })
+  useRoute: () => ({ params: { id: 'root' }, query: {}, path: '/' }),
 }))
 
 describe('Header', () => {
@@ -15,7 +15,7 @@ describe('Header', () => {
 
   it('navigates home when logo is clicked', async () => {
     const wrapper = mount(Header)
-    
+
     await wrapper.find('.logo-container').trigger('click')
   })
 
@@ -24,10 +24,10 @@ describe('Header', () => {
     const wrapper = mount(Header, {
       props: {
         avatarActionItems: [{ id: 'logout', name: 'Logout' }],
-        tapActionItem
-      }
+        tapActionItem,
+      },
     })
-    
+
     const dropdown = wrapper.findComponent({ name: 'ElDropdown' })
     dropdown.vm.$emit('command', 'logout')
     expect(tapActionItem).toHaveBeenCalledWith('logout')

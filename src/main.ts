@@ -5,8 +5,6 @@ import App from './App.vue'
 import '@/styles/reset.scss'
 // app style sheet
 import './style.css'
-// element icons
-import * as Icons from '@element-plus/icons-vue'
 // element css
 import 'element-plus/theme-chalk/el-message-box.css'
 import 'element-plus/theme-chalk/el-message.css'
@@ -22,10 +20,5 @@ import router from '@/routers/index'
 import pinia from '@/store/index'
 
 const app = createApp(App)
-
-// 注册element Icons组件
-for (const [key, component] of Object.entries(Icons)) {
-  app.component(key, component)
-}
 
 app.use(router).use(pinia).mount('#app')

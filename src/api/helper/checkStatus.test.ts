@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
-import { checkStatus } from './checkStatus'
 import { ElMessage } from 'element-plus'
+import { describe, expect, it, vi } from 'vitest'
+import { checkStatus } from './checkStatus'
 
 vi.mock('element-plus', () => ({
   ElMessage: {
-    error: vi.fn()
-  }
+    error: vi.fn(),
+  },
 }))
 
 describe('checkStatus', () => {

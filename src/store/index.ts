@@ -7,28 +7,12 @@ import type { GlobalState } from './interface'
 export const GlobalStore = defineStore('GlobalState', {
   // state: 返回对象的函数
   state: (): GlobalState => ({
-    // token
     token: '',
-    // userInfo
-    userInfo: {},
-    // element组件大小
-    assemblySize: 'default',
-    // 是否是移动端
-    isMobile: false,
   }),
   getters: {},
   actions: {
-    // setToken
     setToken(token: string) {
       this.token = token
-    },
-    // setUserInfo
-    setUserInfo(userInfo: Record<string, unknown>) {
-      this.userInfo = userInfo
-    },
-    // setIsMobile
-    setIsMobile(isMobile: boolean) {
-      this.isMobile = isMobile
     },
   },
   persist: piniaPersistConfig('GlobalState'),

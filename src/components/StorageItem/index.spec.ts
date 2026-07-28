@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import StorageItem from './index.vue'
 
 describe('StorageItem', () => {
@@ -8,13 +8,13 @@ describe('StorageItem', () => {
       props: {
         id: '1',
         name: 'test-item',
-        disabled: false
+        disabled: false,
       },
       global: {
         stubs: {
-          'el-image': true
-        }
-      }
+          'el-image': true,
+        },
+      },
     })
     expect(wrapper.text()).toContain('test-item')
   })
@@ -26,11 +26,11 @@ describe('StorageItem', () => {
         id: '1',
         name: 'test',
         disabled: true,
-        tap: tapMock
+        tap: tapMock,
       },
-      global: { stubs: ['el-image'] }
+      global: { stubs: ['el-image'] },
     })
-    
+
     await wrapper.trigger('click')
     expect(tapMock).not.toHaveBeenCalled()
   })
@@ -42,11 +42,11 @@ describe('StorageItem', () => {
         id: '1',
         name: 'test',
         disabled: false,
-        tap: tapMock
+        tap: tapMock,
       },
-      global: { stubs: ['el-image'] }
+      global: { stubs: ['el-image'] },
     })
-    
+
     await wrapper.trigger('click')
     expect(tapMock).toHaveBeenCalledWith('1')
   })

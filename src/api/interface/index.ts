@@ -4,6 +4,46 @@ export interface Result {
   msg: string
 }
 
+export interface StorageNode {
+  id: string
+  name: string
+  baseName?: string
+  extName?: string
+  mimeType?: string
+  encoding?: string
+  size?: number
+  parentId: string
+  type: 'file' | 'folder'
+  thumbnail?: string
+  url?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface StorageListResponse {
+  docs: StorageNode[]
+  limit: number
+  page: number
+  pages: number
+  total?: number
+}
+
+export interface StoragePathItem {
+  id: string
+  name: string
+}
+
+export interface StorageFolderResult {
+  exist: boolean
+  id: string
+  name: string
+  parentId: string
+}
+
+export interface StorageUpdateResult extends StorageNode {
+  exist: boolean
+}
+
 // 登录
 export namespace Login {
   export interface ReqLoginForm {

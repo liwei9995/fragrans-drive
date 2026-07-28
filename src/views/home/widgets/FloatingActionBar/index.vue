@@ -1,5 +1,5 @@
 <script setup lang="ts" name="floating-action-bar">
-import { Close, Delete, Download, Rank } from '@element-plus/icons-vue'
+import { Close, Delete } from '@element-plus/icons-vue'
 
 interface FloatingActionBarProps {
   selectedCount: number
@@ -7,7 +7,7 @@ interface FloatingActionBarProps {
 
 defineProps<FloatingActionBarProps>()
 
-const emit = defineEmits(['delete', 'move', 'download', 'clear'])
+const emit = defineEmits(['delete', 'clear'])
 </script>
 
 <template>
@@ -20,23 +20,24 @@ const emit = defineEmits(['delete', 'move', 'download', 'clear'])
         </div>
         <div class="divider"></div>
         <div class="actions">
-          <div class="action-item" @click="emit('download')">
-            <el-icon><Download /></el-icon>
-            <span>下载</span>
-          </div>
-          <div class="action-item" @click="emit('move')">
-            <el-icon><Rank /></el-icon>
-            <span>移动</span>
-          </div>
-          <div class="action-item delete" @click="emit('delete')">
+          <button
+            type="button"
+            class="action-item delete"
+            @click="emit('delete')"
+          >
             <el-icon><Delete /></el-icon>
             <span>删除</span>
-          </div>
+          </button>
         </div>
         <div class="divider"></div>
-        <div class="close-btn" @click="emit('clear')">
+        <button
+          type="button"
+          class="close-btn"
+          aria-label="清除选择"
+          @click="emit('clear')"
+        >
           <el-icon><Close /></el-icon>
-        </div>
+        </button>
       </div>
     </div>
   </transition>
@@ -104,6 +105,8 @@ const emit = defineEmits(['delete', 'move', 'download', 'clear'])
       border-radius: 12px;
       color: var(--text-color);
       cursor: pointer;
+      background: transparent;
+      border: 0;
       transition: all 0.2s ease;
       font-size: 14px;
       font-weight: 500;
@@ -129,6 +132,8 @@ const emit = defineEmits(['delete', 'move', 'download', 'clear'])
     border-radius: 50%;
     cursor: pointer;
     color: var(--text-color);
+    background: transparent;
+    border: 0;
     opacity: 0.6;
     transition: all 0.2s ease;
 

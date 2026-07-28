@@ -1,58 +1,21 @@
-import { AxiosCanceler } from '@/api/helper/axiosCancel'
-import { authProfile } from '@/api/modules/user'
-import { ADMIN_URL, HOME_URL } from '@/config/config'
+import { LOGIN_URL } from '@/config/config'
 import router from '@/routers/router'
 import { GlobalStore } from '@/store'
-
-const axiosCancel = new AxiosCanceler()
 
 /**
  * @description 路由拦截 beforeEach（路由配置无数种方法，个人觉得最简便）
  * */
-router.beforeEach(async (to, _from) => {
-  // 在跳转路由之前，清除所有的请求
-  axiosCancel.removeAllPending()
-
+router.beforeEach((to) => {
   // 判断当前路由是否需要访问权限
   if (!to.matched.some((record) => record.meta.requiresAuth)) return true
 
-  // 判断是否有 Token
   const globalStore = GlobalStore()
-  const token = globalStore.token
+  if (globalStore.token) return true
 
-  if (token) {
-    if (to.path === '/') {
-      return { path: HOME_URL }
-    }
-    if (to.path === '/login') {
-      // if is logged in, redirect to the home page
-      return { path: HOME_URL }
-    }
-    try {
-      let roles = (globalStore.userInfo as any)?.roles as string[]
-      if (!roles || roles.length === 0) {
-        const profile = (await authProfile()) as { roles: string[] }
-        roles = profile.roles
-        globalStore.setUserInfo(profile)
-      }
-      
-      const staticRouter = [HOME_URL]
-      const roleList = ([] as string[]).concat(roles)
-      const routerList = roleList.includes('admin')
-        ? staticRouter.concat(ADMIN_URL)
-        : staticRouter
-
-      if (routerList.indexOf(to.path) !== -1 || to.matched.length > 0)
-        return true
-
-      return { path: '/403' }
-    } catch (error) {
-      console.log('permission error', error)
-      return `/login?redirect=${to.path}`
-    }
+  return {
+    path: LOGIN_URL,
+    query: { redirect: to.fullPath },
   }
-
-  return `/login?redirect=${to.path}`
 })
 
 export default router

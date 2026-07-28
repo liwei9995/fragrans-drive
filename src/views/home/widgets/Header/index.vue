@@ -1,5 +1,5 @@
 <script setup lang="ts" name="header">
-import { UserFilled } from '@element-plus/icons-vue'
+import { Search, UserFilled } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -55,10 +55,15 @@ const errorHandler = () => true
     <div class="navbar-wrapper">
       <div class="header-container">
         <div class="header-title">
-          <div class="logo-container" @click="handleClickGoHome">
+          <button
+            type="button"
+            class="logo-container"
+            aria-label="返回首页"
+            @click="handleClickGoHome"
+          >
             <el-image :src="logo" style="width: 24px; height: 24px" />
             <div class="logo-name">Fragrans</div>
-          </div>
+          </button>
           <Breadcrumb :breadcrumb-items="breadcrumbItems" />
         </div>
         <div class="content">

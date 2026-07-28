@@ -75,7 +75,13 @@ pnpm run build
 本项目基于 [**Docker**](https://www.docker.com/) 进行部署，请确保 [**Docker**](https://www.docker.com/) 已正确安装。
 
 ```bash
-bash < deploy/helper.sh
+bash deploy/helper.sh
+```
+
+默认将 `/api` 转发到宿主机的 `3821` 端口。后端地址不同时可显式指定：
+
+```bash
+API_UPSTREAM=http://192.168.1.10:3821 bash deploy/helper.sh
 ```
 
 ## License

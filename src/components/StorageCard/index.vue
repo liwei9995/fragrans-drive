@@ -1,14 +1,12 @@
 <script setup lang="ts" name="storage-card">
+import { More, SuccessFilled } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
-import { GlobalStore } from '@/store'
 
 const router = useRouter()
 const showMoreAction = ref(false)
 const showPlaceholder = ref(true)
-const globalStore = GlobalStore()
-const isMobile = globalStore.isMobile
 
 type ActionItem = {
   id?: string
@@ -113,17 +111,32 @@ const handleLoad = () => (showPlaceholder.value = false)
   <div class="card-wrapper" :class="{ empty: isEmpty }">
     <div v-if="!isEmpty" class="drop-wrapper">
       <el-dropdown trigger="contextmenu" @command="handleCommand" placement="bottom-start" popper-class="premium-context-menu">
-        <div class="card-container" @click="handleClickCard">
+        <div
+          class="card-container"
+          :role="type === 'folder' ? 'button' : undefined"
+          :tabindex="type === 'folder' ? 0 : undefined"
+          @click="handleClickCard"
+          @keydown.enter.space.prevent="handleClickCard"
+        >
           <div class="outer-wrapper" @mouseover="showMoreAction = true" @mouseleave="showMoreAction = false">
             <div class="action-btn"></div>
-          <div class="selection-checkbox" :class="{ visible: selected }" @click.stop="emit('toggle-select', id)">
+          <div
+            class="selection-checkbox"
+            :class="{ visible: selected }"
+            role="checkbox"
+            tabindex="0"
+            :aria-checked="selected"
+            aria-label="选择项目"
+            @click.stop="emit('toggle-select', id)"
+            @keydown.enter.space.stop.prevent="emit('toggle-select', id)"
+          >
             <el-icon v-if="selected" class="check-icon"><SuccessFilled /></el-icon>
             <div v-else class="check-placeholder"></div>
           </div>
           <div class="action-btn-more-wrapper" @click.stop>
               <el-dropdown
                 class="action-btn-more"
-                :class="{ show: showMoreAction || isMobile }"
+                :class="{ show: showMoreAction }"
                 trigger="click"
                 @command="handleCommand"
                 >

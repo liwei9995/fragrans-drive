@@ -22,13 +22,7 @@ export const useCreateFolder = (
     type: 'folder',
     parentId,
   })
-    .then((res: unknown) => {
-      const { exist, name, id, parentId } = res as {
-        exist: boolean
-        name: string
-        id: string
-        parentId: string
-      }
+    .then(({ exist, name, id, parentId }) => {
       ElMessage.closeAll()
 
       if (exist) {
@@ -38,7 +32,7 @@ export const useCreateFolder = (
         typeof onSuccess === 'function' &&
           onSuccess({
             name,
-            id: id,
+            id,
             parentId,
           })
       }

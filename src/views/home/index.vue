@@ -1,17 +1,16 @@
 <script setup lang="ts" name="home">
-import type { UploadFiles, UploadProps } from 'element-plus'
-import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import type { UploadProps } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { deleteFile, getFile, getPath, updateFile } from '@/api/modules/storage'
 import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import { LOGIN_URL } from '@/config/config'
-import { UploadEventEnum } from '@/enums/events'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 import { convertItem, sortDocs, useFetchFiles } from '@/hooks/useFetchFiles'
+import { useUploadQueue } from '@/hooks/useUploadQueue'
 import { GlobalStore } from '@/store'
-import emitter from '@/utils/emitter'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import Empty from './widgets/Empty/index.vue'
@@ -37,10 +36,6 @@ const videoPlayerVisible = ref(false)
 const videoSrc = ref('')
 const needToMoveId = ref('root')
 const uploadStatusRef = ref()
-const uploadPercentage = ref(0)
-const uploadedFiles = ref([] as UploadFiles)
-const notificationTitle = ref('')
-const notificationType = ref('info')
 const folderName = ref(defaultFolderName)
 const needToRenameThumb = ref('')
 const needToRenameFileId = ref('')
@@ -49,12 +44,27 @@ const breadcrumbItems = ref([] as BreadcrumbItem[])
 const isDragging = ref(false)
 const selectedIds = ref(new Set<string>())
 let dragCounter = 0
-let uploadCleanedUp = false
+let latestPathRequest = 0
 const uploadFileLimit = 10
 const route = useRoute()
 const router = useRouter()
-const { fetchFiles, listData, resetListData, isFetching, showSkeleton } = useFetchFiles()
+const { fetchFiles, listData, isFetching, showSkeleton } = useFetchFiles()
 const parentId = ref((route.params.id as string) || 'root')
+const {
+  handleUploadChange,
+  handleUploadProgress,
+  notificationTitle,
+  notificationType,
+  reset: resetUploads,
+  uploadPercentage,
+} = useUploadQueue({
+  onChange: () => {
+    isDragging.value = false
+    dragCounter = 0
+  },
+  onComplete: () => fetchFiles(parentId.value),
+  showStatus: () => uploadStatusRef.value?.show(),
+})
 const basicActionItems = [
   {
     id: 'rename',
@@ -100,22 +110,6 @@ const avatarActionItems = [
   },
 ]
 
-interface Storage {
-  id: string
-  name: string
-  baseName?: string
-  extName?: string
-  mimeType?: string
-  encoding?: string
-  size?: string
-  parentId: string
-  type: string
-  thumbnail?: string
-  url?: string
-  createdAt: string
-  updatedAt: string
-}
-
 const load = () => {
   if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
 
@@ -123,13 +117,15 @@ const load = () => {
 }
 
 const fetchPath = async () => {
+  const request = ++latestPathRequest
   const fileId = route.params.id as string
 
   if (fileId) {
     const pathItems = await getPath(fileId)
+    if (request !== latestPathRequest) return
     if (pathItems && Array.isArray(pathItems)) {
       breadcrumbItems.value = [
-        ...pathItems.map((path: any) => ({
+        ...pathItems.map((path) => ({
           id: String(path.id),
           text: path.name,
         })),
@@ -149,10 +145,10 @@ onBeforeMount(() => {
 })
 
 watch(
-  () => router.currentRoute.value,
+  () => route.params.id,
   () => {
     parentId.value = (route.params.id as string) || 'root'
-    resetListData()
+    handleClearSelection()
     fetchFiles(parentId.value)
     fetchPath()
   },
@@ -169,13 +165,7 @@ const handleMoved = (id: string, parentId: string) => {
 
   if (parentId === paramId) return
 
-  const docs = (listData.value.docs || []) as any as Storage[]
-  const index = docs.findIndex((doc: any) => doc.id === id)
-
-  if (index !== -1) {
-    docs.splice(index, 1)
-    listData.value.docs = docs as any
-  }
+  listData.value.docs = listData.value.docs.filter((doc) => doc.id !== id)
 }
 
 const handleFolderCreated = (parentId: string) => {
@@ -194,9 +184,7 @@ const handleCreateFolder = (name: string) => {
 
 const handleRenameFile = (name: string) => {
   const fileId = needToRenameFileId.value
-  const doc = (listData?.value?.docs as any as Storage[])?.find(
-    (item) => item.id === fileId,
-  )
+  const doc = listData.value.docs.find((item) => item.id === fileId)
 
   if (!doc) return
 
@@ -211,15 +199,15 @@ const handleRenameFile = (name: string) => {
     name: fullName,
     parentId: doc?.parentId || 'root',
     type: doc?.type,
-  }).then((res: any) => {
+  }).then((res) => {
     const { exist, id, name, baseName, extName, createdAt, updatedAt } = res
     if (exist) {
       ElMessage.error('已存在同名文件，请修改名称')
     } else {
       renameDialogFormVisible.value = false
 
-      const docs = listData.value.docs || []
-      const index = docs.findIndex((doc: any) => doc.id === id)
+      const docs = listData.value.docs
+      const index = docs.findIndex((doc) => doc.id === id)
 
       if (index !== -1) {
         docs[index] = convertItem({
@@ -232,7 +220,7 @@ const handleRenameFile = (name: string) => {
           updatedAt,
         })
 
-        listData.value.docs = sortDocs(docs) as any
+        listData.value.docs = sortDocs(docs)
       }
     }
   })
@@ -240,7 +228,7 @@ const handleRenameFile = (name: string) => {
 
 const handleCloseUploadStatus = () => {
   uploadStatusRef.value?.close()
-  uploadedFiles.value = []
+  resetUploads()
 }
 
 const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
@@ -249,9 +237,7 @@ const handleTapActionItem = (command: string | number | object) => {
   if (command === 'folder') {
     folderDialogFormVisible.value = true
   } else if (command === 'logout') {
-    // * 清空 token
-    globalStore.setToken('')
-    // * 跳转到登录页面
+    globalStore.$reset()
     router.push(LOGIN_URL)
   }
 }
@@ -295,13 +281,9 @@ const handleTapCardActionItem = async (
       .then(async () => {
         try {
           await deleteFile(id)
-          const docs = listData.value.docs || []
-          const index = docs.findIndex((doc: any) => doc.id === id)
-
-          if (index !== -1) {
-            docs.splice(index, 1)
-            listData.value.docs = docs as any
-          }
+          listData.value.docs = listData.value.docs.filter(
+            (doc) => doc.id !== id,
+          )
           ElMessage.success('文件删除成功')
         } catch {
           ElMessage.error('文件删除失败，请重试')
@@ -349,41 +331,31 @@ const handleBatchDelete = () => {
       cancelButtonText: '取消',
       type: 'warning',
     },
-  ).then(async () => {
-    try {
+  )
+    .then(async () => {
       const ids = Array.from(selectedIds.value)
-      // Perform sequential deletions (simpler for now than Promise.all if reliability is preferred)
+      let failed = 0
+
       for (const id of ids) {
-        await deleteFile(id)
+        try {
+          await deleteFile(id)
+        } catch {
+          failed++
+        }
       }
+
       handleClearSelection()
-      fetchFiles(parentId.value)
-      ElMessage.success(`成功删除 ${count} 项`)
-    } catch {
-      ElMessage.error('部分文件删除失败')
-    }
-  })
-}
+      await fetchFiles(parentId.value)
 
-const handleBatchMove = () => {
-  // Use the existing Move dialog but set it to handle multiple IDs
-  // For now, easier to move one by one if the dialog is designed for one.
-  // I might need to update Move.vue to handle an array of IDs.
-  // But let's keep it simple for now and move only the first one or prompt user.
-  // Actually, I'll update Move to handle multiple IDs later.
-}
-
-const handleBatchDownload = () => {
-  const docs = (listData.value?.docs ?? []) as unknown as Array<{
-    id: string
-    name: string
-  }>
-  const ids = Array.from(selectedIds.value)
-  for (const id of ids) {
-    const doc = docs.find((d) => d.id === id)
-    download(id, doc?.name)
-  }
-  handleClearSelection()
+      if (failed === 0) {
+        ElMessage.success(`成功删除 ${count} 项`)
+      } else {
+        ElMessage.warning(
+          `删除完成：成功 ${count - failed} 项，失败 ${failed} 项`,
+        )
+      }
+    })
+    .catch(() => {})
 }
 
 const handlePreviewVideo = (videoUrl: string) => {
@@ -391,97 +363,10 @@ const handlePreviewVideo = (videoUrl: string) => {
   videoSrc.value = videoUrl
 }
 
-const handleUploadChange: UploadProps['onChange'] = (
-  uploadFile,
-  uploadFiles,
-) => {
-  isDragging.value = false
-  dragCounter = 0
-
-  if (uploadFiles.length === 0 && uploadedFiles.value.length === 0) {
-    if (!uploadFile || !['success', 'fail'].includes(uploadFile.status)) return
-  }
-
-  const activeFiles = uploadFiles.filter((f) =>
-    ['uploading', 'ready'].includes(f.status),
-  )
-  const finishedInBatch = uploadFiles.filter((f) =>
-    ['success', 'fail'].includes(f.status),
-  )
-
-  // uploadFile might already be success/fail but not yet reflected in uploadFiles
-  if (
-    uploadFile &&
-    ['success', 'fail'].includes(uploadFile.status) &&
-    !finishedInBatch.some((f) => f.uid === uploadFile.uid)
-  ) {
-    finishedInBatch.push(uploadFile)
-  }
-
-  const combined = [...uploadedFiles.value]
-  for (const f of finishedInBatch) {
-    const idx = combined.findIndex((h) => h.uid === f.uid)
-    if (idx > -1) combined[idx] = f
-    else combined.push(f)
-  }
-  uploadedFiles.value = combined
-
-  const pendingCount = activeFiles.filter(
-    (f) => !finishedInBatch.some((done) => done.uid === f.uid),
-  ).length
-  const isAllDone = pendingCount === 0
-
-  const successCount = combined.filter((f) => f.status === 'success').length
-  const failCount = combined.filter((f) => f.status === 'fail').length
-
-  if (!isAllDone) {
-    notificationTitle.value = `正在上传 ∙ 剩余${pendingCount}项`
-    notificationType.value = 'uploading'
-    uploadCleanedUp = false
-  } else if (combined.length > 0) {
-    notificationTitle.value =
-      failCount > 0
-        ? `上传完成 ∙ 成功${successCount}项 失败${failCount}项`
-        : `上传完成 ∙ 共${successCount}项`
-    notificationType.value = 'success'
-    uploadPercentage.value = 0
-  }
-
-  uploadStatusRef.value?.show()
-
-  if (isAllDone && combined.length > 0 && !uploadCleanedUp) {
-    uploadCleanedUp = true
-    emitter.emit(UploadEventEnum.CLEAR_FILES)
-    uploadedFiles.value = []
-    fetchFiles(parentId.value)
-  }
-}
-
 const handleUploadExceed: UploadProps['onExceed'] = (files) => {
   ElMessage.warning(
     `一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`,
   )
-}
-
-const handleUploadProgress: UploadProps['onProgress'] = (
-  _event,
-  _uploadFile,
-  uploadFiles,
-) => {
-  const totalSize = uploadFiles.reduce(
-    (accumulator, current) => accumulator + (current?.size || 0),
-    0,
-  )
-  const uploadedSize = uploadFiles.reduce((accumulator, current) => {
-    const cur = ['uploading', 'success'].includes(current?.status)
-      ? ((current?.size || 0) * (current?.percentage || 0)) / 100
-      : 0
-
-    return accumulator + cur
-  }, 0)
-  const percentage = (uploadedSize / totalSize) * 100
-
-  uploadPercentage.value = percentage
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
@@ -511,6 +396,8 @@ const onDrop = (e: DragEvent) => {
   isDragging.value = false
 }
 
+const onDragOver = (e: DragEvent) => e.preventDefault()
+
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     isDragging.value = false
@@ -521,7 +408,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 onMounted(() => {
   window.addEventListener('dragenter', onDragEnter)
   window.addEventListener('dragleave', onDragLeave)
-  window.addEventListener('dragover', (e) => e.preventDefault())
+  window.addEventListener('dragover', onDragOver)
   window.addEventListener('drop', onDrop)
   window.addEventListener('keydown', handleKeydown)
 })
@@ -529,6 +416,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('dragenter', onDragEnter)
   window.removeEventListener('dragleave', onDragLeave)
+  window.removeEventListener('dragover', onDragOver)
   window.removeEventListener('drop', onDrop)
   window.removeEventListener('keydown', handleKeydown)
 })
@@ -633,8 +521,6 @@ onUnmounted(() => {
           <FloatingActionBar
             :selected-count="selectedIds.size"
             @delete="handleBatchDelete"
-            @move="handleBatchMove"
-            @download="handleBatchDownload"
             @clear="handleClearSelection"
           />
         </div>

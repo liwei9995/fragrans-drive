@@ -1,37 +1,70 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import RequestHttp from './index'
-import { GlobalStore } from '@/store'
-import router from '@/routers'
+import {
+  AxiosHeaders,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 import { ElMessage } from 'element-plus'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import router from '@/routers'
+import { GlobalStore } from '@/store'
 import { checkStatus } from './helper/checkStatus'
-import { setActivePinia, createPinia } from 'pinia'
+import RequestHttp from './index'
+
+type RequestInterceptor = {
+  fulfilled: (
+    config: InternalAxiosRequestConfig,
+  ) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig>
+  rejected: (error: unknown) => Promise<never>
+}
+
+type ResponseInterceptor = {
+  fulfilled: (response: AxiosResponse) => unknown
+  rejected: (error: unknown) => Promise<never>
+}
+
+const requestInterceptor = () =>
+  (
+    RequestHttp.service.interceptors.request as unknown as {
+      handlers: RequestInterceptor[]
+    }
+  ).handlers[0]
+
+const responseInterceptor = () =>
+  (
+    RequestHttp.service.interceptors.response as unknown as {
+      handlers: ResponseInterceptor[]
+    }
+  ).handlers[0]
+
+const response = (status: number, data: unknown): AxiosResponse => ({
+  status,
+  data,
+  statusText: '',
+  headers: new AxiosHeaders(),
+  config: {
+    headers: new AxiosHeaders(),
+  },
+})
 
 vi.mock('element-plus', () => ({
   ElMessage: {
-    error: vi.fn()
-  }
+    error: vi.fn(),
+  },
 }))
 
 vi.mock('@/routers', () => ({
   default: {
-    replace: vi.fn()
-  }
+    replace: vi.fn(),
+    currentRoute: {
+      value: { fullPath: '/home/folder' },
+    },
+  },
 }))
 
 vi.mock('./helper/checkStatus', () => ({
-  checkStatus: vi.fn()
+  checkStatus: vi.fn(),
 }))
-
-vi.mock('./helper/axiosCancel', () => {
-  return {
-    AxiosCanceler: class {
-      addPending = vi.fn()
-      removePending = vi.fn()
-      removeAllPending = vi.fn()
-      reset = vi.fn()
-    }
-  }
-})
 
 describe('api index', () => {
   beforeEach(() => {
@@ -39,7 +72,7 @@ describe('api index', () => {
     vi.clearAllMocks()
     Object.defineProperty(window.navigator, 'onLine', {
       value: true,
-      writable: true
+      writable: true,
     })
   })
 
@@ -50,7 +83,9 @@ describe('api index', () => {
     vi.spyOn(RequestHttp.service, 'delete').mockResolvedValue('delete')
 
     RequestHttp.get('/url')
-    expect(RequestHttp.service.get).toHaveBeenCalledWith('/url', { params: undefined })
+    expect(RequestHttp.service.get).toHaveBeenCalledWith('/url', {
+      params: undefined,
+    })
 
     RequestHttp.post('/url', { a: 1 })
     expect(RequestHttp.service.post).toHaveBeenCalledWith('/url', { a: 1 }, {})
@@ -59,117 +94,92 @@ describe('api index', () => {
     expect(RequestHttp.service.put).toHaveBeenCalledWith('/url', { a: 1 }, {})
 
     RequestHttp.delete('/url')
-    expect(RequestHttp.service.delete).toHaveBeenCalledWith('/url', { params: undefined })
+    expect(RequestHttp.service.delete).toHaveBeenCalledWith('/url', {
+      params: undefined,
+    })
 
     RequestHttp.download('/url', { a: 1 })
-    expect(RequestHttp.service.get).toHaveBeenCalledWith('/url', { a: 1, responseType: 'blob' })
+    expect(RequestHttp.service.get).toHaveBeenCalledWith('/url', {
+      a: 1,
+      responseType: 'blob',
+    })
   })
 
   it('request interceptor adds token', async () => {
     const store = GlobalStore()
     store.setToken('test-token')
-    
-    // @ts-ignore
-    const requestInterceptor = RequestHttp.service.interceptors.request.handlers[0]
-    
-    const config = { headers: new Map() }
-    config.headers.set = vi.fn()
-    
-    const res = await requestInterceptor.fulfilled(config)
-    expect(config.headers.set).toHaveBeenCalledWith('Authorization', 'Bearer test-token')
+
+    const config = {
+      headers: new AxiosHeaders(),
+    } as InternalAxiosRequestConfig
+    const setHeader = vi.spyOn(config.headers, 'set')
+
+    await requestInterceptor().fulfilled(config)
+    expect(setHeader).toHaveBeenCalledWith('Authorization', 'Bearer test-token')
   })
 
   it('request interceptor handles error', async () => {
-    // @ts-ignore
-    const requestInterceptor = RequestHttp.service.interceptors.request.handlers[0]
-    await expect(requestInterceptor.rejected(new Error('req err'))).rejects.toThrow('req err')
+    await expect(
+      requestInterceptor().rejected(new Error('req err')),
+    ).rejects.toThrow('req err')
   })
 
   it('response interceptor handles 401', async () => {
-    // @ts-ignore
-    const responseInterceptor = RequestHttp.service.interceptors.response.handlers[0]
     const store = GlobalStore()
     store.setToken('old-token')
 
-    const response = {
-      status: 401,
-      data: { message: 'unauthorized' },
-      config: {}
-    }
-
-    await expect(responseInterceptor.fulfilled(response)).rejects.toEqual(response.data)
-    expect(ElMessage.error).toHaveBeenCalledWith('unauthorized')
+    await expect(
+      responseInterceptor().rejected({
+        message: 'unauthorized',
+        config: { headers: new AxiosHeaders() },
+        response: { status: 401 },
+      }),
+    ).rejects.toMatchObject({ message: 'unauthorized' })
+    expect(ElMessage.error).toHaveBeenCalledWith('登录失效！请您重新登录')
     expect(store.token).toBe('')
-    expect(router.replace).toHaveBeenCalledWith({ path: '/login' })
-  })
-
-  it('response interceptor handles other errors', async () => {
-    // @ts-ignore
-    const responseInterceptor = RequestHttp.service.interceptors.response.handlers[0]
-
-    const response = {
-      status: 400,
-      data: { message: 'bad request' },
-      config: {}
-    }
-
-    await expect(responseInterceptor.fulfilled(response)).rejects.toEqual(response.data)
-    expect(ElMessage.error).toHaveBeenCalledWith('bad request')
+    expect(router.replace).toHaveBeenCalledWith({
+      path: '/login',
+      query: { redirect: '/home/folder' },
+    })
   })
 
   it('response interceptor handles success', async () => {
-    // @ts-ignore
-    const responseInterceptor = RequestHttp.service.interceptors.response.handlers[0]
+    const result = response(200, { result: 'ok' })
 
-    const response = {
-      status: 200,
-      data: { result: 'ok' },
-      config: {}
-    }
-
-    const data = await responseInterceptor.fulfilled(response)
-    expect(data).toEqual(response.data)
+    const data = await responseInterceptor().fulfilled(result)
+    expect(data).toEqual(result.data)
   })
 
   it('response interceptor handles reject timeout', async () => {
-    // @ts-ignore
-    const responseInterceptor = RequestHttp.service.interceptors.response.handlers[0]
-
     const error = {
-      message: 'timeout of 10000ms exceeded'
+      message: 'timeout of 10000ms exceeded',
     }
 
-    await expect(responseInterceptor.rejected(error)).rejects.toEqual(error)
+    await expect(responseInterceptor().rejected(error)).rejects.toEqual(error)
     expect(ElMessage.error).toHaveBeenCalledWith('请求超时！请您稍后重试')
   })
 
   it('response interceptor handles reject with response', async () => {
-    // @ts-ignore
-    const responseInterceptor = RequestHttp.service.interceptors.response.handlers[0]
-
     const error = {
       message: 'network err',
-      response: { status: 500 }
+      response: { status: 500 },
     }
 
-    await expect(responseInterceptor.rejected(error)).rejects.toEqual(error)
+    await expect(responseInterceptor().rejected(error)).rejects.toEqual(error)
     expect(checkStatus).toHaveBeenCalledWith(500)
   })
 
   it('response interceptor handles reject offline', async () => {
-    // @ts-ignore
-    const responseInterceptor = RequestHttp.service.interceptors.response.handlers[0]
-
     Object.defineProperty(window.navigator, 'onLine', {
       value: false,
-      writable: true
+      writable: true,
     })
 
     const error = {
-      message: 'network err'
+      message: 'network err',
     }
 
-    await expect(responseInterceptor.rejected(error)).rejects.toEqual(error)
+    await expect(responseInterceptor().rejected(error)).rejects.toEqual(error)
     expect(router.replace).toHaveBeenCalledWith({ path: '/500' })
   })
 })

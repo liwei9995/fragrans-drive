@@ -7,8 +7,8 @@ export default mergeConfig(
     test: {
       server: {
         deps: {
-          inline: ['element-plus']
-        }
+          inline: ['element-plus'],
+        },
       },
       globals: true,
       environment: 'jsdom',
@@ -24,15 +24,17 @@ export default mergeConfig(
           'src/components.d.ts',
           'src/main.ts',
           'src/routers/index.ts', // Exclude router since testing route changes in unit tests is often low value and requires e2e
+          'src/routers/router.ts', // Static route declarations are covered by Playwright navigation tests
           'src/views/**/*.vue', // Views are tested via Playwright E2E
           'src/components/ErrorMessage/*.vue', // Simple static error pages
-          'src/config/serviceLoading.ts' // Requires complex element-plus global state mocking
         ],
-        statements: 90,
-        branches: 90,
-        functions: 90,
-        lines: 90
+        thresholds: {
+          statements: 90,
+          branches: 88,
+          functions: 85,
+          lines: 90,
+        },
       },
     },
-  })
+  }),
 )

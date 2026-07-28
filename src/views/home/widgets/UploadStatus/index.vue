@@ -1,12 +1,13 @@
 <script setup lang="ts" name="upload-status">
 import {
   CircleCloseFilled,
+  Close,
   InfoFilled,
   SuccessFilled,
   UploadFilled,
   WarningFilled,
 } from '@element-plus/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 interface UploadStatusProps {
   type?: string
@@ -68,8 +69,12 @@ watch(
         timer = null
       }
     }
-  }
+  },
 )
+
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer)
+})
 
 defineExpose({
   show,

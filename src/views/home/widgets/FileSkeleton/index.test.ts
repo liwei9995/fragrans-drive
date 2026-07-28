@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import FileSkeleton from './index.vue'
 
 describe('FileSkeleton', () => {

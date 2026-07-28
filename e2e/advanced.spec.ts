@@ -1,6 +1,6 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { expect, test } from '@playwright/test'
-import * as fs from 'fs'
-import * as path from 'path'
 
 test.describe('Advanced E2E', () => {
   test.beforeEach(async ({ page }) => {

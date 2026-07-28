@@ -1,4 +1,5 @@
 <script setup lang="ts" name="action-button">
+import { CirclePlusFilled } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
 import Upload from '../Upload/index.vue'

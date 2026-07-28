@@ -1,42 +1,23 @@
 <script setup lang="ts" name="video-player">
-import { onMounted } from 'vue'
-import 'vue3-video-play/dist/style.css'
+import { Close } from '@element-plus/icons-vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 
 interface VideoPlayerProps {
-  show?: boolean
-  width?: string
-  height?: string
-  color?: string
-  title?: string
-  muted?: boolean
-  webFullScreen?: boolean
-  autoPlay?: boolean
-  loop?: boolean
-  volume?: number
-  control?: boolean
   src?: string
   close?: () => void
 }
 
 const props = withDefaults(defineProps<VideoPlayerProps>(), {
-  width: '100%',
-  height: '100%',
-  control: true,
   src: '',
 })
 
-onMounted(() => {
-  // 监听esc事件
-  document.onkeydown = (e: KeyboardEvent) => {
-    e = (window.event as KeyboardEvent) || e
-
-    if (e.code === 'Escape' || e.code === 'Esc') {
-      props.close?.()
-    }
-  }
-})
-
 const handleClose = () => props.close?.()
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') handleClose()
+}
+
+onMounted(() => document.addEventListener('keydown', handleKeydown))
+onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown))
 
 defineExpose({ handleClose })
 </script>
@@ -44,26 +25,19 @@ defineExpose({ handleClose })
 <template>
   <div class="video-player-wrapper">
     <div class="video-player-mask" />
-    <div class="video-player-close-btn" @click="handleClose">
+    <button
+      type="button"
+      class="video-player-close-btn"
+      aria-label="关闭视频"
+      @click="handleClose"
+    >
       <el-icon circle size="24">
         <Close />
       </el-icon>
-    </div>
+    </button>
     <div class="video-wrapper">
       <div class="inner-wrapper">
-        <videoPlay
-          :width="width"
-          :height="height"
-          :color="color"
-          :title="title"
-          :muted="muted"
-          :web-full-screen="webFullScreen"
-          :auto-play="autoPlay"
-          :loop="loop"
-          :volume="volume"
-          :control="control"
-          :src="src"
-        />
+        <video class="video" :src="src" controls playsinline />
       </div>
     </div>
   </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts" name="form-dialog">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 
 interface DialogProps {
   title: string
@@ -19,42 +19,33 @@ const props = withDefaults(defineProps<DialogProps>(), {
 const dialogFormVisible = ref(true)
 const inputValue = ref(props.name)
 
-const handleClick = () => props.onConfirm?.(inputValue.value)
+const handleClick = () => {
+  const name = inputValue.value.trim()
+  if (name) props.onConfirm?.(name)
+}
 
 const handleClose = () => props.onClose?.()
 
 defineExpose({ dialogFormVisible, handleClick, handleClose })
-
-onMounted(() => {
-  // 监听enter事件
-  document.onkeydown = (e: KeyboardEvent) => {
-    e = (window.event as KeyboardEvent) || e
-    if (e.code === 'Enter' || e.code === 'enter' || e.code === 'NumpadEnter') {
-      const inputVal = inputValue.value.trim()
-
-      if (!inputVal) return
-
-      props.onConfirm?.(inputVal)
-    }
-  }
-})
 </script>
 
 <template>
   <el-dialog v-model="dialogFormVisible" class="dialog-wrapper" width="340px" :title="title" @close="handleClose">
-    <el-row justify="center">
-      <div class="thumb-wrapper">
-        <el-image style="width: 115px; height: 90px" :src="thumbUrl" class="thumb" fit="contain" />
-      </div>
-    </el-row>
-    <el-row justify="center">
-      <el-input v-model="inputValue" autofocus maxlength="30" />
-    </el-row>
-    <el-row justify="end">
-      <div class="dialog-footer">
-        <el-button type="primary" :disabled="!inputValue.trim()" @click="handleClick"> 确定 </el-button>
-      </div>
-    </el-row>
+    <form @submit.prevent="handleClick">
+      <el-row justify="center">
+        <div class="thumb-wrapper">
+          <el-image style="width: 115px; height: 90px" :src="thumbUrl" class="thumb" fit="contain" />
+        </div>
+      </el-row>
+      <el-row justify="center">
+        <el-input v-model="inputValue" autofocus maxlength="30" />
+      </el-row>
+      <el-row justify="end">
+        <div class="dialog-footer">
+          <el-button native-type="submit" type="primary" :disabled="!inputValue.trim()"> 确定 </el-button>
+        </div>
+      </el-row>
+    </form>
   </el-dialog>
 </template>
 

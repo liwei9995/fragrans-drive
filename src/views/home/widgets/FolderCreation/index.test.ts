@@ -1,11 +1,11 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import FolderCreation from './index.vue'
 
 vi.mock('@/hooks/useCreateFolder', () => ({
-  useCreateFolder: vi.fn((name, parentId, cb) => {
+  useCreateFolder: vi.fn((name, _parentId, cb) => {
     cb({ id: '1', name })
-  })
+  }),
 }))
 
 describe('FolderCreation', () => {
@@ -19,10 +19,10 @@ describe('FolderCreation', () => {
     const wrapper = mount(FolderCreation, {
       props: {
         parentId: 'root',
-        success
-      }
+        success,
+      },
     })
-    
+
     // Find SuccessFilled icon wrapper and trigger click
     await wrapper.find('.primary').trigger('click')
     expect(success).toHaveBeenCalledWith({ id: '1', name: '新建文件夹' })
@@ -32,10 +32,10 @@ describe('FolderCreation', () => {
     const close = vi.fn()
     const wrapper = mount(FolderCreation, {
       props: {
-        close
-      }
+        close,
+      },
     })
-    
+
     await wrapper.find('.info').trigger('click')
     expect(close).toHaveBeenCalled()
   })

@@ -54,6 +54,8 @@
           align-items: center;
           height: 100%;
           cursor: pointer;
+          background: transparent;
+          border: 0;
 
           &:hover {
             opacity: 0.6;

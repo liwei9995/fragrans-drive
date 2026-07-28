@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { getThumb, FOLDER_THUMB, FILE_TYPE_THUMBS } from './index'
+import { describe, expect, it } from 'vitest'
+import { FILE_TYPE_THUMBS, FOLDER_THUMB, getThumb } from './index'
 
 describe('getThumb', () => {
   it('returns FOLDER_THUMB when type is folder', () => {
@@ -14,8 +14,8 @@ describe('getThumb', () => {
   })
 
   it('returns UNKNOWN thumb for unknown file extension', () => {
-    expect(getThumb('.xyz', 'file')).toBe(FILE_TYPE_THUMBS['unknown'])
-    expect(getThumb('', 'file')).toBe(FILE_TYPE_THUMBS['unknown'])
-    expect(getThumb(undefined, 'file')).toBe(FILE_TYPE_THUMBS['unknown'])
+    expect(getThumb('.xyz', 'file')).toBe(FILE_TYPE_THUMBS.unknown)
+    expect(getThumb('', 'file')).toBe(FILE_TYPE_THUMBS.unknown)
+    expect(getThumb(undefined, 'file')).toBe(FILE_TYPE_THUMBS.unknown)
   })
 })

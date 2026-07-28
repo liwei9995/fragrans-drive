@@ -1,6 +1,7 @@
 <script setup lang="ts" name="LoginForm">
+import { Lock, User } from '@element-plus/icons-vue'
 import type { ElForm } from 'element-plus'
-import { onMounted, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Login } from '@/api/interface'
 import { authLogin } from '@/api/modules/user'
@@ -64,17 +65,6 @@ const login = (formEl: FormInstance | undefined) => {
   })
 }
 
-onMounted(() => {
-  // 监听enter事件（调用登录）
-  document.onkeydown = (e: KeyboardEvent) => {
-    e = (window.event as KeyboardEvent) || e
-    if (e.code === 'Enter' || e.code === 'enter' || e.code === 'NumpadEnter') {
-      if (loading.value) return
-      login(loginFormRef.value)
-    }
-  }
-})
-
 defineExpose({ loginRules, loginFormRef, loginForm, loading, login })
 </script>
 
@@ -84,7 +74,13 @@ defineExpose({ loginRules, loginFormRef, loginForm, loading, login })
       <h1>Log in</h1>
       <small>Sign in if you already have an account.</small>
       <span>
-        <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" size="large">
+        <el-form
+          ref="loginFormRef"
+          :model="loginForm"
+          :rules="loginRules"
+          size="large"
+          @submit.prevent="login(loginFormRef)"
+        >
           <el-form-item prop="email">
             <el-input v-model="loginForm.email" placeholder="Email">
               <template #prefix>
@@ -112,6 +108,7 @@ defineExpose({ loginRules, loginFormRef, loginForm, loading, login })
             round
             size="large"
             type="primary"
+            native-type="submit"
             :disabled="loading"
             :loading="loading"
             @click="login(loginFormRef)"

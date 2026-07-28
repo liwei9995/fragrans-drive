@@ -35,10 +35,7 @@ const fetchPath = async () => {
     return
   }
 
-  const pathItems = (await getPath(id.value)) as Array<{
-    id: string
-    name: string
-  }>
+  const pathItems = await getPath(id.value)
 
   breadcrumbItems.value = [
     ...pathItems.map((path) => ({
