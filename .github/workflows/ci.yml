@@ -50,5 +50,14 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Verify Docker build
-        run: docker build -t fragrans:verify .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: fragrans:verify
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

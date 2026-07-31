@@ -1,11 +1,14 @@
 .git
+.github
+.codegraph
 node_modules
 npm-debug.log
 *.md
 dist
-test
+tests
 docs
-Dockerfile
+scripts
+bacon.toml
 docker-compose.yaml
 docker-compose.develop.yaml
 coverage
