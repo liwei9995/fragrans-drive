@@ -514,7 +514,9 @@ pub async fn get_file(
         let repo = StorageRepository::new(&state.db);
         let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
             .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
-        let existing = repo.find_by_id(obj_id).await?
+        let existing = repo
+            .find_by_id(obj_id)
+            .await?
             .ok_or_else(|| AppError::NotFound("File not found".into()))?;
         if claims.share_version.unwrap_or(0) != existing.share_version {
             return Err(AppError::Unauthorized("Share link has been revoked".into()));

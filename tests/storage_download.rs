@@ -582,8 +582,11 @@ async fn expire_in_seconds_rejects_out_of_range() {
         assert_eq!(status, StatusCode::BAD_REQUEST, "body={body}");
     }
 
-    let (status, url) =
-        download_url(&ctx, &format!(r#"{{"fileId":"{file_id}","expireInSeconds":60}}"#)).await;
+    let (status, url) = download_url(
+        &ctx,
+        &format!(r#"{{"fileId":"{file_id}","expireInSeconds":60}}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let token = url.split("token=").last().unwrap();
     let req = Request::builder()

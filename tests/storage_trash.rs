@@ -134,11 +134,14 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     file_id.to_hex(),
-                    api::middleware::create_token("test-secret-key-that-is-long-enough",
+                    api::middleware::create_token(
+                        "test-secret-key-that-is-long-enough",
                         &ctx.user_id,
                         api::middleware::TokenPurpose::Download,
                         Some(file_id.to_hex()),
-                        (chrono::Utc::now().timestamp() + 3600) as usize, None)
+                        (chrono::Utc::now().timestamp() + 3600) as usize,
+                        None
+                    )
                     .unwrap()
                 ))
                 .body(Body::empty())
@@ -179,11 +182,14 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     file_id.to_hex(),
-                    api::middleware::create_token("test-secret-key-that-is-long-enough",
+                    api::middleware::create_token(
+                        "test-secret-key-that-is-long-enough",
                         &ctx.user_id,
                         api::middleware::TokenPurpose::Download,
                         Some(file_id.to_hex()),
-                        (chrono::Utc::now().timestamp() + 3600) as usize, None)
+                        (chrono::Utc::now().timestamp() + 3600) as usize,
+                        None
+                    )
                     .unwrap()
                 ))
                 .body(Body::empty())
@@ -223,11 +229,14 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     thumb_id.to_hex(),
-                    api::middleware::create_token("test-secret-key-that-is-long-enough",
+                    api::middleware::create_token(
+                        "test-secret-key-that-is-long-enough",
                         &ctx.user_id,
                         api::middleware::TokenPurpose::Download,
                         Some(thumb_id.to_hex()),
-                        (chrono::Utc::now().timestamp() + 3600) as usize, None)
+                        (chrono::Utc::now().timestamp() + 3600) as usize,
+                        None
+                    )
                     .unwrap()
                 ))
                 .body(Body::empty())
