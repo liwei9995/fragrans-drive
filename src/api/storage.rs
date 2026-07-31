@@ -44,6 +44,8 @@ pub struct UpdateStorageDto {
 pub struct GetDownloadUrlDto {
     #[serde(rename = "fileId")]
     pub file_id: String,
+    #[serde(rename = "expireInSeconds", default)]
+    pub expire_in_seconds: Option<i64>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -374,6 +376,22 @@ pub async fn get_files(
         .get_files(&user_ctx.user_id, query, page, limit, sort)
         .await?;
 
+    let thumb_ids: Vec<mongodb::bson::oid::ObjectId> = files
+        .iter()
+        .filter_map(|s| s.thumbnail.as_deref())
+        .filter_map(|id| mongodb::bson::oid::ObjectId::parse_str(id).ok())
+        .collect();
+    let thumb_share_versions: std::collections::HashMap<String, i32> = if thumb_ids.is_empty() {
+        std::collections::HashMap::new()
+    } else {
+        StorageRepository::new(&state.db)
+            .find_many_by_ids(thumb_ids, &user_ctx.user_id)
+            .await?
+            .into_iter()
+            .filter_map(|t| t.id.map(|id| (id.to_hex(), t.share_version)))
+            .collect()
+    };
+
     let base_url = state.config.domain.as_str();
     let docs: Vec<StorageListResponse> = files
         .into_iter()
@@ -383,6 +401,7 @@ pub async fn get_files(
                 base_url,
                 &user_ctx.user_id,
                 &state.config.jwt_secret,
+                &thumb_share_versions,
             )
         })
         .collect::<Result<_, _>>()?;
@@ -492,6 +511,14 @@ pub async fn get_file(
                 "Token not scoped to this file".into(),
             ));
         }
+        let repo = StorageRepository::new(&state.db);
+        let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
+            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+        let existing = repo.find_by_id(obj_id).await?
+            .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+        if claims.share_version.unwrap_or(0) != existing.share_version {
+            return Err(AppError::Unauthorized("Share link has been revoked".into()));
+        }
     } else if claims.purpose != TokenPurpose::Access {
         return Err(AppError::Unauthorized("Invalid token purpose".into()));
     }
@@ -597,15 +624,61 @@ pub async fn get_download_url(
         return Err(AppError::BadRequest("Not a file".into()));
     }
 
+    let expire_secs = match payload.expire_in_seconds {
+        None => 900,
+        Some(s) if (1..=86_400).contains(&s) => s,
+        Some(_) => {
+            return Err(AppError::BadRequest(
+                "expireInSeconds must be between 1 and 86400".into(),
+            ));
+        }
+    };
+
     let domain = state.config.domain.trim_end_matches('/');
     let token = crate::api::middleware::create_token(
         &state.config.jwt_secret,
         &user_ctx.user_id,
         TokenPurpose::Download,
         Some(file_id.to_string()),
-        (chrono::Utc::now().timestamp() + 900) as usize, // 15 min
+        (chrono::Utc::now().timestamp() + expire_secs) as usize,
+        Some(existing.share_version),
     )?;
     Ok(format!("{}/v1/storage/{}?token={}", domain, file_id, token).into_response())
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/{id}/revoke_share",
+    params(
+        ("id" = String, Path, description = "File storage id")
+    ),
+    responses(
+        (status = 200, description = "Share revoked; returns new shareVersion", body = serde_json::Value)
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn revoke_share(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
+        .map_err(|_| AppError::BadRequest("Invalid fileId".into()))?;
+
+    let updated = repo
+        .increment_share_version(obj_id, &user_ctx.user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Share revoked successfully",
+        "shareVersion": updated.share_version
+    }))
+    .into_response())
 }
 
 #[utoipa::path(

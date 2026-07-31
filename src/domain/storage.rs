@@ -148,11 +148,13 @@ pub struct TrashRestoreResponse {
 
 impl StorageListResponse {
     /// 从 Storage 构建列表项，并填入 base_url + token 生成的 url/thumbnail 完整 URL（仅文件有 url）。
+    /// `thumb_share_versions` maps thumbnail id hex → that doc's shareVersion.
     pub fn from_storage_with_urls(
         s: Storage,
         base_url: &str,
         user_id: &str,
         secret: &str,
+        thumb_share_versions: &std::collections::HashMap<String, i32>,
     ) -> Result<Self, crate::api::error::AppError> {
         let base = base_url.trim_end_matches('/');
         let expires_at = (Utc::now().timestamp() + 900) as usize;
@@ -168,6 +170,7 @@ impl StorageListResponse {
                 crate::api::middleware::TokenPurpose::Download,
                 Some(file_id.clone()),
                 expires_at,
+                Some(s.share_version),
             )?;
             Some(format!("{base}/v1/storage/{file_id}?token={token}"))
         } else {
@@ -175,12 +178,14 @@ impl StorageListResponse {
         };
         let thumbnail = match s.thumbnail.as_ref() {
             Some(thumb_id) => {
+                let thumb_version = thumb_share_versions.get(thumb_id).copied().unwrap_or(0);
                 let token = crate::api::middleware::create_token(
                     secret,
                     user_id,
                     crate::api::middleware::TokenPurpose::Download,
                     Some(thumb_id.clone()),
                     expires_at,
+                    Some(thumb_version),
                 )?;
                 Some(format!("{base}/v1/storage/{thumb_id}?token={token}"))
             }
@@ -292,6 +297,9 @@ pub struct Storage {
         skip_serializing_if = "Option::is_none"
     )]
     pub encryption_format: Option<u8>,
+
+    #[serde(rename = "shareVersion", default)]
+    pub share_version: i32,
 
     #[serde(rename = "parentId")]
     pub parent_id: String,

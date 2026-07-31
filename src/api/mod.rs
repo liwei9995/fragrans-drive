@@ -33,6 +33,7 @@ pub struct AppState {
         storage::get_file,
         storage::move_file,
         storage::get_download_url,
+        storage::revoke_share,
         storage::update_file,
         storage::remove_file,
         storage::restore_file,
@@ -128,6 +129,10 @@ pub fn router(db: Database, config: Config) -> Router {
         .route(
             "/download/url",
             axum::routing::post(storage::get_download_url),
+        )
+        .route(
+            "/{id}/revoke_share",
+            axum::routing::post(storage::revoke_share),
         )
         .route(
             "/{id}",

@@ -313,6 +313,7 @@ async fn download_url_rejects_unowned_file() {
         fragrans::api::middleware::TokenPurpose::Access,
         None,
         (chrono::Utc::now().timestamp() + 3600) as usize,
+        None,
     )
     .unwrap();
 
@@ -340,6 +341,7 @@ async fn expired_download_token_is_rejected() {
         purpose: fragrans::api::middleware::TokenPurpose::Download,
         file_id: Some(file_id.clone()),
         exp: (chrono::Utc::now().timestamp() - 3600) as usize,
+        share_version: Some(0),
     };
     let expired_token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
@@ -391,6 +393,206 @@ async fn download_response_does_not_log_query_token() {
 
     // Verifying tracing output requires a custom subscriber which is complex for this test.
     // We trust that our TraceLayer configuration in src/api/mod.rs works as implemented.
+
+    ctx.teardown().await;
+}
+
+async fn download_url(ctx: &TestContext, body: &str) -> (StatusCode, String) {
+    let req = Request::builder()
+        .method("POST")
+        .uri("/v1/storage/download/url")
+        .header(header::AUTHORIZATION, format!("Bearer {}", ctx.auth_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    let status = res.status();
+    let text = String::from_utf8(response_bytes(res).await.to_vec()).unwrap();
+    (status, text.replace('"', ""))
+}
+
+#[tokio::test]
+#[serial]
+async fn revoke_share_invalidates_existing_download_token() {
+    let ctx = setup().await;
+    let file_id = upload_file(&ctx, b"revoked").await;
+
+    let (status, url) = download_url(&ctx, &format!(r#"{{"fileId":"{file_id}"}}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    let old_token = url.split("token=").last().unwrap().to_string();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/v1/storage/{file_id}/revoke_share"))
+        .header(header::AUTHORIZATION, format!("Bearer {}", ctx.auth_token))
+        .body(Body::empty())
+        .unwrap();
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = serde_json::from_slice(&response_bytes(res).await).unwrap();
+    assert_eq!(body["shareVersion"], 1);
+
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={old_token}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    let (status, url) = download_url(&ctx, &format!(r#"{{"fileId":"{file_id}"}}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    let new_token = url.split("token=").last().unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={new_token}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn list_thumbnail_url_uses_live_share_version() {
+    use fragrans::domain::storage::{Storage, StorageType};
+    use fragrans::infrastructure::db::storage_repo::StorageRepository;
+    use jsonwebtoken::{DecodingKey, Validation};
+
+    let ctx = setup().await;
+    let repo = StorageRepository::new(&ctx.db);
+    let now = chrono::Utc::now();
+    let thumb_id = repo
+        .create(Storage {
+            id: None,
+            name: "thumb.jpg".into(),
+            base_name: None,
+            ext_name: None,
+            mime_type: Some("image/jpeg".into()),
+            encoding: None,
+            size: Some(1),
+            md5_hash: None,
+            iv: None,
+            content_hash: Some("a".repeat(64)),
+            hash_algorithm: Some("sha256".into()),
+            encryption_format: Some(1),
+            share_version: 0,
+            parent_id: "root".into(),
+            r#type: StorageType::Thumbnail,
+            user_id: ctx.user_id.clone(),
+            thumbnail: None,
+            trashed: false,
+            created_at: Some(now),
+            updated_at: Some(now),
+        })
+        .await
+        .unwrap();
+    let file_id = repo
+        .create(Storage {
+            id: None,
+            name: "photo.jpg".into(),
+            base_name: Some("photo".into()),
+            ext_name: Some("jpg".into()),
+            mime_type: Some("image/jpeg".into()),
+            encoding: None,
+            size: Some(1),
+            md5_hash: None,
+            iv: None,
+            content_hash: Some("b".repeat(64)),
+            hash_algorithm: Some("sha256".into()),
+            encryption_format: Some(1),
+            share_version: 0,
+            parent_id: "root".into(),
+            r#type: StorageType::File,
+            user_id: ctx.user_id.clone(),
+            thumbnail: Some(thumb_id.to_hex()),
+            trashed: false,
+            created_at: Some(now),
+            updated_at: Some(now),
+        })
+        .await
+        .unwrap();
+
+    let revoke = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/v1/storage/{}/revoke_share", thumb_id.to_hex()))
+                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.auth_token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(revoke.status(), StatusCode::OK);
+
+    let list = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/storage/list")
+                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.auth_token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"query":{"parentId":"root"}}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(list.status(), StatusCode::OK);
+    let body: serde_json::Value = serde_json::from_slice(&response_bytes(list).await).unwrap();
+    let item = body["docs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["id"].as_str() == Some(&file_id.to_hex()))
+        .unwrap();
+    let thumb_url = item["thumbnail"].as_str().unwrap();
+    let token = thumb_url.split("token=").last().unwrap();
+    let claims = jsonwebtoken::decode::<fragrans::api::middleware::Claims>(
+        token,
+        &DecodingKey::from_secret(b"test-secret-key-that-is-long-enough"),
+        &Validation::default(),
+    )
+    .unwrap()
+    .claims;
+    assert_eq!(claims.share_version, Some(1));
+    assert_eq!(claims.file_id.as_deref(), Some(thumb_id.to_hex().as_str()));
+
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn expire_in_seconds_rejects_out_of_range() {
+    let ctx = setup().await;
+    let file_id = upload_file(&ctx, b"expire").await;
+
+    for body in [
+        format!(r#"{{"fileId":"{file_id}","expireInSeconds":-1}}"#),
+        format!(r#"{{"fileId":"{file_id}","expireInSeconds":0}}"#),
+        format!(r#"{{"fileId":"{file_id}","expireInSeconds":86401}}"#),
+    ] {
+        let (status, _) = download_url(&ctx, &body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "body={body}");
+    }
+
+    let (status, url) =
+        download_url(&ctx, &format!(r#"{{"fileId":"{file_id}","expireInSeconds":60}}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    let token = url.split("token=").last().unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={token}"))
+        .body(Body::empty())
+        .unwrap();
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
 
     ctx.teardown().await;
 }

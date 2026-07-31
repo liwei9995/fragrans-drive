@@ -95,6 +95,7 @@ pub async fn setup() -> TestContext {
         api::middleware::TokenPurpose::Access,
         None,
         (chrono::Utc::now().timestamp() + 3600) as usize,
+        None,
     )
     .expect("Failed to encode token");
 
@@ -104,6 +105,7 @@ pub async fn setup() -> TestContext {
         api::middleware::TokenPurpose::Download,
         Some("dummy_file_id".to_string()),
         (chrono::Utc::now().timestamp() + 3600) as usize,
+        None,
     )
     .expect("Failed to encode token");
 

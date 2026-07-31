@@ -38,6 +38,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: None,
             parent_id: "root".to_string(),
             r#type: StorageType::Folder,
@@ -65,6 +66,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             content_hash: Some(thumb_hash.clone()),
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: None,
             parent_id: folder_id.to_hex(),
             r#type: StorageType::Thumbnail,
@@ -92,6 +94,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
             content_hash: Some(file_hash.clone()),
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: None,
             parent_id: folder_id.to_hex(),
             r#type: StorageType::File,
@@ -131,13 +134,11 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     file_id.to_hex(),
-                    api::middleware::create_token(
-                        "test-secret-key-that-is-long-enough",
+                    api::middleware::create_token("test-secret-key-that-is-long-enough",
                         &ctx.user_id,
                         api::middleware::TokenPurpose::Download,
                         Some(file_id.to_hex()),
-                        (chrono::Utc::now().timestamp() + 3600) as usize
-                    )
+                        (chrono::Utc::now().timestamp() + 3600) as usize, None)
                     .unwrap()
                 ))
                 .body(Body::empty())
@@ -178,13 +179,11 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     file_id.to_hex(),
-                    api::middleware::create_token(
-                        "test-secret-key-that-is-long-enough",
+                    api::middleware::create_token("test-secret-key-that-is-long-enough",
                         &ctx.user_id,
                         api::middleware::TokenPurpose::Download,
                         Some(file_id.to_hex()),
-                        (chrono::Utc::now().timestamp() + 3600) as usize
-                    )
+                        (chrono::Utc::now().timestamp() + 3600) as usize, None)
                     .unwrap()
                 ))
                 .body(Body::empty())
@@ -224,13 +223,11 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                 .uri(format!(
                     "/v1/storage/{}?token={}",
                     thumb_id.to_hex(),
-                    api::middleware::create_token(
-                        "test-secret-key-that-is-long-enough",
+                    api::middleware::create_token("test-secret-key-that-is-long-enough",
                         &ctx.user_id,
                         api::middleware::TokenPurpose::Download,
                         Some(thumb_id.to_hex()),
-                        (chrono::Utc::now().timestamp() + 3600) as usize
-                    )
+                        (chrono::Utc::now().timestamp() + 3600) as usize, None)
                     .unwrap()
                 ))
                 .body(Body::empty())
@@ -272,6 +269,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             content_hash: Some(orphan_hash.clone()),
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(orphan_iv.clone()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -297,6 +295,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             content_hash: Some(shared_hash.clone()),
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(shared_iv.clone()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -322,6 +321,7 @@ async fn empty_trash_deletes_docs_and_gc_only_orphaned_files() {
             content_hash: Some(shared_hash.clone()),
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(shared_iv.clone()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -423,6 +423,7 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::Thumbnail,
@@ -452,6 +453,7 @@ async fn trash_list_is_paginated_and_excludes_thumbnail_rows() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: (!is_folder).then(|| "000000000000000000000000".to_string()),
             parent_id: "root".to_string(),
             r#type: if is_folder {
@@ -529,6 +531,7 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: None,
             parent_id: "root".to_string(),
             r#type: StorageType::Folder,
@@ -553,6 +556,7 @@ async fn trash_list_defaults_to_top_level_and_can_include_children() {
         content_hash: None,
         hash_algorithm: None,
         encryption_format: None,
+        share_version: 0,
         iv: Some(get_iv()),
         parent_id: folder_id.to_hex(),
         r#type: StorageType::File,
@@ -626,6 +630,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -651,6 +656,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -675,6 +681,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -700,6 +707,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,
@@ -724,6 +732,7 @@ async fn trash_restore_supports_single_batch_and_all_modes() {
             content_hash: None,
             hash_algorithm: None,
             encryption_format: None,
+            share_version: 0,
             iv: Some(get_iv()),
             parent_id: "root".to_string(),
             r#type: StorageType::File,

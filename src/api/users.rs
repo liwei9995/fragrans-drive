@@ -100,6 +100,7 @@ pub async fn login(
         crate::api::middleware::TokenPurpose::Access,
         None,
         (Utc::now().timestamp() + 3600 * 24 * 7) as usize,
+        None,
     )?;
 
     Ok(Json(LoginResponse {

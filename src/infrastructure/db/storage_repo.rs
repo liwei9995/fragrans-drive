@@ -125,6 +125,23 @@ impl StorageRepository {
             .await
     }
 
+    pub async fn increment_share_version(
+        &self,
+        id: ObjectId,
+        user_id: &str,
+    ) -> Result<Option<Storage>, mongodb::error::Error> {
+        self.collection
+            .find_one_and_update(
+                doc! { "_id": id, "userId": user_id },
+                doc! {
+                    "$inc": { "shareVersion": 1 },
+                    "$set": { "updatedAt": mongodb::bson::DateTime::now() },
+                },
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+    }
+
     pub async fn update_many_by_ids(
         &self,
         ids: Vec<ObjectId>,

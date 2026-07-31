@@ -17,6 +17,8 @@ pub struct Claims {
     pub purpose: TokenPurpose,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub share_version: Option<i32>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -56,12 +58,14 @@ pub fn create_token(
     purpose: TokenPurpose,
     file_id: Option<String>,
     exp: usize,
+    share_version: Option<i32>,
 ) -> Result<String, crate::api::error::AppError> {
     let claims = Claims {
         user_id: user_id.to_string(),
         exp,
         purpose,
         file_id,
+        share_version,
     };
     jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
