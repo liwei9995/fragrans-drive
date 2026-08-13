@@ -2,155 +2,149 @@
 
 A high-performance file storage service rewritten in **Rust**.
 
-## 📖 Description
+## Description
 
-**Fragrans** (Osmanthus fragrans) 旨在提供一个高效、安全且可扩展的个人文件存储解决方案。本项目已从原有的 Node.js/NestJS 架构完整重写为 Rust，以获得更低的内存占用、更高的并发处理能力以及更小的部署体积。
+**Fragrans** (Osmanthus fragrans) aims to provide an efficient, secure, and scalable personal file storage solution. The project has been fully rewritten from the original Node.js/NestJS stack to Rust for lower memory usage, higher concurrency, and a smaller deployment footprint.
 
-> "暗淡轻黄体性柔，情疏迹远只香留。" —— 正如桂花般，Fragrans 追求在后台默默且高效地处理您的每一份文件。
+> "Pale yellow, soft by nature — distant in form, yet its fragrance remains." — Like osmanthus, Fragrans quietly and efficiently handles every file behind the scenes.
 
-## ✨ 特性 (Features)
+## Features
 
-- **高性能底层**：基于 Rust + Axum + Tokio，充分利用异步 I/O。
-- **存储优化**：
-  - **MD5 去重**：相同内容的文件在物理存储上仅保留一份。
-  - **文件分片**：采用 `aa/bb/cc/hash` 的分层存储结构，避免单目录文件过多。
-  - **加密存储**：所有物理文件均采用 AES-256-CTR 加密，确保数据落地安全。
-- **图像处理**：自动为上传的图片生成 WebP/JPEG 缩略图。
-- **安全认证**：基于 JWT 的身份验证机制。
-- **极简部署**：提供多阶段构建的 Docker 镜像，体积仅约 30MB。
+- **High-performance core**: Built on Rust + Axum + Tokio with async I/O.
+- **Storage optimizations**:
+  - **Content deduplication**: Identical file content is stored once on disk.
+  - **Sharded paths**: Uses an `aa/bb/cc/hash` layout to avoid overcrowded directories.
+  - **Encrypted at rest**: Physical files are encrypted (AES-based) so data is safe on disk.
+- **Image processing**: Automatically generates WebP/JPEG thumbnails for uploaded images.
+- **Secure auth**: JWT-based authentication.
+- **Minimal deployment**: Multi-stage Docker image, roughly ~30MB.
 
-## 🛠️ 技术栈 (Tech Stack)
+## Tech Stack
 
-- **语言**: Rust
-- **Web 框架**: [Axum](https://github.com/tokio-rs/axum)
-- **异步运行时**: [Tokio](https://tokio.rs/)
-- **数据库**: MongoDB (Official Rust Driver)
-- **加密与哈希**: `bcrypt`, `aes`, `ctr`, `md5`
-- **图像处理**: `image` crate
+- **Language**: Rust
+- **Web framework**: [Axum](https://github.com/tokio-rs/axum)
+- **Async runtime**: [Tokio](https://tokio.rs/)
+- **Database**: MongoDB (official Rust driver)
+- **Crypto & hashing**: `bcrypt`, `aes`, `ctr`, `md5`
+- **Image processing**: `image` crate
 
-## 🚀 快速开始 (Quick Start)
+## Quick Start
 
-### 环境要求
+### Requirements
 
-- Rust 工具链 (1.75+)
-- MongoDB (推荐 5.0+)
+- Rust toolchain (1.75+)
+- MongoDB (5.0+ recommended)
 
-### 本地开发
+### Local development
 
-1. **配置环境变量**
-   复制 `.env.example` 为 `.env` 并根据需要修改：
+1. **Configure environment variables**  
+   Copy `.env.example` to `.env` and adjust as needed:
 
    ```bash
    cp .env.example .env
    ```
 
-2. **启动数据库**
-   使用现有的 Docker Compose 启动 MongoDB：
+2. **Start the database**  
+   Start MongoDB with the existing Docker Compose setup:
 
    ```bash
    docker-compose up -d mongo
    ```
 
-3. **运行项目**
+3. **Run the project**
 
    ```bash
    cargo run
    ```
 
-   服务默认监听端口：`3821`
+   The service listens on port `3821` by default.
 
-4. **开发时自动重新编译（可选）**
-   使用 [Bacon](https://github.com/Canop/bacon)（cargo-watch 的推荐替代）在代码修改时自动检查或运行：
+4. **Auto-rebuild during development (optional)**  
+   Use [Bacon](https://github.com/Canop/bacon) (recommended alternative to cargo-watch) to check or run on file changes:
 
    ```bash
    cargo install --locked bacon
    bacon
    ```
 
-   默认会持续执行 `cargo check`。若需「改代码自动运行服务」，在项目根目录添加 `bacon.toml`：
-
-   ```toml
-   [jobs.run]
-   command = ["cargo", "run"]
-   need_stdout = true
-   allow_warnings = true
-   background = true
-   ```
-
-   然后执行 `bacon run`。
-
-   **若用 Cmd+C 退出后服务仍在后台运行**：Ctrl/Cmd+C 可能只结束 Bacon，其启动的子进程（本服务）未收到信号而继续运行。可先清理再启动：
+   By default this keeps running `cargo check`. For “restart the server on code changes”, use the project’s `bacon.toml` and run:
 
    ```bash
-   # 按进程名结束残留的 fragrans 进程
+   bacon run
+   ```
+
+   **If the service keeps running after Cmd+C**: Ctrl/Cmd+C may only stop Bacon while the child process (this service) keeps running. Clean up before restarting:
+
+   ```bash
+   # Kill leftover fragrans processes by name
    pkill -f fragrans
-   # 或按端口结束（默认 3821）
+   # Or free the default port (3821)
    lsof -ti:3821 | xargs kill
    ```
 
-   之后若需自动重载，可直接用 `cargo run`，需要重启时再 Cmd+C 后重新执行，这样会一并结束服务。
+   For simple reloads you can also use `cargo run` and restart with Cmd+C + run again so the process exits cleanly.
 
-### 运行测试
+### Running tests
 
 ```bash
-# 运行所有测试 (已包含单元测试与集成测试，覆盖认证、存储与回收站)
+# Run all tests (unit + integration: auth, storage, trash)
 cargo test
-# 检查代码格式
+# Check formatting
 cargo fmt --all -- --check
-# 运行 Lint 检查
+# Lint
 cargo clippy
 ```
 
-## 🌐 API 接口文档 (API Documentation)
+## API Documentation
 
-目前 API 遵循 RESTful 规范，基础版本为 `/v1`。
+The API follows REST conventions under the `/v1` base path.
 
-### 访问方式
+### How to explore
 
-本项目通过 **utoipa** 自动生成 OpenAPI 接口文档，您可以通过交互式 UI 直接测试接口：
+OpenAPI docs are generated with **utoipa**. Use the interactive UI to try endpoints:
 
 - **Swagger UI**: [http://localhost:3821/swagger-ui](http://localhost:3821/swagger-ui)
 - **OpenAPI JSON**: `/api-docs/openapi.json`
 
-主要接口概览：
+Main endpoints:
 
-| 模块        | 路径                 | 方法     | 描述                       |
-| ----------- | -------------------- | -------- | -------------------------- |
-| **Auth**    | `/v1/auth/login`     | POST     | 用户登录 (获取 Token)      |
-| **Users**   | `/v1/users`          | GET/POST | 用户管理 (需 Token)        |
-| **Storage** | `/v1/storage/upload` | POST     | 文件上传 (需 Token)        |
-| **Storage** | `/v1/storage/list`   | POST     | 获取文件列表 (需 Token)    |
-| **Storage** | `/v1/storage/{id}`   | GET      | 文件下载 (支持 token 验证) |
+| Module      | Path                 | Method   | Description                          |
+| ----------- | -------------------- | -------- | ------------------------------------ |
+| **Auth**    | `/v1/auth/login`     | POST     | User login (returns a token)         |
+| **Users**   | `/v1/users`          | GET/POST | User management (token required)     |
+| **Storage** | `/v1/storage/upload` | POST     | File upload (token required)         |
+| **Storage** | `/v1/storage/list`   | POST     | List files (token required)          |
+| **Storage** | `/v1/storage/{id}`   | GET      | Download file (token query supported)|
 
-*提示：在 Swagger UI 中点击 "Authorize" 并输入 Bearer Token 即可测试加密接口。*
+*Tip: In Swagger UI, click "Authorize" and enter a Bearer token to call protected endpoints.*
 
-## 📦 部署 (Deployment)
+## Deployment
 
-### Docker 部署
+### Docker
 
-本项目提供优化后的多阶段构建 Dockerfile：
+The repo includes an optimized multi-stage Dockerfile:
 
 ```bash
-# 构建镜像
+# Build the image
 docker build -t fragrans-rust .
 
-# 使用 Docker Compose 一键启动
+# Start with Docker Compose
 docker-compose up -d
 ```
 
-对外映射端口默认为 `8085`。
+The published host port defaults to `8085`.
 
-## 📂 目录结构
+## Directory layout
 
-- `src/api/`: API 路由处理器与中间件，负责 HTTP 请求与响应。
-- `src/service/`: 核心业务逻辑层，负责串联领域模型与基础设施。
-- `src/domain/`: 领域模型 (User, Storage)。
-- `src/infrastructure/`: 外部服务实现 (DB, Storage I/O, Image processing)。
-- `src/config/`: 配置加载逻辑。
-- `src/utils/`: 通用工具类 (加密、哈希)。
-- `tests/`: 完整的集成测试套件。
+- `src/api/`: HTTP handlers and middleware.
+- `src/service/`: Business logic wiring domain models and infrastructure.
+- `src/domain/`: Domain models (User, Storage).
+- `src/infrastructure/`: External integrations (DB, storage I/O, image processing).
+- `src/config/`: Configuration loading.
+- `src/utils/`: Shared helpers (crypto, hashing).
+- `tests/`: Integration test suite.
 
-## 🤝 贡献与支持
+## Contributing & support
 
-- **作者**: [Aaron Li](https://www.oyiyio.com)
-- **许可证**: MIT
+- **Author**: [Aaron Li](https://www.oyiyio.com)
+- **License**: MIT

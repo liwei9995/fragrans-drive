@@ -93,7 +93,7 @@ pub fn router(db: Database, config: Config) -> Router {
         .route("/login", axum::routing::post(users::login))
         .with_state(state.clone());
 
-    // 创建用户（注册）无需登录，其余用户接口需 JWT
+    // User registration does not require auth; other user routes require JWT.
     let user_routes_public = Router::new()
         .route("/", axum::routing::post(users::create_user))
         .with_state(state.clone());

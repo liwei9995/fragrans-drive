@@ -137,7 +137,7 @@ pub struct MoveFileDto {
 
 #[derive(Deserialize, ToSchema)]
 pub struct GetPathDto {
-    /// 文件或文件夹 id；也接受 body 中的 fileId（兼容 NestJS）。
+    /// File or folder id; also accepts `fileId` in the body (NestJS compatibility).
     #[serde(alias = "fileId")]
     pub id: String,
 }

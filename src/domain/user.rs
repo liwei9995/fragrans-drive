@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-/// API 返回用，不包含 password。JSON 中 _id 为 hex 字符串，createdAt/updatedAt 为毫秒时间戳字符串。
+/// API response shape without password. JSON `_id` is hex; createdAt/updatedAt are millisecond timestamp strings.
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UserResponse {
     #[serde(
@@ -55,7 +55,7 @@ pub struct User {
     #[schema(value_type = Option<String>)]
     pub id: Option<ObjectId>,
     pub email: String,
-    /// 仅写入 DB，API 返回时用 UserResponse 排除
+    /// Stored in DB only; omitted from API responses via UserResponse.
     pub password: String,
 
     #[serde(rename = "firstName")]

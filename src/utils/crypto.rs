@@ -1,6 +1,6 @@
 use bcrypt::{hash, verify};
 
-/// 密码仅以 bcrypt 哈希形式存储，禁止明文落库。cost 12 约 200ms/次，兼顾安全与性能。
+/// Passwords are stored only as bcrypt hashes (never plaintext). Cost 12 is ~200ms/hash, balancing security and latency.
 const PASSWORD_COST: u32 = 12;
 
 pub fn hash_password(password: &str) -> String {

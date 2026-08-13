@@ -1,4 +1,4 @@
-//! API JSON 响应序列化：_id 为 hex 字符串，时间为毫秒时间戳字符串。
+//! API JSON response serializers: `_id` as hex string; times as millisecond timestamp strings.
 
 use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
@@ -30,7 +30,7 @@ where
     }
 }
 
-/// 序列化为 RFC 3339 字符串（如 "2023-03-22T16:48:12.233Z"），用于 storage list 等接口。
+/// Serialize as an RFC 3339 string (e.g. "2023-03-22T16:48:12.233Z"), used by storage list and similar APIs.
 pub fn serialize_optional_datetime_as_rfc3339<S>(
     dt: &Option<DateTime<Utc>>,
     serializer: S,

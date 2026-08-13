@@ -83,8 +83,7 @@ impl StorageRepository {
             .collect())
     }
 
-    /// 返回在给定 query 下所有作为 thumbnail 被引用的 _id（用于列表接口排除缩略图单独成条）。
-    /// 分页查询：返回 (当前页条目, 总条数)。
+    /// Paginated query: returns (page items, total count).
     pub async fn find_many_paginated(
         &self,
         query: Document,

@@ -1,5 +1,5 @@
-# Bacon 配置：代码变更时自动重新编译并运行服务
-# 使用方式：bacon run
+# Bacon config: rebuild and restart the service on code changes.
+# Usage: bacon run
 
 [jobs.run]
 command = ["cargo", "run"]

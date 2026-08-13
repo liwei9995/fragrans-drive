@@ -1,5 +1,5 @@
-//! 兼容 BSON DateTime 与 RFC 3339 字符串的 Option<DateTime<Utc>> 序列化。
-//! 旧数据可能是字符串，新数据为 BSON DateTime。
+//! Serialize/deserialize `Option<DateTime<Utc>>` for both BSON DateTime and RFC 3339 strings.
+//! Legacy rows may store strings; new rows use BSON DateTime.
 
 use chrono::{DateTime, Utc};
 use mongodb::bson::Bson;

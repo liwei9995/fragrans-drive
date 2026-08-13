@@ -10,7 +10,7 @@ pub enum StorageType {
     Thumbnail,
 }
 
-/// 列表单条：不含敏感字段，id 为 hex，createdAt/updatedAt 为 RFC3339，url/thumbnail 为完整 URL。
+/// List item: no sensitive fields; id is hex; createdAt/updatedAt are RFC3339; url/thumbnail are absolute URLs.
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StorageListResponse {
     #[serde(
@@ -49,7 +49,7 @@ pub struct StorageListResponse {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-/// 创建文件夹接口返回：id, name, parentId, type, createdAt, updatedAt, exist（已存在为 true，新建为 false）。
+/// Create-folder response: id, name, parentId, type, createdAt, updatedAt, exist (true if already present).
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CreateFolderResponse {
     #[serde(
@@ -76,7 +76,7 @@ pub struct CreateFolderResponse {
     pub exist: bool,
 }
 
-/// PUT /storage/:id 返回：id, name, parentId, type, userId, trashed, createdAt, updatedAt, baseName, extName。
+/// PUT /storage/:id response: id, name, parentId, type, userId, trashed, createdAt, updatedAt, baseName, extName.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UpdateStorageResponse {
     #[serde(
@@ -109,7 +109,7 @@ pub struct UpdateStorageResponse {
     pub ext_name: Option<String>,
 }
 
-/// 路径节点（get_path 返回的从 root 到当前文件/文件夹的每一级）。
+/// Path node (each level from root to the current file/folder returned by get_path).
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct StoragePathNode {
     pub id: String,
@@ -120,7 +120,7 @@ pub struct StoragePathNode {
     pub r#type: StorageType,
 }
 
-/// 分页列表响应：`{ docs, total, limit, page, pages }`。
+/// Paginated list response: `{ docs, total, limit, page, pages }`.
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StorageListPaginatedResponse {
     pub docs: Vec<StorageListResponse>,
@@ -147,7 +147,7 @@ pub struct TrashRestoreResponse {
 }
 
 impl StorageListResponse {
-    /// 从 Storage 构建列表项，并填入 base_url + token 生成的 url/thumbnail 完整 URL（仅文件有 url）。
+    /// Build a list item from Storage and fill absolute url/thumbnail URLs via base_url + token (files only get `url`).
     /// `thumb_share_versions` maps thumbnail id hex → that doc's shareVersion.
     pub fn from_storage_with_urls(
         s: Storage,
