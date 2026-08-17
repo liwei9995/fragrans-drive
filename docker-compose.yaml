@@ -1,29 +1,27 @@
 services:
   web:
-    build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+    image: ${ALIYUN_REGISTRY_URL}/fragrans-web:${IMAGE_TAG:-latest}
+    restart: always
     ports:
-      - 80:80
+      - 8062:80
     environment:
       API_UPSTREAM: http://api:3821
     depends_on:
       - api
 
   api:
-    build:
-      context: ./apps/web/backend
+    image: ${ALIYUN_REGISTRY_URL}/fragrans-api:${IMAGE_TAG:-latest}
     restart: always
     volumes:
       - storage-files:/app/bucket
     ports:
       - 8085:3821
     environment:
-      MONGO_URI: mongodb://test:nest@mongo:27017/fragrans?authSource=admin
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-secret}
-      STORAGE_MASTER_KEY_HEX: ${STORAGE_MASTER_KEY_HEX:-1234567890123456789012345678901234567890123456789012345678901234}
+      MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/fragrans?authSource=admin
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      STORAGE_MASTER_KEY_HEX: ${STORAGE_MASTER_KEY_HEX}
       STORAGE_DESTINATION: /app/bucket/storage
-      DRIVE_DOMAIN: ${DRIVE_DOMAIN:-http://localhost}
+      DRIVE_DOMAIN: ${DRIVE_DOMAIN}
     depends_on:
       mongo:
         condition: service_healthy
@@ -36,10 +34,10 @@ services:
     volumes:
       - storage-db:/data/db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: test
-      MONGO_INITDB_ROOT_PASSWORD: nest
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     healthcheck:
-      test: ["CMD", "mongosh", "--host", "localhost:27017", "--username", "test", "--password", "nest", "--authenticationDatabase", "admin", "--quiet", "--eval", "quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)"]
+      test: ["CMD", "mongosh", "--host", "localhost:27017", "--username", "${MONGO_INITDB_ROOT_USERNAME}", "--password", "${MONGO_INITDB_ROOT_PASSWORD}", "--authenticationDatabase", "admin", "--quiet", "--eval", "quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -51,9 +49,11 @@ services:
       - 8084:8081
     environment:
       ME_CONFIG_OPTIONS_EDITORTHEME: material
-      ME_CONFIG_MONGODB_ADMINUSERNAME: test
-      ME_CONFIG_MONGODB_ADMINPASSWORD: nest
-      ME_CONFIG_MONGODB_URL: mongodb://test:nest@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/
 
 volumes:
   storage-files:

@@ -1,0 +1,105 @@
+version: 2.1
+
+jobs:
+  build-and-deploy:
+    # Use standard linux machine image with Docker pre-installed
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+
+      # 启用远程 Docker 环境用于构建镜像
+      - setup_remote_docker:
+          version: default
+
+      # 1. 登录阿里云容器镜像服务并构建、推送镜像
+      - run:
+          name: Build and Push Docker Images
+          command: |
+            echo "Logging into Aliyun ACR..."
+            docker login --username "$ALIYUN_REGISTRY_USER" --password "$ALIYUN_REGISTRY_PASSWORD" "$ALIYUN_REGISTRY_URL"
+
+            # 计算版本号与 Tags
+            TIMESTAMP=$(date +%Y%m%d%H%M)
+            SHORT_SHA=$(echo $CIRCLE_SHA1 | cut -c1-8)
+            UNIQUE_TAG="prod-${TIMESTAMP}-${SHORT_SHA}"
+
+            # 从 package.json 中提取 version
+            APP_VERSION=$(grep -o '"version": "[^"]*"' package.json | head -n 1 | cut -d'"' -f4)
+            SEMVER_TAG="v${APP_VERSION}"
+            LATEST_TAG="prod-latest"
+
+            BUILD_ARGS="--build-arg VERSION=${APP_VERSION} --build-arg GIT_REVISION=${CIRCLE_SHA1}"
+
+            echo "Building Web Image..."
+            WEB_IMAGE="${ALIYUN_REGISTRY_URL}/fragrans-web"
+            docker build -f apps/web/Dockerfile $BUILD_ARGS -t ${WEB_IMAGE}:${UNIQUE_TAG} .
+            docker tag ${WEB_IMAGE}:${UNIQUE_TAG} ${WEB_IMAGE}:${SEMVER_TAG}
+            docker tag ${WEB_IMAGE}:${UNIQUE_TAG} ${WEB_IMAGE}:${LATEST_TAG}
+            docker push ${WEB_IMAGE}:${UNIQUE_TAG}
+            docker push ${WEB_IMAGE}:${SEMVER_TAG}
+            docker push ${WEB_IMAGE}:${LATEST_TAG}
+
+            echo "Building API Image..."
+            API_IMAGE="${ALIYUN_REGISTRY_URL}/fragrans-api"
+            docker build -f apps/api/Dockerfile $BUILD_ARGS -t ${API_IMAGE}:${UNIQUE_TAG} apps/api
+            docker tag ${API_IMAGE}:${UNIQUE_TAG} ${API_IMAGE}:${SEMVER_TAG}
+            docker tag ${API_IMAGE}:${UNIQUE_TAG} ${API_IMAGE}:${LATEST_TAG}
+            docker push ${API_IMAGE}:${UNIQUE_TAG}
+            docker push ${API_IMAGE}:${SEMVER_TAG}
+            docker push ${API_IMAGE}:${LATEST_TAG}
+
+            # 将 UNIQUE_TAG 写入环境变量文件，以便后续步骤使用
+            echo "export UNIQUE_TAG=${UNIQUE_TAG}" >> $BASH_ENV
+
+      # 2. 配置 SSH 以安全连接到阿里云服务器
+      - run:
+          name: Add Aliyun Host to known_hosts and Setup SSH Key
+          command: |
+            mkdir -p ~/.ssh
+            echo "$ALIYUN_SSH_KEY_B64" | base64 -d > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            ssh-keyscan -H $ALIYUN_HOST >> ~/.ssh/known_hosts
+
+      # 3. 生成 .env 并部署配置到阿里云
+      - run:
+          name: Deploy to Aliyun
+          command: |
+            echo "Generating .env file from CircleCI environment variables..."
+            # 将运行所需的变量注入 .env 文件，包括构建的 UNIQUE_TAG
+            cat <<EOF > .env
+            MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME
+            MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD
+            MONGO_EXPRESS_USERNAME=$MONGO_EXPRESS_USERNAME
+            MONGO_EXPRESS_PASSWORD=$MONGO_EXPRESS_PASSWORD
+            JWT_SECRET_KEY=$JWT_SECRET_KEY
+            STORAGE_MASTER_KEY_HEX=$STORAGE_MASTER_KEY_HEX
+            DRIVE_DOMAIN=$DRIVE_DOMAIN
+            ALIYUN_REGISTRY_URL=$ALIYUN_REGISTRY_URL
+            IMAGE_TAG=$UNIQUE_TAG
+            EOF
+
+            echo "Deploying config files to Aliyun..."
+            ssh $ALIYUN_USER@$ALIYUN_HOST "mkdir -p $ALIYUN_DEPLOY_PATH"
+
+            # 只需上传 docker-compose.yaml 和 .env，无需上传源码
+            scp docker-compose.yaml .env $ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/
+
+            # 在远程登录镜像库 -> 拉取最新版本镜像 -> 启动服务 -> 清理废弃镜像
+            ssh $ALIYUN_USER@$ALIYUN_HOST "cd $ALIYUN_DEPLOY_PATH && \
+              docker login --username '$ALIYUN_REGISTRY_USER' --password '$ALIYUN_REGISTRY_PASSWORD' '$ALIYUN_REGISTRY_URL' && \
+              docker-compose pull && \
+              docker-compose up -d && \
+              docker image prune -f"
+
+workflows:
+  version: 2
+  build-deploy-pipeline:
+    jobs:
+      - build-and-deploy:
+          filters:
+            branches:
+              # 允许在 main 和 feat/monorepo 分支上触发部署
+              only: 
+                - main
+                - feat/monorepo

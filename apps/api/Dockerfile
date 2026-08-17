@@ -29,6 +29,11 @@ RUN mkdir -p /app/bucket && chown -R appuser:appgroup /app
 WORKDIR /app
 COPY --from=builder /usr/src/fragrans/target/release/fragrans /usr/local/bin/fragrans
 
+ARG VERSION
+ARG GIT_REVISION
+ENV APP_VERSION=${VERSION} \
+    GIT_REVISION=${GIT_REVISION}
+
 USER appuser
 EXPOSE 3821
 CMD ["fragrans"]
