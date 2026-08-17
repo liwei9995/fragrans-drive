@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - 80:80
+    environment:
+      API_UPSTREAM: http://api:3821
     depends_on:
       - api
 
