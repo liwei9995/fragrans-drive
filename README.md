@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://www.oyiyio.com/" rel="noopener" target="_blank">
-    <img width="150" src="./public/logo.svg" alt="Fragrans Drive" />
+    <img width="150" src="./apps/web/public/logo.svg" alt="Fragrans Drive" />
   </a>
 </p>
 
@@ -65,7 +65,7 @@ The backend API listens on `127.0.0.1:3821` by default.
 
 ## Deployment & CI/CD
 
-The project utilizes an enterprise-grade CI/CD pipeline powered by **CircleCI**. 
+The project utilizes an enterprise-grade CI/CD pipeline powered by **CircleCI**.
 
 When code is merged into the `main` branch:
 1. **Build**: CircleCI automatically builds the Docker images for both the Web and API applications using `setup_remote_docker`.
