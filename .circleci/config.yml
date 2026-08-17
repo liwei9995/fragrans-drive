@@ -80,13 +80,14 @@ jobs:
             EOF
 
             echo "Deploying config files to Aliyun..."
-            ssh $ALIYUN_USER@$ALIYUN_HOST "mkdir -p $ALIYUN_DEPLOY_PATH"
+            SSH_OPTS="-i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o BatchMode=yes"
+            ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "mkdir -p $ALIYUN_DEPLOY_PATH"
 
             # 只需上传 docker-compose.yaml 和 .env，无需上传源码
-            scp docker-compose.yaml .env $ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/
+            scp $SSH_OPTS docker-compose.yaml .env $ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/
 
             # 在远程登录镜像库 -> 拉取最新版本镜像 -> 启动服务 -> 清理废弃镜像
-            ssh $ALIYUN_USER@$ALIYUN_HOST "cd $ALIYUN_DEPLOY_PATH && \
+            ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "cd $ALIYUN_DEPLOY_PATH && \
               docker login --username '$ALIYUN_REGISTRY_USER' --password '$ALIYUN_REGISTRY_PASSWORD' '$ALIYUN_REGISTRY_URL' && \
               docker-compose pull && \
               docker-compose up -d && \
