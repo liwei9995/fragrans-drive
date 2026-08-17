@@ -57,7 +57,7 @@ jobs:
           name: Add Aliyun Host to known_hosts and Setup SSH Key
           command: |
             mkdir -p ~/.ssh
-            echo "$ALIYUN_SSH_KEY_B64" | base64 -d > ~/.ssh/id_rsa
+            echo "$ALIYUN_SSH_KEY_B64" | tr -d ' ' | base64 -d -i > ~/.ssh/id_rsa
             chmod 600 ~/.ssh/id_rsa
             ssh-keyscan -H $ALIYUN_HOST >> ~/.ssh/known_hosts
 
