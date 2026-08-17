@@ -1,0 +1,58 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 80:80
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ./backend
+    restart: always
+    volumes:
+      - storage-files:/app/bucket
+    ports:
+      - 8085:3821
+    environment:
+      MONGO_URI: mongodb://test:nest@mongo:27017/fragrans?authSource=admin
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-secret}
+      STORAGE_MASTER_KEY_HEX: ${STORAGE_MASTER_KEY_HEX:-1234567890123456789012345678901234567890123456789012345678901234}
+      STORAGE_DESTINATION: /app/bucket/storage
+      DRIVE_DOMAIN: ${DRIVE_DOMAIN:-http://localhost}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:8
+    restart: always
+    ports:
+      - 25018:27017
+    volumes:
+      - storage-db:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: test
+      MONGO_INITDB_ROOT_PASSWORD: nest
+    healthcheck:
+      test: ["CMD", "mongosh", "--host", "localhost:27017", "--username", "test", "--password", "nest", "--authenticationDatabase", "admin", "--quiet", "--eval", "quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8084:8081
+    environment:
+      ME_CONFIG_OPTIONS_EDITORTHEME: material
+      ME_CONFIG_MONGODB_ADMINUSERNAME: test
+      ME_CONFIG_MONGODB_ADMINPASSWORD: nest
+      ME_CONFIG_MONGODB_URL: mongodb://test:nest@mongo:27017/
+
+volumes:
+  storage-files:
+  storage-db:
