@@ -1,0 +1,51 @@
+version: 2.1
+
+jobs:
+  deploy:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      
+      # 1. 注入 SSH 密钥
+      # 请在 CircleCI 控制台的 Project Settings -> SSH Keys 中添加允许免密登录阿里云主机 root 账号的私钥。
+      # 添加后，将此处替换为 CircleCI 生成的 fingerprint（指纹）。
+      - add_ssh_keys:
+          fingerprints:
+            - "fc:1e:91:69:68:30:bf:85:ea:15:40:db:7b:0f:d9:ac"
+
+      # 2. 将阿里云主机 IP 加入到 known_hosts
+      # ALIYUN_HOST 需要在 CircleCI 控制台的 Project Settings -> Environment Variables 中配置 (例如: 8.134.197.215)
+      - run:
+          name: Add Aliyun Host to known_hosts
+          command: |
+            mkdir -p ~/.ssh
+            ssh-keyscan -H $ALIYUN_HOST >> ~/.ssh/known_hosts
+
+      # 3. 登录阿里云主机并执行部署脚本
+      # ALIYUN_USER 需要在 CircleCI 环境变量中配置 (例如: root)
+      - run:
+          name: Deploy to Aliyun Host
+          command: |
+            ssh $ALIYUN_USER@$ALIYUN_HOST << 'EOF'
+              # 以下命令将在你的阿里云主机上执行
+              # 请将 /path/to/fragrans 替换为你主机上实际的项目路径
+              cd /path/to/fragrans
+              
+              echo "Pulling latest code from main..."
+              git pull origin main
+              
+              echo "Building and restarting Docker containers..."
+              docker compose up -d --build
+              
+              echo "Deployment successful!"
+            EOF
+
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - deploy:
+          filters:
+            branches:
+              only: main

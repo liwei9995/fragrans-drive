@@ -1,0 +1,9 @@
+# Bacon config: rebuild and restart the service on code changes.
+# Usage: bacon run
+
+[jobs.run]
+command = ["cargo", "run"]
+need_stdout = true
+allow_warnings = true
+background = true
+on_change_strategy = "kill_then_restart"

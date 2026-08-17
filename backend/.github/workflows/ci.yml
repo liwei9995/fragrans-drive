@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+env:
+  TEST_MONGO_URI: mongodb://test:nest@127.0.0.1:25018/?authSource=admin
+  JWT_SECRET_KEY: test-secret-key-that-is-at-least-32-bytes
+  STORAGE_MASTER_KEY_HEX: 0000000000000000000000000000000000000000000000000000000000000000
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:8.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test
+          MONGO_INITDB_ROOT_PASSWORD: nest
+        ports:
+          - 25018:27017
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Strict Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docker build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: fragrans:verify
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
