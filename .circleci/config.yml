@@ -67,7 +67,7 @@ jobs:
           command: |
             echo "Generating .env file from CircleCI environment variables..."
             # 将运行所需的变量注入 .env 文件，包括构建的 UNIQUE_TAG
-            cat <<EOF > .env
+            cat \<<EOF > .env
             MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME
             MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD
             MONGO_EXPRESS_USERNAME=$MONGO_EXPRESS_USERNAME
