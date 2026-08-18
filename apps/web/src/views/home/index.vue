@@ -242,12 +242,15 @@ const handleTapActionItem = (command: string | number | object) => {
   }
 }
 
-/** 通过带 Authorization 的直连接口下载，不依赖 URL 中的 token */
-const download = async (id: string, filename?: string) => {
-  ElMessage.info('文件下载准备中...')
+const download = (id: string, filename?: string) => {
   try {
-    const blob = (await getFile(id)) as Blob
-    const url = URL.createObjectURL(blob)
+    const token = globalStore.token
+    let baseUrl = import.meta.env.VITE_API_URL as string
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1)
+    }
+    const url = `${baseUrl}/v1/storage/${id}?token=${token}`
+
     const a = document.createElement('a')
     a.href = url
     a.download = filename || id
@@ -255,10 +258,9 @@ const download = async (id: string, filename?: string) => {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    // 不在此处提示「下载成功」：点击后仅唤起保存对话框，用户选择保存位置并确认后才真正完成，无法可靠检测
-  } catch {
+  } catch (error) {
     ElMessage.error('下载失败，请重试')
+    console.error('Download error:', error)
   }
 }
 
