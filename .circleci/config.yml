@@ -91,7 +91,7 @@ jobs:
             ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "cd $ALIYUN_DEPLOY_PATH && \
               docker login --username '$ALIYUN_REGISTRY_USER' --password '$ALIYUN_REGISTRY_PASSWORD' '$ALIYUN_REGISTRY_URL' && \
               docker-compose pull && \
-              docker-compose up -d && \
+              docker-compose up -d --remove-orphans && \
               docker image prune -f"
 
 workflows:
