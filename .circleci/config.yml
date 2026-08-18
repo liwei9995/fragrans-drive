@@ -57,10 +57,8 @@ jobs:
           name: Add Aliyun Host to known_hosts and Setup SSH Key
           command: |
             mkdir -p ~/.ssh
-            echo "$ALIYUN_SSH_KEY_B64" | tr -d ' ' | base64 -d -i > ~/.ssh/id_rsa
-            chmod 600 ~/.ssh/id_rsa
-            echo "MD5 of id_rsa in CI:"
-            md5sum ~/.ssh/id_rsa
+            echo "$ALIYUN_SSH_KEY_B64" | tr -d ' ' | base64 -d -i > ~/.ssh/aliyun_ed25519
+            chmod 600 ~/.ssh/aliyun_ed25519
             ssh-keyscan -H $ALIYUN_HOST >> ~/.ssh/known_hosts
 
       # 3. 生成 .env 并部署配置到阿里云
@@ -82,7 +80,7 @@ jobs:
             EOF
 
             echo "Deploying config files to Aliyun..."
-            SSH_OPTS="-vvv -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o BatchMode=yes"
+            SSH_OPTS="-i ~/.ssh/aliyun_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o BatchMode=yes"
             ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "mkdir -p $ALIYUN_DEPLOY_PATH"
 
             # 只需上传 docker-compose.yaml 和 .env，无需上传源码
