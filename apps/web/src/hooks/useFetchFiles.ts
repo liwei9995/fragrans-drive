@@ -49,7 +49,7 @@ export const convertItem = (item: StorageNode): StorageViewItem => ({
       : getThumb(item.extName, item.type),
   thumbPlaceholder: getThumb(item.extName, item.type),
   previewSrcList:
-    !item.mimeType?.startsWith('video/') && item.url
+    item.mimeType?.startsWith('image/') && item.url
       ? [toProxyStorageUrl(item.url)]
       : [],
   videoUrl: item.mimeType?.startsWith('video/')
