@@ -27,12 +27,12 @@ services:
         condition: service_healthy
 
   mongo:
-    image: mongo
+    image: mongo:8.0
     restart: always
     ports:
       - 25018:27017
     volumes:
-      - storage-db:/data/db
+      - storage-db-v8:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -58,5 +58,5 @@ services:
 volumes:
   storage-files:
     external: true
-  storage-db:
+  storage-db-v8:
     external: true
