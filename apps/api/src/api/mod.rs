@@ -22,6 +22,7 @@ pub struct AppState {
 #[openapi(
     paths(
         users::login,
+        users::refresh,
         users::create_user,
         users::update_password,
         users::update_profile,
@@ -43,7 +44,7 @@ pub struct AppState {
     ),
     components(
         schemas(
-            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::CreateUserResponse,
+            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::RefreshTokenDto, users::CreateUserResponse,
             storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
@@ -91,6 +92,7 @@ pub fn router(db: Database, config: Config) -> Router {
 
     let auth_routes = Router::new()
         .route("/login", axum::routing::post(users::login))
+        .route("/refresh", axum::routing::post(users::refresh))
         .with_state(state.clone());
 
     // User registration does not require auth; other user routes require JWT.

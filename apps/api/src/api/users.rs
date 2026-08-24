@@ -1,7 +1,10 @@
 use crate::api::AppState;
 use crate::api::error::AppError;
-use crate::api::middleware::UserContext;
+use crate::api::middleware::{
+    Claims, TokenPurpose, UserContext, create_token, create_token_with_jti,
+};
 use crate::domain::user::{User, UserResponse};
+use crate::infrastructure::db::refresh_session_repo::RefreshSessionRepository;
 use crate::infrastructure::db::user_repo::UserRepository;
 use crate::utils::crypto::{hash_password, verify_password};
 use axum::{
@@ -10,9 +13,59 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::Utc;
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use mongodb::bson::{Bson, DateTime as BsonDateTime, doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+const ACCESS_TTL_SECS: i64 = 3600 * 2;
+const REFRESH_TTL_SECS: i64 = 3600 * 24 * 7;
+
+fn invalid_token() -> AppError {
+    AppError::Unauthorized("Invalid token".to_string())
+}
+
+struct IssuedTokens {
+    access_token: String,
+    refresh_token: String,
+    refresh_jti: String,
+    refresh_expires_at: mongodb::bson::DateTime,
+}
+
+fn issue_auth_tokens(
+    secret: &str,
+    user_id: &str,
+    token_version: i32,
+) -> Result<IssuedTokens, AppError> {
+    let now = Utc::now().timestamp();
+    let refresh_exp = now + REFRESH_TTL_SECS;
+    let refresh_jti = uuid::Uuid::new_v4().to_string();
+    let access_token = create_token(
+        secret,
+        user_id,
+        TokenPurpose::Access,
+        None,
+        (now + ACCESS_TTL_SECS) as usize,
+        None,
+        Some(token_version),
+    )?;
+    let refresh_token = create_token_with_jti(
+        secret,
+        user_id,
+        TokenPurpose::Refresh,
+        None,
+        refresh_exp as usize,
+        None,
+        Some(token_version),
+        Some(refresh_jti.clone()),
+    )?;
+    Ok(IssuedTokens {
+        access_token,
+        refresh_token,
+        refresh_jti,
+        refresh_expires_at: mongodb::bson::DateTime::from_millis(refresh_exp * 1000),
+    })
+}
 
 #[derive(Deserialize, ToSchema)]
 pub struct CreateUserDto {
@@ -53,6 +106,12 @@ pub struct LoginDto {
 #[derive(Serialize, ToSchema)]
 pub struct LoginResponse {
     pub access_token: String,
+    pub refresh_token: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct RefreshTokenDto {
+    pub refresh_token: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -91,20 +150,83 @@ pub async fn login(
         ));
     }
 
-    let token = crate::api::middleware::create_token(
-        &state.config.jwt_secret,
-        &user
-            .id
-            .ok_or_else(|| AppError::DatabaseError(mongodb::error::Error::custom("missing id")))?
-            .to_hex(),
-        crate::api::middleware::TokenPurpose::Access,
-        None,
-        (Utc::now().timestamp() + 3600 * 24 * 7) as usize,
-        None,
-    )?;
+    let user_id = user
+        .id
+        .ok_or_else(|| AppError::DatabaseError(mongodb::error::Error::custom("missing id")))?
+        .to_hex();
+    let tokens = issue_auth_tokens(&state.config.jwt_secret, &user_id, user.token_version)?;
+    RefreshSessionRepository::new(&state.db)
+        .create(
+            &user_id,
+            &tokens.refresh_jti,
+            user.token_version,
+            tokens.refresh_expires_at,
+        )
+        .await?;
 
     Ok(Json(LoginResponse {
-        access_token: token,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/refresh",
+    request_body = RefreshTokenDto,
+    responses(
+        (status = 200, description = "Tokens refreshed", body = LoginResponse),
+        (status = 401, description = "Invalid refresh token")
+    ),
+    tag = "auth"
+)]
+pub async fn refresh(
+    State(state): State<AppState>,
+    Json(payload): Json<RefreshTokenDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let claims = decode::<Claims>(
+        &payload.refresh_token,
+        &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map_err(|_| invalid_token())?
+    .claims;
+
+    if claims.purpose != TokenPurpose::Refresh {
+        return Err(invalid_token());
+    }
+
+    let token_version = claims.token_version.ok_or_else(invalid_token)?;
+    let refresh_jti = claims.jti.as_deref().ok_or_else(invalid_token)?;
+    let id = ObjectId::parse_str(&claims.user_id).map_err(|_| invalid_token())?;
+    let repo = UserRepository::new(&state.db);
+    let user = repo.find_by_id(id).await?.ok_or_else(invalid_token)?;
+    if user.token_version != token_version {
+        return Err(invalid_token());
+    }
+
+    let sessions = RefreshSessionRepository::new(&state.db);
+    if !sessions
+        .consume(&claims.user_id, refresh_jti, token_version)
+        .await?
+    {
+        return Err(invalid_token());
+    }
+
+    let user_id = user.id.ok_or_else(invalid_token)?.to_hex();
+    let tokens = issue_auth_tokens(&state.config.jwt_secret, &user_id, user.token_version)?;
+    sessions
+        .create(
+            &user_id,
+            &tokens.refresh_jti,
+            user.token_version,
+            tokens.refresh_expires_at,
+        )
+        .await?;
+
+    Ok(Json(LoginResponse {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
     }))
 }
 
@@ -139,6 +261,7 @@ pub async fn create_user(
         age: None,
         avatar: None,
         roles: vec!["user".to_string()],
+        token_version: 0,
         created_at: Some(Utc::now()),
         updated_at: Some(Utc::now()),
     };

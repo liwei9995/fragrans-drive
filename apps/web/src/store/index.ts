@@ -7,12 +7,17 @@ import type { GlobalState } from './interface'
 export const GlobalStore = defineStore('GlobalState', {
   // state: 返回对象的函数
   state: (): GlobalState => ({
-    token: '',
+    accessToken: '',
+    refreshToken: '',
   }),
   getters: {},
   actions: {
-    setToken(token: string) {
-      this.token = token
+    setTokens(accessToken: string, refreshToken: string) {
+      this.accessToken = accessToken
+      this.refreshToken = refreshToken
+    },
+    setAccessToken(token: string) {
+      this.accessToken = token
     },
   },
   persist: piniaPersistConfig('GlobalState'),

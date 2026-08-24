@@ -51,7 +51,10 @@ impl UserRepository {
         self.collection
             .update_one(
                 doc! { "_id": id },
-                doc! { "$set": { "password": hashed_password } },
+                doc! {
+                    "$set": { "password": hashed_password },
+                    "$inc": { "tokenVersion": 1 }
+                },
             )
             .await?;
         Ok(())

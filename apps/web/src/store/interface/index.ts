@@ -1,4 +1,5 @@
 /* GlobalState */
 export interface GlobalState {
-  token: string
+  accessToken: string
+  refreshToken: string
 }

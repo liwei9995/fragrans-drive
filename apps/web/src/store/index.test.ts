@@ -9,12 +9,22 @@ describe('GlobalStore', () => {
 
   it('initial state', () => {
     const store = GlobalStore()
-    expect(store.token).toBe('')
+    expect(store.accessToken).toBe('')
+    expect(store.refreshToken).toBe('')
   })
 
-  it('setToken updates token', () => {
+  it('setTokens updates both tokens', () => {
     const store = GlobalStore()
-    store.setToken('new-token')
-    expect(store.token).toBe('new-token')
+    store.setTokens('access', 'refresh')
+    expect(store.accessToken).toBe('access')
+    expect(store.refreshToken).toBe('refresh')
+  })
+
+  it('setAccessToken updates only access token', () => {
+    const store = GlobalStore()
+    store.setTokens('access', 'refresh')
+    store.setAccessToken('next-access')
+    expect(store.accessToken).toBe('next-access')
+    expect(store.refreshToken).toBe('refresh')
   })
 })

@@ -1,4 +1,4 @@
-import {
+import axios, {
   AxiosHeaders,
   type AxiosResponse,
   type InternalAxiosRequestConfig,
@@ -107,7 +107,7 @@ describe('api index', () => {
 
   it('request interceptor adds token', async () => {
     const store = GlobalStore()
-    store.setToken('test-token')
+    store.setTokens('test-token', 'refresh-token')
 
     const config = {
       headers: new AxiosHeaders(),
@@ -126,21 +126,150 @@ describe('api index', () => {
 
   it('response interceptor handles 401', async () => {
     const store = GlobalStore()
-    store.setToken('old-token')
+    store.setTokens('old-token', '')
 
     await expect(
       responseInterceptor().rejected({
         message: 'unauthorized',
-        config: { headers: new AxiosHeaders() },
+        config: { headers: new AxiosHeaders(), url: '/v1/storage/list' },
         response: { status: 401 },
       }),
     ).rejects.toMatchObject({ message: 'unauthorized' })
     expect(ElMessage.error).toHaveBeenCalledWith('登录失效！请您重新登录')
-    expect(store.token).toBe('')
+    expect(store.accessToken).toBe('')
+    expect(store.refreshToken).toBe('')
     expect(router.replace).toHaveBeenCalledWith({
       path: '/login',
       query: { redirect: '/home/folder' },
     })
+  })
+
+  it('does not refresh failed login requests', async () => {
+    const store = GlobalStore()
+    store.setTokens('old-access', 'refresh-token')
+    const postSpy = vi.spyOn(axios, 'post')
+
+    await expect(
+      responseInterceptor().rejected({
+        message: 'unauthorized',
+        config: { headers: new AxiosHeaders(), url: '/v1/auth/login' },
+        response: {
+          status: 401,
+          data: { error: 'Invalid email or password' },
+        },
+      }),
+    ).rejects.toMatchObject({ message: 'unauthorized' })
+
+    expect(postSpy).not.toHaveBeenCalled()
+    expect(store.accessToken).toBe('old-access')
+    expect(ElMessage.error).toHaveBeenCalledWith('Invalid email or password')
+    postSpy.mockRestore()
+  })
+
+  it('refreshes once for concurrent 401s', async () => {
+    const store = GlobalStore()
+    store.setTokens('old-access', 'refresh-token')
+
+    let resolveRefresh!: (value: {
+      data: { access_token: string; refresh_token: string }
+    }) => void
+    const refreshCall = new Promise<{
+      data: { access_token: string; refresh_token: string }
+    }>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const postSpy = vi
+      .spyOn(axios, 'post')
+      .mockReturnValue(refreshCall as never)
+    const originalAdapter = RequestHttp.service.defaults.adapter
+    RequestHttp.service.defaults.adapter = vi.fn().mockResolvedValue({
+      data: 'retried',
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+    })
+
+    const failedConfig = () => ({
+      headers: new AxiosHeaders(),
+      url: '/v1/storage/list',
+      method: 'post',
+    })
+
+    const first = responseInterceptor().rejected({
+      message: 'unauthorized',
+      config: failedConfig(),
+      response: { status: 401 },
+    })
+    const second = responseInterceptor().rejected({
+      message: 'unauthorized',
+      config: failedConfig(),
+      response: { status: 401 },
+    })
+
+    expect(postSpy).toHaveBeenCalledTimes(1)
+
+    resolveRefresh({
+      data: { access_token: 'new-access', refresh_token: 'new-refresh' },
+    })
+
+    await expect(first).resolves.toBe('retried')
+    await expect(second).resolves.toBe('retried')
+    expect(postSpy).toHaveBeenCalledTimes(1)
+    expect(postSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/auth/refresh'),
+      { refresh_token: 'refresh-token' },
+      { timeout: 10000 },
+    )
+    expect(store.accessToken).toBe('new-access')
+    expect(store.refreshToken).toBe('new-refresh')
+    expect(RequestHttp.service.defaults.adapter).toHaveBeenCalled()
+    expect(router.replace).not.toHaveBeenCalled()
+
+    postSpy.mockRestore()
+    RequestHttp.service.defaults.adapter = originalAdapter
+  })
+
+  it('rejects queued requests when refresh times out', async () => {
+    const store = GlobalStore()
+    store.setTokens('old-access', 'refresh-token')
+
+    let rejectRefresh!: (reason: Error) => void
+    const refreshCall = new Promise((_, reject) => {
+      rejectRefresh = reject
+    })
+    const postSpy = vi
+      .spyOn(axios, 'post')
+      .mockReturnValue(refreshCall as never)
+    const failedConfig = () => ({
+      headers: new AxiosHeaders(),
+      url: '/v1/storage/list',
+      method: 'post',
+    })
+
+    const first = responseInterceptor().rejected({
+      message: 'unauthorized',
+      config: failedConfig(),
+      response: { status: 401 },
+    })
+    const second = responseInterceptor().rejected({
+      message: 'unauthorized',
+      config: failedConfig(),
+      response: { status: 401 },
+    })
+
+    rejectRefresh(new Error('timeout'))
+    const results = await Promise.allSettled([first, second])
+
+    expect(results.every((result) => result.status === 'rejected')).toBe(true)
+    expect(postSpy).toHaveBeenCalledTimes(1)
+    expect(store.accessToken).toBe('')
+    expect(store.refreshToken).toBe('')
+    expect(router.replace).toHaveBeenCalledWith({
+      path: '/login',
+      query: { redirect: '/home/folder' },
+    })
+    postSpy.mockRestore()
   })
 
   it('response interceptor handles success', async () => {

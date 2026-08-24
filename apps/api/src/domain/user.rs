@@ -70,6 +70,9 @@ pub struct User {
 
     pub roles: Vec<String>,
 
+    #[serde(rename = "tokenVersion", default)]
+    pub token_version: i32,
+
     #[serde(
         rename = "createdAt",
         skip_serializing_if = "Option::is_none",

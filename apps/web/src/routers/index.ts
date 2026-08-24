@@ -10,7 +10,7 @@ router.beforeEach((to) => {
   if (!to.matched.some((record) => record.meta.requiresAuth)) return true
 
   const globalStore = GlobalStore()
-  if (globalStore.token) return true
+  if (globalStore.accessToken) return true
 
   return {
     path: LOGIN_URL,

@@ -5,6 +5,7 @@ use mongodb::{
     options::{ClientOptions, IndexOptions},
 };
 
+pub mod refresh_session_repo;
 pub mod storage_repo;
 pub mod user_repo;
 
@@ -33,6 +34,7 @@ pub async fn init_db(config: &Config) -> Result<Database, mongodb::error::Error>
 pub async fn ensure_indexes(db: &Database) -> Result<(), mongodb::error::Error> {
     let users = db.collection::<mongodb::bson::Document>("users");
     let storage = db.collection::<mongodb::bson::Document>("storage");
+    let refresh_sessions = db.collection::<mongodb::bson::Document>("refresh_sessions");
 
     let email_index = IndexModel::builder()
         .keys(doc! { "email": 1 })
@@ -44,6 +46,28 @@ pub async fn ensure_indexes(db: &Database) -> Result<(), mongodb::error::Error> 
         )
         .build();
     users.create_index(email_index).await?;
+
+    let refresh_jti_index = IndexModel::builder()
+        .keys(doc! { "jtiHash": 1 })
+        .options(
+            IndexOptions::builder()
+                .name("refresh_jti_unique".to_string())
+                .unique(true)
+                .build(),
+        )
+        .build();
+    refresh_sessions.create_index(refresh_jti_index).await?;
+
+    let refresh_expiry_index = IndexModel::builder()
+        .keys(doc! { "expiresAt": 1 })
+        .options(
+            IndexOptions::builder()
+                .name("refresh_expiry_ttl".to_string())
+                .expire_after(std::time::Duration::ZERO)
+                .build(),
+        )
+        .build();
+    refresh_sessions.create_index(refresh_expiry_index).await?;
 
     let list_index = IndexModel::builder()
         .keys(

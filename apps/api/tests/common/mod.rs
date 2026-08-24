@@ -76,6 +76,7 @@ pub async fn setup() -> TestContext {
         age: None,
         avatar: None,
         roles: vec!["user".to_string()],
+        token_version: 0,
         created_at: Some(Utc::now()),
         updated_at: Some(Utc::now()),
     };
@@ -96,6 +97,7 @@ pub async fn setup() -> TestContext {
         None,
         (chrono::Utc::now().timestamp() + 3600) as usize,
         None,
+        None,
     )
     .expect("Failed to encode token");
 
@@ -105,6 +107,7 @@ pub async fn setup() -> TestContext {
         api::middleware::TokenPurpose::Download,
         Some("dummy_file_id".to_string()),
         (chrono::Utc::now().timestamp() + 3600) as usize,
+        None,
         None,
     )
     .expect("Failed to encode token");

@@ -171,6 +171,7 @@ impl StorageListResponse {
                 Some(file_id.clone()),
                 expires_at,
                 Some(s.share_version),
+                None,
             )?;
             Some(format!("{base}/v1/storage/{file_id}?token={token}"))
         } else {
@@ -186,6 +187,7 @@ impl StorageListResponse {
                     Some(thumb_id.clone()),
                     expires_at,
                     Some(thumb_version),
+                    None,
                 )?;
                 Some(format!("{base}/v1/storage/{thumb_id}?token={token}"))
             }

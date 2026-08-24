@@ -5,6 +5,7 @@ import { ResultEnum } from '@/enums/httpEnum'
 import {
   createFolder,
   deleteFile,
+  getDownloadUrl,
   getFile,
   getFiles,
   getPath,
@@ -61,6 +62,13 @@ describe('storage module api', () => {
   it('getPath', () => {
     getPath('1')
     expect(http.post).toHaveBeenCalledWith(`${PORT}/storage/path`, {
+      fileId: '1',
+    })
+  })
+
+  it('getDownloadUrl', () => {
+    getDownloadUrl('1')
+    expect(http.post).toHaveBeenCalledWith(`${PORT}/storage/download/url`, {
       fileId: '1',
     })
   })

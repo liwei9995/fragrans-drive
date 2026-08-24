@@ -50,14 +50,12 @@ const login = (formEl: FormInstance | undefined) => {
         email: loginForm.email,
         password: loginForm.password,
       }
-      const res = (await authLogin(requestLoginForm)) as {
-        access_token: string
-      }
+      const res = await authLogin(requestLoginForm)
       const { redirect } = route.query
       const path = (redirect || HOME_URL) as string
 
       // * 存储 token
-      globalStore.setToken(res?.access_token)
+      globalStore.setTokens(res.access_token, res.refresh_token)
       router.push(path)
     } finally {
       loading.value = false

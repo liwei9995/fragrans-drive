@@ -505,27 +505,25 @@ pub async fn get_file(
         Err(_) => return Err(AppError::Unauthorized("Invalid token".into())),
     };
 
-    if claims.purpose == TokenPurpose::Download {
-        if claims.file_id.as_deref() != Some(id.as_str()) {
-            return Err(AppError::Unauthorized(
-                "Token not scoped to this file".into(),
-            ));
-        }
-        let repo = StorageRepository::new(&state.db);
-        let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
-            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
-        let existing = repo
-            .find_by_id(obj_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("File not found".into()))?;
-        if claims.share_version.unwrap_or(0) != existing.share_version {
-            return Err(AppError::Unauthorized("Share link has been revoked".into()));
-        }
-    } else if claims.purpose != TokenPurpose::Access {
+    if claims.purpose != TokenPurpose::Download {
         return Err(AppError::Unauthorized("Invalid token purpose".into()));
     }
-
+    if claims.file_id.as_deref() != Some(id.as_str()) {
+        return Err(AppError::Unauthorized(
+            "Token not scoped to this file".into(),
+        ));
+    }
     let repo = StorageRepository::new(&state.db);
+    let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
+        .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+    let existing = repo
+        .find_by_id(obj_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+    if claims.share_version.unwrap_or(0) != existing.share_version {
+        return Err(AppError::Unauthorized("Share link has been revoked".into()));
+    }
+
     let service = StorageService::new(repo, state.local_storage.clone());
 
     let (filename, mime_type, len, stream) =
@@ -644,6 +642,7 @@ pub async fn get_download_url(
         Some(file_id.to_string()),
         (chrono::Utc::now().timestamp() + expire_secs) as usize,
         Some(existing.share_version),
+        None,
     )?;
     Ok(format!("{}/v1/storage/{}?token={}", domain, file_id, token).into_response())
 }

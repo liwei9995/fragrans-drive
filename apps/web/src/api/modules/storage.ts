@@ -51,3 +51,8 @@ export const updateFile = (
 export const getPath = (fileId: string) => {
   return http.post<StoragePathItem[]>(`${PORT}/storage/path`, { fileId })
 }
+
+// 获取带 Download 票的文件下载地址
+export const getDownloadUrl = (fileId: string) => {
+  return http.post<string>(`${PORT}/storage/download/url`, { fileId })
+}

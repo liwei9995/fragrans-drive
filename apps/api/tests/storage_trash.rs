@@ -140,6 +140,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                         api::middleware::TokenPurpose::Download,
                         Some(file_id.to_hex()),
                         (chrono::Utc::now().timestamp() + 3600) as usize,
+                        None,
                         None
                     )
                     .unwrap()
@@ -188,6 +189,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                         api::middleware::TokenPurpose::Download,
                         Some(file_id.to_hex()),
                         (chrono::Utc::now().timestamp() + 3600) as usize,
+                        None,
                         None
                     )
                     .unwrap()
@@ -235,6 +237,7 @@ async fn delete_restore_roundtrip_cascades_to_children_and_thumbnail() {
                         api::middleware::TokenPurpose::Download,
                         Some(thumb_id.to_hex()),
                         (chrono::Utc::now().timestamp() + 3600) as usize,
+                        None,
                         None
                     )
                     .unwrap()

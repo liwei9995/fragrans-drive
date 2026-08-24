@@ -3,7 +3,12 @@ import type { UploadProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { deleteFile, getFile, getPath, updateFile } from '@/api/modules/storage'
+import {
+  deleteFile,
+  getDownloadUrl,
+  getPath,
+  updateFile,
+} from '@/api/modules/storage'
 import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import { LOGIN_URL } from '@/config/config'
@@ -242,17 +247,13 @@ const handleTapActionItem = (command: string | number | object) => {
   }
 }
 
-const download = (id: string, filename?: string) => {
+const download = async (id: string, filename?: string) => {
   try {
-    const token = globalStore.token
-    let baseUrl = import.meta.env.VITE_API_URL as string
-    if (baseUrl.endsWith('/')) {
-      baseUrl = baseUrl.slice(0, -1)
-    }
-    const url = `${baseUrl}/v1/storage/${id}?token=${token}`
+    const url = await getDownloadUrl(id)
+    const href = String(url).replace(/^"|"$/g, '')
 
     const a = document.createElement('a')
-    a.href = url
+    a.href = href
     a.download = filename || id
     a.style.display = 'none'
     document.body.appendChild(a)

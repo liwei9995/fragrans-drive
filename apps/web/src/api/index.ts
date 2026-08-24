@@ -12,13 +12,25 @@ import router from '@/routers'
 import { GlobalStore } from '@/store'
 import { checkStatus } from './helper/checkStatus'
 
-/**
- * pinia 错误使用说明示例
- * https://github.com/vuejs/pinia/discussions/971
- * https://github.com/vuejs/pinia/discussions/664#discussioncomment-1329898
- * https://pinia.vuejs.org/core-concepts/outside-component-usage.html#single-page-applications
- */
-// const globalStore = GlobalStore();
+type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+
+let isRefreshing = false
+let requestsQueue: Array<(token: string | null) => void> = []
+
+const flushQueue = (token: string | null) => {
+  const queued = requestsQueue
+  requestsQueue = []
+  for (const resume of queued) resume(token)
+}
+
+const redirectToLogin = async () => {
+  GlobalStore().$reset()
+  ElMessage.error('登录失效！请您重新登录')
+  await router.replace({
+    path: '/login',
+    query: { redirect: router.currentRoute.value.fullPath },
+  })
+}
 
 const config = {
   // 默认地址请求地址，可在 .env 开头文件中修改
@@ -43,7 +55,7 @@ class RequestHttp {
     this.service.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const globalStore = GlobalStore()
-        const token: string = globalStore.token
+        const token: string = globalStore.accessToken
 
         if (token) {
           config.headers.set('Authorization', `Bearer ${token}`)
@@ -69,16 +81,71 @@ class RequestHttp {
         // 请求超时单独判断，因为请求超时没有 response
         if (error.message.indexOf('timeout') !== -1)
           ElMessage.error('请求超时！请您稍后重试')
+
         if (response?.status === ResultEnum.UNAUTHORIZED) {
-          GlobalStore().$reset()
-          ElMessage.error('登录失效！请您重新登录')
-          await router.replace({
-            path: '/login',
-            query: { redirect: router.currentRoute.value.fullPath },
-          })
-        } else if (response) {
-          checkStatus(response.status)
+          const retryConfig = error.config as RetryConfig | undefined
+          const requestUrl = String(retryConfig?.url ?? '')
+          const isRefreshRequest = requestUrl.includes('/auth/refresh')
+          const isLoginRequest = requestUrl.includes('/auth/login')
+
+          if (isLoginRequest) {
+            const message =
+              (response.data as { error?: string } | undefined)?.error ??
+              '登录失败，请检查邮箱和密码'
+            ElMessage.error(message)
+            return Promise.reject(error)
+          }
+
+          if (!retryConfig || retryConfig._retry || isRefreshRequest) {
+            await redirectToLogin()
+            return Promise.reject(error)
+          }
+
+          const globalStore = GlobalStore()
+          if (!globalStore.refreshToken) {
+            await redirectToLogin()
+            return Promise.reject(error)
+          }
+
+          if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+              requestsQueue.push((token) => {
+                if (!token) {
+                  reject(error)
+                  return
+                }
+                retryConfig._retry = true
+                resolve(this.service(retryConfig))
+              })
+            })
+          }
+
+          isRefreshing = true
+          try {
+            const { data } = await axios.post<{
+              access_token: string
+              refresh_token: string
+            }>(
+              `${config.baseURL}/v1/auth/refresh`,
+              {
+                refresh_token: globalStore.refreshToken,
+              },
+              { timeout: config.timeout },
+            )
+            globalStore.setTokens(data.access_token, data.refresh_token)
+            isRefreshing = false
+            flushQueue(data.access_token)
+            retryConfig._retry = true
+            return this.service(retryConfig)
+          } catch {
+            isRefreshing = false
+            flushQueue(null)
+            await redirectToLogin()
+            return Promise.reject(error)
+          }
         }
+
+        if (response) checkStatus(response.status)
         // 服务器结果都没有返回(可能服务器错误可能客户端断网)，断网处理:可以跳转到断网页面
         if (!window.navigator.onLine) router.replace({ path: '/500' })
 

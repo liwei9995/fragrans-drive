@@ -15,9 +15,9 @@ const storageAction = computed(
   () => `${import.meta.env.VITE_API_URL}/v1/storage/upload`,
 )
 const globalStore = GlobalStore()
-const uploadHeaders = {
-  Authorization: `Bearer ${globalStore.token}`,
-}
+const uploadHeaders = computed(() => ({
+  Authorization: `Bearer ${globalStore.accessToken}`,
+}))
 
 interface UploaderProps {
   multiple?: boolean

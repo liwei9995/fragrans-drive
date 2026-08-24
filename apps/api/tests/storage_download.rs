@@ -152,14 +152,24 @@ async fn legacy_file_remains_downloadable_before_migration() {
         .await
         .unwrap();
 
+    let file_id_hex = file_id.to_hex();
+    let download_token = fragrans::api::middleware::create_token(
+        "test-secret-key-that-is-long-enough",
+        &ctx.user_id,
+        fragrans::api::middleware::TokenPurpose::Download,
+        Some(file_id_hex.clone()),
+        (chrono::Utc::now().timestamp() + 3600) as usize,
+        Some(0),
+        None,
+    )
+    .unwrap();
     let response = ctx
         .app
         .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/v1/storage/{file_id}"))
-                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.auth_token))
+                .uri(format!("/v1/storage/{file_id_hex}?token={download_token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -293,6 +303,7 @@ async fn download_url_rejects_unowned_file() {
         age: None,
         avatar: None,
         roles: vec!["user".to_string()],
+        token_version: 0,
         created_at: Some(chrono::Utc::now()),
         updated_at: Some(chrono::Utc::now()),
     };
@@ -313,6 +324,7 @@ async fn download_url_rejects_unowned_file() {
         fragrans::api::middleware::TokenPurpose::Access,
         None,
         (chrono::Utc::now().timestamp() + 3600) as usize,
+        None,
         None,
     )
     .unwrap();
@@ -342,6 +354,8 @@ async fn expired_download_token_is_rejected() {
         file_id: Some(file_id.clone()),
         exp: (chrono::Utc::now().timestamp() - 3600) as usize,
         share_version: Some(0),
+        token_version: None,
+        jti: None,
     };
     let expired_token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),

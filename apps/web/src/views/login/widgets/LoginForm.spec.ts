@@ -4,7 +4,7 @@ import LoginForm from './LoginForm.vue'
 
 vi.mock('@/store', () => ({
   GlobalStore: vi.fn(() => ({
-    setToken: vi.fn(),
+    setTokens: vi.fn(),
   })),
 }))
 

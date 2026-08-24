@@ -19,6 +19,10 @@ pub struct Claims {
     pub file_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub share_version: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_version: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jti: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -26,6 +30,7 @@ pub struct Claims {
 pub enum TokenPurpose {
     Access,
     Download,
+    Refresh,
 }
 
 #[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
@@ -59,6 +64,29 @@ pub fn create_token(
     file_id: Option<String>,
     exp: usize,
     share_version: Option<i32>,
+    token_version: Option<i32>,
+) -> Result<String, crate::api::error::AppError> {
+    create_token_with_jti(
+        secret,
+        user_id,
+        purpose,
+        file_id,
+        exp,
+        share_version,
+        token_version,
+        None,
+    )
+}
+
+pub fn create_token_with_jti(
+    secret: &str,
+    user_id: &str,
+    purpose: TokenPurpose,
+    file_id: Option<String>,
+    exp: usize,
+    share_version: Option<i32>,
+    token_version: Option<i32>,
+    jti: Option<String>,
 ) -> Result<String, crate::api::error::AppError> {
     let claims = Claims {
         user_id: user_id.to_string(),
@@ -66,6 +94,8 @@ pub fn create_token(
         purpose,
         file_id,
         share_version,
+        token_version,
+        jti,
     };
     jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
