@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { toProxyStorageUrl } from './storageUrl'
+import { toDownloadHref, toProxyStorageUrl } from './storageUrl'
 
 describe('toProxyStorageUrl', () => {
   const originalEnv = import.meta.env
@@ -48,5 +48,25 @@ describe('toProxyStorageUrl', () => {
     expect(toProxyStorageUrl('https://example.com:8080/path/test.jpg')).toBe(
       '/api/path/test.jpg',
     )
+  })
+})
+
+describe('toDownloadHref', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rewrites absolute download URLs through the /api proxy', () => {
+    import.meta.env.VITE_API_URL = '/api'
+    expect(
+      toDownloadHref('http://localhost:3821/v1/storage/abc?token=eyJ.abc.def'),
+    ).toBe('/api/v1/storage/abc?token=eyJ.abc.def')
+  })
+
+  it('strips accidental JSON quotes from a plain-text URL body', () => {
+    import.meta.env.VITE_API_URL = '/api'
+    expect(
+      toDownloadHref('"https://drive.example.com/v1/storage/abc?token=tok"'),
+    ).toBe('/api/v1/storage/abc?token=tok')
   })
 })

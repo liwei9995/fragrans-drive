@@ -16,6 +16,7 @@ import { useCreateFolder } from '@/hooks/useCreateFolder'
 import { convertItem, sortDocs, useFetchFiles } from '@/hooks/useFetchFiles'
 import { useUploadQueue } from '@/hooks/useUploadQueue'
 import { GlobalStore } from '@/store'
+import { toDownloadHref } from '@/utils/storageUrl'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import Empty from './widgets/Empty/index.vue'
@@ -250,7 +251,7 @@ const handleTapActionItem = (command: string | number | object) => {
 const download = async (id: string, filename?: string) => {
   try {
     const url = await getDownloadUrl(id)
-    const href = String(url).replace(/^"|"$/g, '')
+    const href = toDownloadHref(url)
 
     const a = document.createElement('a')
     a.href = href
