@@ -155,24 +155,26 @@ class RequestHttp {
   }
 
   // * 常用请求方法封装
+  // ponytail: axios 1.19's AxiosResponseResult does not collapse when R is a
+  // free generic; interceptor already unwraps response.data to T.
   get<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
-    return this.service.get<T, T>(url, { params, ..._object })
+    return this.service.get(url, { params, ..._object }) as Promise<T>
   }
   post<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
-    return this.service.post<T, T>(url, params, _object)
+    return this.service.post(url, params, _object) as Promise<T>
   }
   put<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
-    return this.service.put<T, T>(url, params, _object)
+    return this.service.put(url, params, _object) as Promise<T>
   }
   delete<T = unknown>(url: string, params?: unknown, _object = {}): Promise<T> {
-    return this.service.delete<T, T>(url, { params, ..._object })
+    return this.service.delete(url, { params, ..._object }) as Promise<T>
   }
   download(url: string, params?: object, _object = {}): Promise<Blob> {
-    return this.service.get<Blob, Blob>(url, {
+    return this.service.get(url, {
       ...params,
       ..._object,
       responseType: 'blob',
-    })
+    }) as Promise<Blob>
   }
 }
 
