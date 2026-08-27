@@ -193,15 +193,9 @@ pub async fn upload_file(
         }
     };
 
-    struct UploadedFile {
-        name: String,
-        content_type: String,
-        temp_file: tempfile::NamedTempFile,
-        hash: String,
-        size: i64,
-    }
-
-    let mut uploaded_files = Vec::new();
+    let mut uploaded_ids = Vec::new();
+    let mut expected_hash: Option<String> = None;
+    let mut expected_size: Option<i64> = None;
 
     while let Some(mut field) = multipart.next_field().await.map_err(|e| {
         if is_length_limit(&e)
@@ -230,6 +224,24 @@ pub async fn upload_file(
             continue;
         }
 
+        if field.name().is_some_and(|n| n == "hash") {
+            let bytes = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+            if let Ok(value) = String::from_utf8(bytes.to_vec()) {
+                expected_hash = Some(value.trim().to_string());
+            }
+            continue;
+        }
+
+        if field.name().is_some_and(|n| n == "size") {
+            let bytes = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+            if let Ok(value) = String::from_utf8(bytes.to_vec()) {
+                if let Ok(size) = value.trim().parse::<i64>() {
+                    expected_size = Some(size);
+                }
+            }
+            continue;
+        }
+
         let name = match field.file_name() {
             Some(n) => n.trim().to_string(),
             None => continue,
@@ -242,77 +254,89 @@ pub async fn upload_file(
             .unwrap_or("application/octet-stream")
             .to_string();
 
-        let temp_file =
-            tempfile::NamedTempFile::new().map_err(|e| AppError::InternalError(e.to_string()))?;
-        let std_file = temp_file
-            .as_file()
-            .try_clone()
-            .map_err(|e| AppError::InternalError(e.to_string()))?;
-        let mut async_file = tokio::fs::File::from_std(std_file);
+        let hash = expected_hash.take();
+        let size = expected_size.take();
 
-        let mut hasher = sha2::Sha256::new();
-        use sha2::Digest;
-        let mut size = 0i64;
-
-        while let Some(chunk) = field.chunk().await.map_err(|e| {
-            if is_length_limit(&e)
-                || e.to_string().contains("payload too large")
-                || e.to_string().contains("length limit exceeded")
-            {
-                AppError::PayloadTooLarge(e.to_string())
-            } else {
-                AppError::BadRequest(e.to_string())
-            }
-        })? {
-            hasher.update(&chunk);
-            tokio::io::AsyncWriteExt::write_all(&mut async_file, &chunk)
-                .await
-                .map_err(|e| AppError::InternalError(e.to_string()))?;
-            size += chunk.len() as i64;
-            if size > max_file_size {
+        if let (Some(hash_val), Some(size_val)) = (hash, size) {
+            if size_val > max_file_size {
                 return Err(AppError::PayloadTooLarge(format!(
                     "File exceeds limit of {} bytes",
                     max_file_size
                 )));
             }
-        }
-        tokio::io::AsyncWriteExt::flush(&mut async_file)
-            .await
-            .map_err(|e| AppError::InternalError(e.to_string()))?;
-        let hash = hex::encode(hasher.finalize());
+            use futures::StreamExt;
+            let stream = field.map(|res| res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())));
+            let reader = tokio_util::io::StreamReader::new(stream);
+            
+            let id = service
+                .upload_stream(
+                    &user_ctx.user_id,
+                    &parent_id,
+                    &name,
+                    &content_type,
+                    reader,
+                    &hash_val,
+                    size_val,
+                )
+                .await?;
+            uploaded_ids.push(id);
+        } else {
+            // Fallback for older clients without hash/size
+            let temp_file = tempfile::NamedTempFile::new().map_err(|e| AppError::InternalError(e.to_string()))?;
+            let std_file = temp_file
+                .as_file()
+                .try_clone()
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+            let mut async_file = tokio::fs::File::from_std(std_file);
 
-        uploaded_files.push(UploadedFile {
-            name,
-            content_type,
-            temp_file,
-            hash,
-            size,
-        });
-    }
+            let mut hasher = sha2::Sha256::new();
+            use sha2::Digest;
+            let mut file_size = 0i64;
 
-    if uploaded_files.is_empty() {
-        return Err(AppError::BadRequest("No files uploaded".to_string()));
-    }
-
-    let mut uploaded_ids = Vec::new();
-    for uf in uploaded_files {
-        match service
-            .upload_file_chunk(
-                &user_ctx.user_id,
-                &parent_id,
-                &uf.name,
-                &uf.content_type,
-                &uf.temp_file.path().to_path_buf(),
-                &uf.hash,
-                uf.size,
-            )
-            .await
-        {
-            Ok(id) => uploaded_ids.push(id),
-            Err(e) => {
-                return Err(e);
+            while let Some(chunk) = field.chunk().await.map_err(|e| {
+                if is_length_limit(&e)
+                    || e.to_string().contains("payload too large")
+                    || e.to_string().contains("length limit exceeded")
+                {
+                    AppError::PayloadTooLarge(e.to_string())
+                } else {
+                    AppError::BadRequest(e.to_string())
+                }
+            })? {
+                hasher.update(&chunk);
+                tokio::io::AsyncWriteExt::write_all(&mut async_file, &chunk)
+                    .await
+                    .map_err(|e| AppError::InternalError(e.to_string()))?;
+                file_size += chunk.len() as i64;
+                if file_size > max_file_size {
+                    return Err(AppError::PayloadTooLarge(format!(
+                        "File exceeds limit of {} bytes",
+                        max_file_size
+                    )));
+                }
             }
+            tokio::io::AsyncWriteExt::flush(&mut async_file)
+                .await
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+            let hash_val = hex::encode(hasher.finalize());
+
+            let id = service
+                .upload_file_chunk(
+                    &user_ctx.user_id,
+                    &parent_id,
+                    &name,
+                    &content_type,
+                    &temp_file.path().to_path_buf(),
+                    &hash_val,
+                    file_size,
+                )
+                .await?;
+            uploaded_ids.push(id);
         }
+    }
+
+    if uploaded_ids.is_empty() {
+        return Err(AppError::BadRequest("No files uploaded".to_string()));
     }
 
     Ok(Json(uploaded_ids))
@@ -523,11 +547,28 @@ pub async fn get_file(
     if claims.share_version.unwrap_or(0) != existing.share_version {
         return Err(AppError::Unauthorized("Share link has been revoked".into()));
     }
+    let mut range_start = 0;
+    let mut range_end = None;
+    if let Some(range_header) = headers.get(axum::http::header::RANGE) {
+        if let Ok(range_str) = range_header.to_str() {
+            if let Some(stripped) = range_str.strip_prefix("bytes=") {
+                let parts: Vec<&str> = stripped.split('-').collect();
+                if parts.len() == 2 {
+                    if let Ok(start) = parts[0].parse::<u64>() {
+                        range_start = start;
+                    }
+                    if let Ok(end) = parts[1].parse::<u64>() {
+                        range_end = Some(end);
+                    }
+                }
+            }
+        }
+    }
 
     let service = StorageService::new(repo, state.local_storage.clone());
 
-    let (filename, mime_type, len, stream) =
-        service.stream_file_content(id, claims.user_id).await?;
+    let (filename, mime_type, total_size, range_len, stream) =
+        service.stream_file_content(id, claims.user_id, range_start, range_end).await?;
     let sanitized_filename: String = filename
         .chars()
         .map(|character| {
@@ -543,21 +584,32 @@ pub async fn get_file(
 
     use axum::http::header::{
         CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE, REFERRER_POLICY,
-        X_CONTENT_TYPE_OPTIONS,
+        X_CONTENT_TYPE_OPTIONS, ACCEPT_RANGES, CONTENT_RANGE
     };
-    let headers = [
-        (CONTENT_TYPE, mime_type),
-        (CONTENT_LENGTH, len.to_string()),
-        (
-            CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", sanitized_filename),
-        ),
-        (CACHE_CONTROL, "private, no-store".to_string()),
-        (REFERRER_POLICY, "no-referrer".to_string()),
-        (X_CONTENT_TYPE_OPTIONS, "nosniff".to_string()),
-    ];
+    let mut res_headers = axum::http::HeaderMap::new();
+    res_headers.insert(CONTENT_TYPE, mime_type.parse().unwrap());
+    res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
+    res_headers.insert(
+        CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{}\"", sanitized_filename).parse().unwrap(),
+    );
+    res_headers.insert(CACHE_CONTROL, "private, no-store".parse().unwrap());
+    res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
+    res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+    res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
 
-    Ok((headers, axum::body::Body::from_stream(stream)))
+    let status = if range_len < total_size {
+        let actual_end = range_start + range_len - 1;
+        res_headers.insert(
+            CONTENT_RANGE,
+            format!("bytes {}-{}/{}", range_start, actual_end, total_size).parse().unwrap(),
+        );
+        axum::http::StatusCode::PARTIAL_CONTENT
+    } else {
+        axum::http::StatusCode::OK
+    };
+
+    Ok((status, res_headers, axum::body::Body::from_stream(stream)))
 }
 
 #[utoipa::path(

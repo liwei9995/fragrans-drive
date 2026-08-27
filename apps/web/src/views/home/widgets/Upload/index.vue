@@ -1,8 +1,14 @@
 <script setup lang="ts" name="upload">
-import type { UploadInstance, UploadProps } from 'element-plus'
+import axios from 'axios'
+import type {
+  UploadInstance,
+  UploadProps,
+  UploadRequestOptions,
+} from 'element-plus'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { GlobalStore } from '@/store'
+import { calculateFileHash } from '@/utils/fileHash'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,6 +63,37 @@ const handleError: UploadProps['onError'] = (
   clearFiles(['fail'])
 }
 
+const customUploadRequest = async (options: UploadRequestOptions) => {
+  const { file, onProgress, onSuccess, onError } = options
+
+  try {
+    const fileHash = await calculateFileHash(file, (percent) => {
+      onProgress({ percent: percent * 0.1 } as any)
+    })
+
+    const formData = new FormData()
+    formData.append('parentId', uploadPayload.value.parentId)
+    formData.append('hash', fileHash)
+    formData.append('size', file.size.toString())
+    formData.append(options.filename || 'file', file)
+
+    const response = await axios.post(storageAction.value, formData, {
+      headers: uploadHeaders.value,
+      onUploadProgress: (progressEvent) => {
+        const { loaded, total } = progressEvent
+        if (total) {
+          const percent = 10 + Math.round((loaded / total) * 90)
+          onProgress({ percent } as any)
+        }
+      },
+    })
+
+    onSuccess(response.data)
+  } catch (error) {
+    onError(error as any)
+  }
+}
+
 const clearFiles = (
   status?: Array<'ready' | 'uploading' | 'success' | 'fail'>,
 ) => {
@@ -93,6 +130,7 @@ onBeforeUnmount(() => {
     :on-success="handleSuccess"
     :on-error="handleError"
     :before-upload="beforeUpload"
+    :http-request="customUploadRequest"
   >
     <template #trigger>
       <slot name="trigger" />

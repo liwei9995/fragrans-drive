@@ -71,6 +71,9 @@ importers:
       element-plus:
         specifier: ^2.14.5
         version: 2.14.5(vue@3.5.41(@typescript/typescript6@6.0.2))
+      hash-wasm:
+        specifier: ^4.12.0
+        version: 4.12.0
       pinia:
         specifier: ^4.0.3
         version: 4.0.3(@typescript/typescript6@6.0.2)(@vue/devtools-api@8.2.1)(vue@3.5.41(@typescript/typescript6@6.0.2))
@@ -1508,6 +1511,9 @@ packages:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
 
+  hash-wasm@4.12.0:
+    resolution: {integrity: sha512-+/2B2rYLb48I/evdOIhP+K/DD2ca2fgBjp6O+GBEnCDk2e4rpeXIK8GvIyRPjTezgmWn9gmKwkQjjx6BtqDHVQ==}
+
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
@@ -1963,11 +1969,6 @@ packages:
   mute-stream@0.0.8:
     resolution: {integrity: sha512-nnbWWOkoWyUsTjKrhgD0dcz22mdkSnpYqbEjIm2nhwhuxlSkpywJmBo8h0ZqJdkp73mb90SssHkN4rsRaBAfAA==}
 
-  nanoid@3.3.16:
-    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
-    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
-    hasBin: true
-
   nanoid@3.3.18:
     resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -2176,10 +2177,6 @@ packages:
     engines: {node: '>=18.0'}
     peerDependencies:
       postcss: ^8.4.31
-
-  postcss@8.5.23:
-    resolution: {integrity: sha512-g50586zr4bZmwFiTlflMu8E0bDTb5I5gertgwAKmsdUlTQIhZtunzUlD1WSzwcVWPoAVpsrA6vlfCD7oXvRwgg==}
-    engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.26:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
@@ -3399,7 +3396,7 @@ snapshots:
       '@vue/shared': 3.5.41
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.23
+      postcss: 8.5.26
       source-map-js: 1.2.1
 
   '@vue/compiler-ssr@3.5.41':
@@ -4252,6 +4249,8 @@ snapshots:
     dependencies:
       has-symbols: 1.1.0
 
+  hash-wasm@4.12.0: {}
+
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
@@ -4678,8 +4677,6 @@ snapshots:
 
   mute-stream@0.0.8: {}
 
-  nanoid@3.3.16: {}
-
   nanoid@3.3.18: {}
 
   neo-async@2.6.2: {}
@@ -4866,12 +4863,6 @@ snapshots:
   postcss-safe-parser@7.0.1(postcss@8.5.26):
     dependencies:
       postcss: 8.5.26
-
-  postcss@8.5.23:
-    dependencies:
-      nanoid: 3.3.16
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
 
   postcss@8.5.26:
     dependencies:

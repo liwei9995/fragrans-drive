@@ -329,7 +329,20 @@ impl StorageService {
 
         let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
         let mut thumbnail_item = None;
+        
+        let mut is_valid_image = false;
         if is_raster_image {
+            let mut file = tokio::fs::File::open(temp_file_path).await?;
+            let mut buffer = [0; 512];
+            use tokio::io::AsyncReadExt;
+            if let Ok(n) = file.read(&mut buffer).await {
+                if n > 0 && infer::is_image(&buffer[..n]) {
+                    is_valid_image = true;
+                }
+            }
+        }
+
+        if is_valid_image {
             let data = tokio::fs::read(temp_file_path).await?;
             let thumb_data = tokio::task::spawn_blocking(move || generate_thumbnail(&data))
                 .await
@@ -411,6 +424,166 @@ impl StorageService {
         }
     }
 
+    pub async fn upload_stream<R: tokio::io::AsyncRead + Unpin + Send + Sync>(
+        &self,
+        user_id: &str,
+        parent_id: &str,
+        name: &str,
+        content_type: &str,
+        reader: R,
+        hash: &str,
+        size: i64,
+    ) -> Result<String, AppError> {
+        let need_store = !self
+            .local_storage
+            .exists(user_id, hash)
+            .await
+            .map_err(|error| AppError::InternalError(error.to_string()))?;
+
+        if need_store {
+            self.local_storage
+                .store_from_async_read(user_id, hash, reader, size as u64)
+                .await
+                .map_err(|error| AppError::InternalError(error.to_string()))?;
+        }
+
+        let mut storage_item = Storage {
+            id: None,
+            name: name.to_string(),
+            base_name: Some(
+                StdPath::new(name)
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
+            ext_name: Some(
+                StdPath::new(name)
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+            mime_type: Some(content_type.to_string()),
+            encoding: None,
+            size: Some(size),
+            md5_hash: None,
+            iv: None,
+            content_hash: Some(hash.to_string()),
+            hash_algorithm: Some("sha256".to_string()),
+            encryption_format: Some(1),
+            share_version: 0,
+            parent_id: parent_id.to_string(),
+            r#type: StorageType::File,
+            user_id: user_id.to_string(),
+            thumbnail: None,
+            trashed: false,
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
+        };
+
+        let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
+        let mut thumbnail_item = None;
+
+        if is_raster_image {
+            let stream_res = self
+                .local_storage
+                .stream_content(user_id.to_string(), hash.to_string(), 0, None)
+                .await;
+
+            if let Ok((_total_len, _range_len, mut stream)) = stream_res {
+                let mut data = Vec::new();
+                use futures::StreamExt;
+                let max_thumb_size = 20 * 1024 * 1024;
+                let mut valid = true;
+
+                while let Some(chunk) = stream.next().await {
+                    if let Ok(chunk) = chunk {
+                        if data.len() + chunk.len() > max_thumb_size {
+                            valid = false;
+                            break;
+                        }
+                        data.extend_from_slice(&chunk);
+                    } else {
+                        valid = false;
+                        break;
+                    }
+                }
+
+                if valid && !data.is_empty() && infer::is_image(&data) {
+                    let thumb_data_res =
+                        tokio::task::spawn_blocking(move || generate_thumbnail(&data)).await;
+
+                    if let Ok(Ok(thumb_data)) = thumb_data_res {
+                        use sha2::Digest;
+                        let mut hasher = sha2::Sha256::new();
+                        hasher.update(&thumb_data);
+                        let thumb_hash = hex::encode(hasher.finalize());
+
+                        let thumb_need_store = !self
+                            .local_storage
+                            .exists(user_id, &thumb_hash)
+                            .await
+                            .map_err(|error| AppError::InternalError(error.to_string()))?;
+
+                        let thumb_item = Storage {
+                            id: None,
+                            name: format!("{}_thumbnail", name),
+                            base_name: None,
+                            ext_name: None,
+                            mime_type: Some("image/jpeg".to_string()),
+                            encoding: None,
+                            size: Some(thumb_data.len() as i64),
+                            md5_hash: None,
+                            iv: None,
+                            content_hash: Some(thumb_hash.clone()),
+                            hash_algorithm: Some("sha256".to_string()),
+                            encryption_format: Some(1),
+                            share_version: 0,
+                            parent_id: parent_id.to_string(),
+                            r#type: StorageType::Thumbnail,
+                            user_id: user_id.to_string(),
+                            thumbnail: None,
+                            trashed: false,
+                            created_at: Some(Utc::now()),
+                            updated_at: Some(Utc::now()),
+                        };
+
+                        if thumb_need_store {
+                            let thumb_temp = tempfile::NamedTempFile::new()
+                                .map_err(|error| AppError::InternalError(error.to_string()))?;
+                            tokio::fs::write(thumb_temp.path(), &thumb_data)
+                                .await
+                                .map_err(|e| AppError::InternalError(e.to_string()))?;
+                            self.local_storage
+                                .store_from_file(user_id, &thumb_hash, thumb_temp.path())
+                                .await
+                                .map_err(|error| AppError::InternalError(error.to_string()))?;
+                        }
+                        thumbnail_item = Some(thumb_item);
+                    }
+                }
+            }
+        }
+
+        let thumbnail_id = match thumbnail_item {
+            Some(item) => Some(self.repo.create(item).await?),
+            None => None,
+        };
+        storage_item.thumbnail = thumbnail_id.map(|id| id.to_hex());
+
+        match self.repo.create(storage_item).await {
+            Ok(id) => Ok(id.to_hex()),
+            Err(error) => {
+                if let Some(thumbnail_id) = thumbnail_id {
+                    let _ = self.repo.delete_one(thumbnail_id, user_id).await;
+                }
+                Err(AppError::DatabaseError(error))
+            }
+        }
+    }
+
     pub async fn get_files(
         &self,
         user_id: &str,
@@ -459,7 +632,9 @@ impl StorageService {
         &self,
         file_id: String,
         user_id: String,
-    ) -> Result<(String, String, u64, StorageStream), AppError> {
+        range_start: u64,
+        range_end: Option<u64>,
+    ) -> Result<(String, String, u64, u64, StorageStream), AppError> {
         let id_oid =
             ObjectId::parse_str(&file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
 
@@ -473,12 +648,12 @@ impl StorageService {
                 .mime_type
                 .unwrap_or_else(|| "application/octet-stream".to_string());
             if let Some(hash) = item.content_hash {
-                let (len, stream) = self
+                let (total_len, range_len, stream) = self
                     .local_storage
-                    .stream_content(item.user_id, hash)
+                    .stream_content(item.user_id, hash, range_start, range_end)
                     .await
                     .map_err(|e| AppError::InternalError(e.to_string()))?;
-                return Ok((filename, mime, len, stream));
+                return Ok((filename, mime, total_len, range_len, stream));
             } else if let Some(md5_hash) = item.md5_hash {
                 // Deprecated compatibility path. Legacy files are bounded in memory and should
                 // be migrated to v1 as soon as possible.
@@ -497,11 +672,19 @@ impl StorageService {
                     ));
                 }
 
-                let len = data.len() as u64;
+                let total_len = data.len() as u64;
+                let actual_end = std::cmp::min(range_end.unwrap_or(total_len.saturating_sub(1)), total_len.saturating_sub(1));
+                let range_start = std::cmp::min(range_start, total_len);
+                let range_len = if range_start <= actual_end { actual_end - range_start + 1 } else { 0 };
+                
                 let stream: StorageStream = Box::pin(futures::stream::once(async move {
-                    Ok(axum::body::Bytes::from(data))
+                    if range_start < total_len {
+                        Ok(axum::body::Bytes::from(data[(range_start as usize)..((range_start + range_len) as usize)].to_vec()))
+                    } else {
+                        Ok(axum::body::Bytes::new())
+                    }
                 }));
-                return Ok((filename, mime, len, stream));
+                return Ok((filename, mime, total_len, range_len, stream));
             }
         }
         Err(AppError::NotFound("File not found".into()))

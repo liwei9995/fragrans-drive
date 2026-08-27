@@ -88,34 +88,37 @@ impl LocalStorage {
         Ok(path)
     }
 
-    pub async fn store_from_file(
+    pub async fn store_from_async_read<R: tokio::io::AsyncRead + Unpin>(
         &self,
         user_id: &str,
         content_hash: &str,
-        source: &Path,
+        mut in_reader: R,
+        plaintext_size: u64,
     ) -> Result<(), StorageIoError> {
         let path = self.get_path(user_id, content_hash)?;
-        if let Some(parent) = path.parent() {
+        if path.exists() {
+            return Ok(());
+        }
+
+        let temp_path = path.with_extension("tmp");
+        if let Some(parent) = temp_path.parent() {
             fs::create_dir_all(parent).await?;
         }
 
-        let temp_path =
-            path.with_file_name(format!(".{}.{}.tmp", content_hash, uuid::Uuid::new_v4()));
-        let result = async {
-            let mut in_file = fs::File::open(source).await?;
-            let plaintext_size = in_file.metadata().await?.len();
+        let result: Result<(), StorageIoError> = async {
             let mut out_file = fs::File::create(&temp_path).await?;
-
             let mut base_nonce = [0u8; 12];
             rand::thread_rng().fill_bytes(&mut base_nonce);
 
             out_file.write_all(MAGIC).await?;
-            out_file.write_all(&[VERSION]).await?;
-            out_file.write_all(&CHUNK_SIZE.to_be_bytes()).await?;
-            out_file.write_all(&plaintext_size.to_be_bytes()).await?;
+            out_file.write_u8(VERSION).await?;
+            out_file.write_u32(CHUNK_SIZE).await?;
+            out_file.write_u64(plaintext_size).await?;
             out_file.write_all(&base_nonce).await?;
 
-            let cipher = Aes256Gcm::new(self.master_key.as_ref().into());
+            let master_key = self.master_key.clone();
+            let cipher = Aes256Gcm::new(master_key.as_ref().into());
+
             let mut hasher = Sha256::new();
             let mut buffer = vec![0u8; CHUNK_SIZE as usize];
             let mut chunk_index: u32 = 0;
@@ -124,7 +127,7 @@ impl LocalStorage {
             loop {
                 let mut chunk_bytes = 0;
                 while chunk_bytes < CHUNK_SIZE as usize {
-                    let n = in_file.read(&mut buffer[chunk_bytes..]).await?;
+                    let n = in_reader.read(&mut buffer[chunk_bytes..]).await?;
                     if n == 0 {
                         break;
                     }
@@ -157,15 +160,20 @@ impl LocalStorage {
                 aad.extend_from_slice(&chunk_index.to_be_bytes());
                 aad.extend_from_slice(&(chunk_bytes as u32).to_be_bytes());
 
-                let ciphertext = cipher
-                    .encrypt(
+                let cipher = cipher.clone();
+                let msg = buffer[..chunk_bytes].to_vec();
+                let ciphertext = tokio::task::spawn_blocking(move || {
+                    cipher.encrypt(
                         &nonce,
                         Payload {
-                            msg: &buffer[..chunk_bytes],
+                            msg: &msg,
                             aad: &aad,
                         },
                     )
-                    .map_err(|e| StorageIoError::Crypto(e.to_string()))?;
+                })
+                .await
+                .map_err(|e| StorageIoError::Crypto(format!("Task error: {}", e)))?
+                .map_err(|e| StorageIoError::Crypto(e.to_string()))?;
 
                 out_file.write_all(&ciphertext).await?;
 
@@ -206,6 +214,17 @@ impl LocalStorage {
         }
 
         result
+    }
+
+    pub async fn store_from_file(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+        source: &Path,
+    ) -> Result<(), StorageIoError> {
+        let plaintext_size = fs::metadata(source).await?.len();
+        let in_file = fs::File::open(source).await?;
+        self.store_from_async_read(user_id, content_hash, in_file, plaintext_size).await
     }
 
     pub async fn read_all(
@@ -299,15 +318,19 @@ impl LocalStorage {
             aad.extend_from_slice(&chunk_index.to_be_bytes());
             aad.extend_from_slice(&expected_plaintext_len.to_be_bytes());
 
-            let plaintext = cipher
-                .decrypt(
+            let cipher = cipher.clone();
+            let plaintext = tokio::task::spawn_blocking(move || {
+                cipher.decrypt(
                     &nonce,
                     Payload {
                         msg: &ciphertext,
                         aad: &aad,
                     },
                 )
-                .map_err(|e| StorageIoError::Crypto(e.to_string()))?;
+            })
+            .await
+            .map_err(|e| StorageIoError::Crypto(format!("Task error: {}", e)))?
+            .map_err(|e| StorageIoError::Crypto(e.to_string()))?;
 
             result.extend_from_slice(&plaintext);
             read_plaintext += plaintext.len() as u64;
@@ -345,7 +368,9 @@ impl LocalStorage {
         &self,
         user_id: String,
         content_hash: String,
-    ) -> Result<(u64, StorageStream), StorageIoError> {
+        range_start: u64,
+        range_end: Option<u64>,
+    ) -> Result<(u64, u64, StorageStream), StorageIoError> {
         let path = self.get_path(&user_id, &content_hash)?;
         if !path.exists() {
             return Err(StorageIoError::Io(std::io::Error::new(
@@ -390,6 +415,18 @@ impl LocalStorage {
 
         let master_key = self.master_key.clone();
 
+        let actual_end = std::cmp::min(range_end.unwrap_or(plaintext_size.saturating_sub(1)), plaintext_size.saturating_sub(1));
+        let range_start = std::cmp::min(range_start, plaintext_size);
+        let range_len = if range_start <= actual_end { actual_end - range_start + 1 } else { 0 };
+        
+        let start_chunk = if range_len == 0 { 0 } else { (range_start / (CHUNK_SIZE as u64)) as u32 };
+        let end_chunk = if range_len == 0 { 0 } else { (actual_end / (CHUNK_SIZE as u64)) as u32 };
+        
+        let file_offset = HEADER_SIZE + (start_chunk as u64 * (CHUNK_SIZE as u64 + 16));
+        use std::io::SeekFrom;
+        use tokio::io::AsyncSeekExt;
+        in_file.seek(SeekFrom::Start(file_offset)).await?;
+
         struct State {
             in_file: fs::File,
             master_key: Arc<[u8; 32]>,
@@ -398,7 +435,9 @@ impl LocalStorage {
             plaintext_size: u64,
             base_nonce: [u8; 12],
             chunk_index: u32,
-            read_plaintext: u64,
+            end_chunk: u32,
+            range_start: u64,
+            range_len: u64,
             done: bool,
         }
 
@@ -409,27 +448,35 @@ impl LocalStorage {
             content_hash,
             plaintext_size,
             base_nonce,
-            chunk_index: 0,
-            read_plaintext: 0,
-            done: false,
+            chunk_index: start_chunk,
+            end_chunk,
+            range_start,
+            range_len,
+            done: range_len == 0,
         };
 
+        use futures::StreamExt;
         let stream = futures::stream::unfold(state, |mut s| async move {
             if s.done {
                 return None;
             }
-            let remaining = s.plaintext_size - s.read_plaintext;
+
+            let chunk_offset = s.chunk_index as u64 * CHUNK_SIZE as u64;
+            let remaining = s.plaintext_size.saturating_sub(chunk_offset);
+            
             if remaining == 0 && s.chunk_index > 0 {
                 let mut extra = [0u8; 1];
                 match s.in_file.read(&mut extra).await {
                     Ok(n) if n > 0 => {
                         s.done = true;
-                        return Some((Err(StorageIoError::Format("Extra ciphertext".into())), s));
+                        let fut = async move { Err(StorageIoError::Format("Extra ciphertext".into())) };
+                        return Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s));
                     }
                     Ok(_) => return None,
                     Err(e) => {
                         s.done = true;
-                        return Some((Err(StorageIoError::Io(e)), s));
+                        let fut = async move { Err(StorageIoError::Io(e)) };
+                        return Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s));
                     }
                 }
             }
@@ -440,7 +487,8 @@ impl LocalStorage {
             let mut ciphertext = vec![0u8; expected_ciphertext_len];
             if let Err(e) = s.in_file.read_exact(&mut ciphertext).await {
                 s.done = true;
-                return Some((Err(StorageIoError::Io(e)), s));
+                let fut = async move { Err(StorageIoError::Io(e)) };
+                return Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s));
             }
 
             let mut nonce_bytes = s.base_nonce;
@@ -463,47 +511,54 @@ impl LocalStorage {
             aad.extend_from_slice(&expected_plaintext_len.to_be_bytes());
 
             let cipher = Aes256Gcm::new(s.master_key.as_ref().into());
-            let plaintext = match cipher.decrypt(
-                &nonce,
-                Payload {
-                    msg: &ciphertext,
-                    aad: &aad,
-                },
-            ) {
-                Ok(p) => p,
-                Err(e) => {
-                    s.done = true;
-                    return Some((Err(StorageIoError::Crypto(e.to_string())), s));
-                }
-            };
+            
+            let is_last_chunk = s.chunk_index == s.end_chunk;
+            let chunk_index = s.chunk_index;
+            let range_start = s.range_start;
+            let range_len = s.range_len;
 
-            s.read_plaintext += plaintext.len() as u64;
-
-            if s.chunk_index == u32::MAX {
+            if s.chunk_index == u32::MAX || is_last_chunk {
                 s.done = true;
-                return Some((Err(StorageIoError::TooManyChunks), s));
             }
             s.chunk_index += 1;
 
-            if expected_plaintext_len < CHUNK_SIZE {
-                let mut extra = [0u8; 1];
-                match s.in_file.read(&mut extra).await {
-                    Ok(n) if n > 0 => {
-                        s.done = true;
-                        return Some((Err(StorageIoError::Format("Extra ciphertext".into())), s));
-                    }
-                    Ok(_) => s.done = true,
-                    Err(error) => {
-                        s.done = true;
-                        return Some((Err(StorageIoError::Io(error)), s));
-                    }
+            let fut = async move {
+                let plaintext_result = tokio::task::spawn_blocking(move || {
+                    cipher.decrypt(
+                        &nonce,
+                        Payload {
+                            msg: &ciphertext,
+                            aad: &aad,
+                        },
+                    )
+                }).await;
+
+                let plaintext = match plaintext_result {
+                    Ok(Ok(p)) => p,
+                    Ok(Err(e)) => return Err(StorageIoError::Crypto(e.to_string())),
+                    Err(e) => return Err(StorageIoError::Crypto(format!("Task error: {}", e))),
+                };
+
+                let current_chunk_offset = chunk_index as u64 * CHUNK_SIZE as u64;
+                let chunk_end_offset = current_chunk_offset + plaintext.len() as u64;
+                let range_end = range_start + range_len;
+
+                let intersect_start = std::cmp::max(current_chunk_offset, range_start);
+                let intersect_end = std::cmp::min(chunk_end_offset, range_end);
+
+                if intersect_start < intersect_end {
+                    let start_idx = (intersect_start - current_chunk_offset) as usize;
+                    let end_idx = (intersect_end - current_chunk_offset) as usize;
+                    Ok(axum::body::Bytes::from(plaintext[start_idx..end_idx].to_vec()))
+                } else {
+                    Ok(axum::body::Bytes::new())
                 }
-            }
+            };
+            
+            Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s))
+        }).buffered(4);
 
-            Some((Ok(axum::body::Bytes::from(plaintext)), s))
-        });
-
-        Ok((plaintext_size, Box::pin(stream)))
+        Ok((plaintext_size, range_len, Box::pin(stream)))
     }
 }
 pub mod legacy {
