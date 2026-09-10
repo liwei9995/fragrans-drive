@@ -343,20 +343,24 @@ const handleTapCardActionItem = async (
   if (command === 'download') {
     download(id, name)
   } else if (command === 'delete') {
-    ElMessageBox.confirm('文件删除后将无法恢复，确定要删除么？', '删除文件', {
-      confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    ElMessageBox.confirm(
+      '文件将移入回收站，可在回收站中随时还原。确定要删除吗？',
+      '移入回收站',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
       .then(async () => {
         try {
           await deleteFile(id)
           listData.value.docs = listData.value.docs.filter(
             (doc) => doc.id !== id,
           )
-          ElMessage.success('文件删除成功')
+          ElMessage.success('已移入回收站')
         } catch {
-          ElMessage.error('文件删除失败，请重试')
+          ElMessage.error('移入回收站失败，请重试')
         }
       })
       .catch(() => {})
@@ -434,8 +438,8 @@ const handleClearSelection = () => {
 const handleBatchDelete = () => {
   const count = selectedIds.value.size
   ElMessageBox.confirm(
-    `确定要删除选中的 ${count} 项吗？此操作不可逆。`,
-    '批量删除',
+    `确定要将选中的 ${count} 项移入回收站吗？（可在回收站中随时还原）`,
+    '批量移入回收站',
     {
       confirmButtonText: '确定删除',
       cancelButtonText: '取消',
@@ -458,10 +462,10 @@ const handleBatchDelete = () => {
       await fetchFiles(parentId.value)
 
       if (failed === 0) {
-        ElMessage.success(`成功删除 ${count} 项`)
+        ElMessage.success(`已将 ${count} 项移入回收站`)
       } else {
         ElMessage.warning(
-          `删除完成：成功 ${count - failed} 项，失败 ${failed} 项`,
+          `操作完成：成功移入回收站 ${count - failed} 项，失败 ${failed} 项`,
         )
       }
     })
