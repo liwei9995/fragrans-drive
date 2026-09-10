@@ -4,6 +4,7 @@ use mongodb::{
     Collection, Database,
     bson::{Document, doc, oid::ObjectId},
 };
+use std::collections::HashSet;
 
 #[derive(Clone)]
 pub struct StorageRepository {
@@ -276,6 +277,47 @@ impl StorageRepository {
         self.collection
             .count_documents(doc! { "userId": user_id, "contentHash": hash })
             .await
+    }
+
+    /// Batch checks which content hashes still have active references for the given user.
+    /// Aggregates with $match and $group to check all hashes in a single batch query.
+    pub async fn find_referenced_content_hashes(
+        &self,
+        user_id: &str,
+        hashes: &[String],
+    ) -> Result<HashSet<String>, mongodb::error::Error> {
+        if hashes.is_empty() {
+            return Ok(HashSet::new());
+        }
+
+        let mut referenced = HashSet::new();
+        let doc_coll = self.collection.clone_with_type::<Document>();
+
+        for chunk in hashes.chunks(1000) {
+            let pipeline = vec![
+                doc! {
+                    "$match": {
+                        "userId": user_id,
+                        "contentHash": { "$in": chunk }
+                    }
+                },
+                doc! {
+                    "$group": {
+                        "_id": "$contentHash"
+                    }
+                },
+            ];
+
+            let mut cursor = doc_coll.aggregate(pipeline).await?;
+            while let Some(res) = cursor.next().await {
+                let doc = res?;
+                if let Ok(hash) = doc.get_str("_id") {
+                    referenced.insert(hash.to_string());
+                }
+            }
+        }
+
+        Ok(referenced)
     }
 
     #[allow(dead_code)]

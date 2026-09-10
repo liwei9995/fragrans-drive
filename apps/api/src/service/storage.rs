@@ -958,9 +958,14 @@ impl StorageService {
         let deleted_docs = self.repo.delete_many_by_ids(ids, user_id).await?;
         let mut deleted_files = 0;
 
-        for hash in hashes {
-            let remaining = self.repo.count_by_user_content_hash(user_id, &hash).await?;
-            if remaining == 0 {
+        let hash_list: Vec<String> = hashes.into_iter().collect();
+        let referenced_hashes = self
+            .repo
+            .find_referenced_content_hashes(user_id, &hash_list)
+            .await?;
+
+        for hash in hash_list {
+            if !referenced_hashes.contains(&hash) {
                 self.local_storage
                     .remove(user_id, &hash)
                     .await
