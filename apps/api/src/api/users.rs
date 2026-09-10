@@ -92,6 +92,8 @@ pub struct UpdateUserDto {
 
 #[derive(Deserialize, ToSchema)]
 pub struct UpdatePasswordDto {
+    #[serde(rename = "oldPassword")]
+    pub old_password: String,
     pub password: String,
     #[serde(rename = "changePassword")]
     pub change_password: String,
@@ -367,6 +369,11 @@ pub async fn update_password(
     user_ctx: UserContext,
     Json(payload): Json<UpdatePasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
+    if payload.old_password.is_empty() {
+        return Err(AppError::BadRequest(
+            "Current password is required".to_string(),
+        ));
+    }
     if payload.password.len() < 6 {
         return Err(AppError::BadRequest(
             "Password must be at least 6 characters".to_string(),
@@ -378,9 +385,20 @@ pub async fn update_password(
 
     let id = ObjectId::parse_str(&user_ctx.user_id)
         .map_err(|_| AppError::BadRequest("Invalid user ID".to_string()))?;
-    let hashed = hash_password(&payload.password);
 
     let repo = UserRepository::new(&state.db);
+    let user = repo
+        .find_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    if !verify_password(&payload.old_password, &user.password) {
+        return Err(AppError::BadRequest(
+            "Incorrect current password".to_string(),
+        ));
+    }
+
+    let hashed = hash_password(&payload.password);
     repo.update_password(id, &hashed).await?;
     Ok((StatusCode::OK, "Password updated"))
 }

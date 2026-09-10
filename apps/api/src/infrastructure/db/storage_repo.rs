@@ -294,4 +294,43 @@ impl StorageRepository {
         let result = self.collection.delete_many(doc! {}).await?;
         Ok(result.deleted_count)
     }
+
+    pub async fn get_storage_usage(
+        &self,
+        user_id: &str,
+    ) -> Result<(i64, u64), mongodb::error::Error> {
+        let pipeline = vec![
+            doc! {
+                "$match": {
+                    "userId": user_id,
+                    "trashed": false,
+                    "type": "file"
+                }
+            },
+            doc! {
+                "$group": {
+                    "_id": mongodb::bson::Bson::Null,
+                    "totalSize": { "$sum": "$size" },
+                    "fileCount": { "$sum": 1 }
+                }
+            },
+        ];
+        let doc_coll = self.collection.clone_with_type::<Document>();
+        let mut cursor = doc_coll.aggregate(pipeline).await?;
+        if let Some(res) = cursor.next().await {
+            let doc = res?;
+            let total_size = doc
+                .get_i64("totalSize")
+                .or_else(|_| doc.get_i32("totalSize").map(|v| v as i64))
+                .or_else(|_| doc.get_f64("totalSize").map(|v| v as i64))
+                .unwrap_or(0);
+            let file_count = doc
+                .get_i64("fileCount")
+                .or_else(|_| doc.get_i32("fileCount").map(|v| v as i64))
+                .unwrap_or(0)
+                .max(0) as u64;
+            return Ok((total_size, file_count));
+        }
+        Ok((0, 0))
+    }
 }

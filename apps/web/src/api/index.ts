@@ -166,6 +166,9 @@ class RequestHttp {
   put<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
     return this.service.put(url, params, _object) as Promise<T>
   }
+  patch<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {
+    return this.service.patch(url, params, _object) as Promise<T>
+  }
   delete<T = unknown>(url: string, params?: unknown, _object = {}): Promise<T> {
     return this.service.delete(url, { params, ..._object }) as Promise<T>
   }

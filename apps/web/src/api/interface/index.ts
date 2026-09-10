@@ -86,6 +86,13 @@ export namespace Storage {
     query?: Record<string, string>
     pagination?: Record<string, unknown>
     isPublic?: boolean
+    keyword?: string
+    types?: string[]
+    sortBy?: string
+    sortOrder?: number
+    viewMode?: string
+    page?: number
+    limit?: number
   }
 
   export interface ReqStorageUpdateFileName {
@@ -109,6 +116,27 @@ export namespace Storage {
     publicAccessCount?: number
     lastPublicAccessedAt?: string
   }
+
+  export interface TrashRestoreParams {
+    fileIds?: string[]
+    restoreAll?: boolean
+  }
+
+  export interface TrashRestoreResponse {
+    requestedItems: number
+    restoredDocs: number
+  }
+
+  export interface TrashCleanupResponse {
+    deletedDocs: number
+    deletedFiles: number
+  }
+
+  export interface StorageUsage {
+    usedBytes: number
+    fileCount: number
+    quotaBytes: number
+  }
 }
 
 // * 用户管理模块
@@ -123,5 +151,32 @@ export namespace User {
     updatedAt: string
     avatar: string
     roles: string[]
+  }
+
+  export interface UserProfile {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+    gender?: number
+    age?: number
+    avatar?: string
+    roles?: string[]
+    createdAt?: string
+    updatedAt?: string
+  }
+
+  export interface UpdateProfileParams {
+    firstName?: string
+    lastName?: string
+    gender?: number
+    age?: number
+    avatar?: string
+  }
+
+  export interface UpdatePasswordParams {
+    oldPassword: string
+    password: string
+    changePassword: string
   }
 }

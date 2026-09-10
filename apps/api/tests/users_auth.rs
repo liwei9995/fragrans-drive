@@ -230,6 +230,25 @@ async fn password_change_invalidates_refresh_token() {
     let access = login_data["access_token"].as_str().unwrap().to_string();
     let refresh = login_data["refresh_token"].as_str().unwrap().to_string();
 
+    // Attempt password change with incorrect old password
+    let wrong_old_pwd_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/users/password",
+            &access,
+            serde_json::json!({
+                "oldPassword": "wrongpassword",
+                "password": "newpassword123",
+                "changePassword": "newpassword123"
+            }),
+        ))
+        .await
+        .expect("update password with wrong old password");
+    assert_eq!(wrong_old_pwd_res.status(), StatusCode::BAD_REQUEST);
+
+    // Successful password change with correct old password
     let update_res = ctx
         .app
         .clone()
@@ -238,6 +257,7 @@ async fn password_change_invalidates_refresh_token() {
             "/v1/users/password",
             &access,
             serde_json::json!({
+                "oldPassword": "password123",
                 "password": "newpassword123",
                 "changePassword": "newpassword123"
             }),

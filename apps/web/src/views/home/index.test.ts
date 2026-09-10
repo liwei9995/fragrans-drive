@@ -9,13 +9,17 @@ vi.mock('@/store', () => ({
   })),
 }))
 
-vi.mock('vue-router', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    currentRoute: { value: { params: { id: 'root' } } },
-  }),
-  useRoute: () => ({ params: { id: 'root' }, query: {} }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRouter: () => ({
+      push: vi.fn(),
+      currentRoute: { value: { params: { id: 'root' } } },
+    }),
+    useRoute: () => ({ params: { id: 'root' }, query: {} }),
+  }
+})
 
 vi.mock('@/hooks/useFetchFiles', () => ({
   useFetchFiles: vi.fn(() => ({

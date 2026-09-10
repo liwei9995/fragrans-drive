@@ -27,4 +27,21 @@ describe('GlobalStore', () => {
     expect(store.accessToken).toBe('next-access')
     expect(store.refreshToken).toBe('refresh')
   })
+
+  it('setUserInfo and setAvatar update userInfo state', () => {
+    const store = GlobalStore()
+    expect(store.userInfo).toBeNull()
+    store.setUserInfo({
+      id: 'u1',
+      email: 'alex@example.com',
+      firstName: 'Alex',
+      lastName: 'Li',
+      avatar: 'https://example.com/avatar.png',
+    })
+    expect(store.userInfo?.firstName).toBe('Alex')
+    expect(store.userInfo?.avatar).toBe('https://example.com/avatar.png')
+
+    store.setAvatar('https://example.com/new-avatar.png')
+    expect(store.userInfo?.avatar).toBe('https://example.com/new-avatar.png')
+  })
 })

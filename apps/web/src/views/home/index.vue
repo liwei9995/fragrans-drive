@@ -9,9 +9,10 @@ import {
   getPath,
   updateFile,
 } from '@/api/modules/storage'
+import { getProfile } from '@/api/modules/user'
 import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
-import { LOGIN_URL } from '@/config/config'
+import { HOME_URL, LOGIN_URL } from '@/config/config'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 import {
   convertItem,
@@ -31,7 +32,10 @@ import Footer from './widgets/Footer/index.vue'
 import GlobalDropzone from './widgets/GlobalDropzone/index.vue'
 import Header from './widgets/Header/index.vue'
 import Move from './widgets/Move/index.vue'
+import ProfileDialog from './widgets/ProfileDialog/index.vue'
 import PublicLinkDialog from './widgets/PublicLinkDialog/index.vue'
+import SearchDialog from './widgets/SearchDialog/index.vue'
+import TrashDialog from './widgets/TrashDialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
 
 type BreadcrumbItem = {
@@ -45,6 +49,9 @@ const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const moveDialogFormVisible = ref(false)
 const publicLinkDialogVisible = ref(false)
+const searchDialogVisible = ref(false)
+const trashDialogVisible = ref(false)
+const profileDialogVisible = ref(false)
 const activePublicFile = ref<StorageViewItem | null>(null)
 const videoPlayerVisible = ref(false)
 const videoSrc = ref('')
@@ -135,6 +142,14 @@ const actionItems = [
 ]
 
 const avatarActionItems = [
+  {
+    id: 'profile',
+    name: '个人中心',
+  },
+  {
+    id: 'trash',
+    name: '回收站',
+  },
   {
     id: 'logout',
     name: '退出登录',
@@ -275,10 +290,28 @@ const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
 const handleTapActionItem = (command: string | number | object) => {
   if (command === 'folder') {
     folderDialogFormVisible.value = true
+  } else if (command === 'profile') {
+    profileDialogVisible.value = true
+  } else if (command === 'trash') {
+    trashDialogVisible.value = true
   } else if (command === 'logout') {
     globalStore.$reset()
     router.push(LOGIN_URL)
   }
+}
+
+const handleSearchNavigate = (folderId: string) => {
+  if (folderId === 'root' || !folderId || folderId === '0') {
+    router.push(HOME_URL)
+  } else {
+    router.push(`${HOME_URL}/${folderId}`)
+  }
+}
+
+const handleTrashRestored = () => {
+  fetchFiles(parentId.value, true, {
+    isPublic: onlyPublic.value ? true : undefined,
+  })
 }
 
 const download = async (id: string, filename?: string) => {
@@ -476,13 +509,26 @@ const onDrop = (e: DragEvent) => {
 const onDragOver = (e: DragEvent) => e.preventDefault()
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    searchDialogVisible.value = !searchDialogVisible.value
+  } else if (e.key === 'Escape') {
+    searchDialogVisible.value = false
+    trashDialogVisible.value = false
+    profileDialogVisible.value = false
     isDragging.value = false
     dragCounter = 0
   }
 }
 
 onMounted(() => {
+  if (!globalStore.userInfo?.id) {
+    getProfile()
+      .then((profile) => {
+        globalStore.setUserInfo(profile)
+      })
+      .catch(() => {})
+  }
   window.addEventListener('dragenter', onDragEnter)
   window.addEventListener('dragleave', onDragLeave)
   window.addEventListener('dragover', onDragOver)
@@ -505,6 +551,7 @@ onUnmounted(() => {
       <div class="file-drag-zone">
         <div class="page-content">
           <Header
+            :avatar="globalStore.userInfo?.avatar"
             :breadcrumb-items="breadcrumbItems"
             :action-items="actionItems"
             :avatar-action-items="avatarActionItems"
@@ -516,6 +563,8 @@ onUnmounted(() => {
             :on-upload-progress="handleUploadProgress"
             :before-upload="handelBeforeUpload"
             @toggle-only-public="handleToggleOnlyPublic"
+            @open-search="searchDialogVisible = true"
+            @open-trash="trashDialogVisible = true"
           />
           <div class="sub-nav-wrapper">
             <Breadcrumb :breadcrumb-items="breadcrumbItems" />
@@ -600,6 +649,21 @@ onUnmounted(() => {
             :file="activePublicFile"
             @close="handleClosePublicLinkDialog"
             @updated="handlePublicFileUpdated"
+          />
+          <SearchDialog
+            :visible="searchDialogVisible"
+            @close="searchDialogVisible = false"
+            @navigate="handleSearchNavigate"
+          />
+          <TrashDialog
+            :visible="trashDialogVisible"
+            @close="trashDialogVisible = false"
+            @restored="handleTrashRestored"
+          />
+          <ProfileDialog
+            :visible="profileDialogVisible"
+            @close="profileDialogVisible = false"
+            @updated="(p) => globalStore.setUserInfo(p)"
           />
           <UploadStatus
             ref="uploadStatusRef"

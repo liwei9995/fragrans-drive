@@ -1,5 +1,5 @@
 <script setup lang="ts" name="header">
-import { Link, Search, UserFilled } from '@element-plus/icons-vue'
+import { Delete, Link, Search, UserFilled } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -44,7 +44,11 @@ const props = withDefaults(defineProps<HeaderProps>(), {
   onlyPublic: false,
 })
 
-const emit = defineEmits<(e: 'toggle-only-public') => void>()
+const emit = defineEmits<{
+  (e: 'toggle-only-public'): void
+  (e: 'open-search'): void
+  (e: 'open-trash'): void
+}>()
 
 const handleCommand = (command: string | number | object) =>
   props.tapActionItem && props.tapActionItem(command)
@@ -89,10 +93,19 @@ const errorHandler = () => true
               </el-button>
             </el-tooltip>
           </div>
-          <div class="search">
-            <el-icon :size="24">
-              <Search />
-            </el-icon>
+          <div class="search" @click="emit('open-search')">
+            <el-tooltip content="全局搜索 (Cmd+K)" placement="bottom">
+              <el-icon :size="24">
+                <Search />
+              </el-icon>
+            </el-tooltip>
+          </div>
+          <div class="trash-btn" @click="emit('open-trash')">
+            <el-tooltip content="回收站" placement="bottom">
+              <el-icon :size="24">
+                <Delete />
+              </el-icon>
+            </el-tooltip>
           </div>
           <div class="action">
             <ActionButton

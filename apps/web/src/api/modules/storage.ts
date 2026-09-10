@@ -67,3 +67,31 @@ export const setPublicStatus = (
     params,
   )
 }
+
+// 获取回收站列表
+export const getTrashList = (params?: Storage.ReqStorageList) => {
+  return http.post<StorageListResponse>(`${PORT}/storage/trash/list`, params)
+}
+
+// 恢复指定或全部回收站文件
+export const restoreTrash = (params: Storage.TrashRestoreParams) => {
+  return http.post<Storage.TrashRestoreResponse>(
+    `${PORT}/storage/trash/restore`,
+    params,
+  )
+}
+
+// 恢复单个文件
+export const restoreFile = (id: string) => {
+  return http.post<StorageUpdateResult>(`${PORT}/storage/${id}/restore`)
+}
+
+// 清空回收站
+export const emptyTrash = () => {
+  return http.delete<Storage.TrashCleanupResponse>(`${PORT}/storage/trash`)
+}
+
+// 获取存储容量与文件统计
+export const getStorageUsage = () => {
+  return http.get<Storage.StorageUsage>(`${PORT}/storage/usage`)
+}

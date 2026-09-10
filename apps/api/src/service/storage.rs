@@ -1046,4 +1046,9 @@ impl StorageService {
             .collect();
         Ok(path)
     }
+
+    pub async fn get_storage_usage(&self, user_id: &str) -> Result<(i64, u64), AppError> {
+        let (size, count) = self.repo.get_storage_usage(user_id).await?;
+        Ok((size, count))
+    }
 }

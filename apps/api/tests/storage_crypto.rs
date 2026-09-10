@@ -1,4 +1,5 @@
 use fragrans::infrastructure::storage::local::{LocalStorage, StorageIoError};
+use serial_test::serial;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -20,6 +21,8 @@ async fn create_temp_file(content: &[u8]) -> (TempDir, PathBuf, String) {
     let path = dir.path().join("source.tmp");
     let mut file = fs::File::create(&path).await.unwrap();
     file.write_all(content).await.unwrap();
+    file.flush().await.unwrap();
+    drop(file);
 
     let mut hasher = Sha256::new();
     hasher.update(content);
@@ -29,6 +32,7 @@ async fn create_temp_file(content: &[u8]) -> (TempDir, PathBuf, String) {
 }
 
 #[tokio::test]
+#[serial]
 async fn encrypted_roundtrip_for_boundary_sizes() {
     let (_sd, storage) = setup_storage().await;
     let chunk_size = 1_048_576;
@@ -55,6 +59,7 @@ async fn encrypted_roundtrip_for_boundary_sizes() {
 }
 
 #[tokio::test]
+#[serial]
 async fn tampered_header_is_rejected() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -79,6 +84,7 @@ async fn tampered_header_is_rejected() {
 }
 
 #[tokio::test]
+#[serial]
 async fn tampered_ciphertext_is_rejected() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -103,6 +109,7 @@ async fn tampered_ciphertext_is_rejected() {
 }
 
 #[tokio::test]
+#[serial]
 async fn wrong_key_is_rejected() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -116,6 +123,7 @@ async fn wrong_key_is_rejected() {
 }
 
 #[tokio::test]
+#[serial]
 async fn wrong_user_is_rejected() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -147,6 +155,7 @@ async fn wrong_user_is_rejected() {
 }
 
 #[tokio::test]
+#[serial]
 async fn wrong_hash_is_rejected() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -179,6 +188,7 @@ async fn wrong_hash_is_rejected() {
 }
 
 #[tokio::test]
+#[serial]
 async fn same_content_for_different_users_uses_different_paths() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -208,6 +218,7 @@ async fn same_content_for_different_users_uses_different_paths() {
 }
 
 #[tokio::test]
+#[serial]
 async fn failed_write_leaves_no_temp_or_partial_file() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3];
@@ -234,6 +245,7 @@ async fn failed_write_leaves_no_temp_or_partial_file() {
 }
 
 #[tokio::test]
+#[serial]
 async fn concurrent_identical_writes_produce_one_readable_object() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![7; 3 * 1_048_576 + 17];
@@ -269,6 +281,7 @@ async fn concurrent_identical_writes_produce_one_readable_object() {
 }
 
 #[tokio::test]
+#[serial]
 async fn invalid_storage_identifiers_are_rejected() {
     let (_sd, storage) = setup_storage().await;
     let content = b"content";
@@ -289,6 +302,7 @@ async fn invalid_storage_identifiers_are_rejected() {
 }
 
 #[tokio::test]
+#[serial]
 async fn two_users_upload_same_content_and_both_download_original() {
     let (_sd, storage) = setup_storage().await;
     let content = vec![1, 2, 3, 4, 5];

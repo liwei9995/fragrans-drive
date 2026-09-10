@@ -1015,3 +1015,151 @@ async fn restore_folder_name_conflict_returns_409_and_leaves_item_trashed() {
 
     ctx.teardown().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn storage_usage_reports_active_files_and_quota() {
+    let ctx = setup().await;
+    let repo = StorageRepository::new(&ctx.db);
+    let now = Utc::now();
+
+    // Create an active file of 2048 bytes
+    repo.create(Storage {
+        id: None,
+        name: "test1.txt".to_string(),
+        base_name: Some("test1".to_string()),
+        ext_name: Some("txt".to_string()),
+        mime_type: Some("text/plain".to_string()),
+        encoding: None,
+        size: Some(2048),
+        md5_hash: None,
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
+        share_version: 0,
+        is_public: false,
+        public_slug: None,
+        public_expires_at: None,
+        public_access_count: Some(0),
+        last_public_accessed_at: None,
+        iv: None,
+        parent_id: "root".to_string(),
+        r#type: StorageType::File,
+        user_id: ctx.user_id.clone(),
+        thumbnail: None,
+        trashed: false,
+        created_at: Some(now),
+        updated_at: Some(now),
+    })
+    .await
+    .expect("create file 1");
+
+    // Create another active file of 1024 bytes
+    repo.create(Storage {
+        id: None,
+        name: "test2.txt".to_string(),
+        base_name: Some("test2".to_string()),
+        ext_name: Some("txt".to_string()),
+        mime_type: Some("text/plain".to_string()),
+        encoding: None,
+        size: Some(1024),
+        md5_hash: None,
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
+        share_version: 0,
+        is_public: false,
+        public_slug: None,
+        public_expires_at: None,
+        public_access_count: Some(0),
+        last_public_accessed_at: None,
+        iv: None,
+        parent_id: "root".to_string(),
+        r#type: StorageType::File,
+        user_id: ctx.user_id.clone(),
+        thumbnail: None,
+        trashed: false,
+        created_at: Some(now),
+        updated_at: Some(now),
+    })
+    .await
+    .expect("create file 2");
+
+    // Create a trashed file of 5000 bytes (should NOT be counted in active usage)
+    repo.create(Storage {
+        id: None,
+        name: "trashed.txt".to_string(),
+        base_name: Some("trashed".to_string()),
+        ext_name: Some("txt".to_string()),
+        mime_type: Some("text/plain".to_string()),
+        encoding: None,
+        size: Some(5000),
+        md5_hash: None,
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
+        share_version: 0,
+        is_public: false,
+        public_slug: None,
+        public_expires_at: None,
+        public_access_count: Some(0),
+        last_public_accessed_at: None,
+        iv: None,
+        parent_id: "root".to_string(),
+        r#type: StorageType::File,
+        user_id: ctx.user_id.clone(),
+        thumbnail: None,
+        trashed: true,
+        created_at: Some(now),
+        updated_at: Some(now),
+    })
+    .await
+    .expect("create trashed file");
+
+    // Create an active folder (should NOT be counted in fileCount or size)
+    repo.create(Storage {
+        id: None,
+        name: "test-folder".to_string(),
+        base_name: Some("test-folder".to_string()),
+        ext_name: None,
+        mime_type: None,
+        encoding: None,
+        size: None,
+        md5_hash: None,
+        content_hash: None,
+        hash_algorithm: None,
+        encryption_format: None,
+        share_version: 0,
+        is_public: false,
+        public_slug: None,
+        public_expires_at: None,
+        public_access_count: Some(0),
+        last_public_accessed_at: None,
+        iv: None,
+        parent_id: "root".to_string(),
+        r#type: StorageType::Folder,
+        user_id: ctx.user_id.clone(),
+        thumbnail: None,
+        trashed: false,
+        created_at: Some(now),
+        updated_at: Some(now),
+    })
+    .await
+    .expect("create folder");
+
+    let res = ctx
+        .app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/storage/usage", &ctx.auth_token))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let body = response_bytes(res).await;
+    let data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(data["usedBytes"], 3072);
+    assert_eq!(data["fileCount"], 2);
+    assert_eq!(data["quotaBytes"], 53687091200_i64);
+
+    ctx.teardown().await;
+}

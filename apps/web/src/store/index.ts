@@ -9,6 +9,7 @@ export const GlobalStore = defineStore('GlobalState', {
   state: (): GlobalState => ({
     accessToken: '',
     refreshToken: '',
+    userInfo: null,
   }),
   getters: {},
   actions: {
@@ -18,6 +19,14 @@ export const GlobalStore = defineStore('GlobalState', {
     },
     setAccessToken(token: string) {
       this.accessToken = token
+    },
+    setUserInfo(userInfo: GlobalState['userInfo']) {
+      this.userInfo = userInfo
+    },
+    setAvatar(avatar: string) {
+      if (this.userInfo) {
+        this.userInfo.avatar = avatar
+      }
     },
   },
   persist: piniaPersistConfig('GlobalState'),

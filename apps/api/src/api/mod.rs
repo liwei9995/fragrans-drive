@@ -43,11 +43,12 @@ pub struct AppState {
         storage::get_path,
         storage::set_public_status,
         storage::get_public_file,
+        storage::get_storage_usage,
     ),
     components(
         schemas(
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::RefreshTokenDto, users::CreateUserResponse,
-            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse,
+            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse, storage::StorageUsageResponse,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
         )
@@ -130,6 +131,7 @@ pub fn router(db: Database, config: Config) -> Router {
         .route("/path", axum::routing::post(storage::get_path))
         .route("/move", axum::routing::post(storage::move_file))
         .route("/trash", axum::routing::delete(storage::empty_trash))
+        .route("/usage", axum::routing::get(storage::get_storage_usage))
         .route(
             "/download/url",
             axum::routing::post(storage::get_download_url),

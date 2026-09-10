@@ -303,7 +303,7 @@ pub async fn upload_file(
     multipart_res: Result<Multipart, axum::extract::multipart::MultipartRejection>,
 ) -> Result<impl IntoResponse, AppError> {
     let repo = StorageRepository::new(&state.db);
-    let service = StorageService::new(repo, state.local_storage.clone());
+    let service = StorageService::new(repo.clone(), state.local_storage.clone());
     let mut parent_id = "root".to_string();
     let max_file_size = state.config.max_upload_bytes as i64;
 
@@ -347,6 +347,17 @@ pub async fn upload_file(
             let value = value.trim();
             if !value.is_empty() {
                 parent_id = value.to_string();
+                for uploaded_id in &uploaded_ids {
+                    if let Ok(oid) = mongodb::bson::oid::ObjectId::parse_str(uploaded_id) {
+                        let _ = repo
+                            .update_one(
+                                oid,
+                                &user_ctx.user_id,
+                                doc! { "parentId": &parent_id },
+                            )
+                            .await;
+                    }
+                }
             }
             continue;
         }
@@ -1318,4 +1329,40 @@ pub async fn get_path(
     let service = StorageService::new(repo, state.local_storage.clone());
     let path = service.get_path(id, &user_ctx.user_id).await?;
     Ok(Json(path))
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct StorageUsageResponse {
+    #[serde(rename = "usedBytes")]
+    pub used_bytes: i64,
+    #[serde(rename = "fileCount")]
+    pub file_count: u64,
+    #[serde(rename = "quotaBytes")]
+    pub quota_bytes: i64,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/storage/usage",
+    responses(
+        (status = 200, description = "Storage usage and quota for the current user", body = StorageUsageResponse)
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_storage_usage(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+) -> Result<impl IntoResponse, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let service = StorageService::new(repo, state.local_storage.clone());
+    let (used_bytes, file_count) = service.get_storage_usage(&user_ctx.user_id).await?;
+    const DEFAULT_QUOTA_BYTES: i64 = 50 * 1024 * 1024 * 1024; // 50 GB
+    Ok(Json(StorageUsageResponse {
+        used_bytes,
+        file_count,
+        quota_bytes: DEFAULT_QUOTA_BYTES,
+    }))
 }

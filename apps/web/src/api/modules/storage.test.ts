@@ -5,17 +5,23 @@ import { ResultEnum } from '@/enums/httpEnum'
 import {
   createFolder,
   deleteFile,
+  emptyTrash,
   getDownloadUrl,
   getFile,
   getFiles,
   getPath,
+  getStorageUsage,
+  getTrashList,
   moveFile,
+  restoreFile,
+  restoreTrash,
   setPublicStatus,
   updateFile,
 } from './storage'
 
 vi.mock('@/api', () => ({
   default: {
+    get: vi.fn(),
     post: vi.fn(),
     delete: vi.fn(),
     download: vi.fn(),
@@ -79,5 +85,35 @@ describe('storage module api', () => {
     expect(http.put).toHaveBeenCalledWith(`${PORT}/storage/1/public`, {
       isPublic: true,
     })
+  })
+
+  it('getTrashList', () => {
+    const params = { page: 1, limit: 20 }
+    getTrashList(params)
+    expect(http.post).toHaveBeenCalledWith(`${PORT}/storage/trash/list`, params)
+  })
+
+  it('restoreTrash', () => {
+    const params = { fileIds: ['1', '2'] }
+    restoreTrash(params)
+    expect(http.post).toHaveBeenCalledWith(
+      `${PORT}/storage/trash/restore`,
+      params,
+    )
+  })
+
+  it('restoreFile', () => {
+    restoreFile('1')
+    expect(http.post).toHaveBeenCalledWith(`${PORT}/storage/1/restore`)
+  })
+
+  it('emptyTrash', () => {
+    emptyTrash()
+    expect(http.delete).toHaveBeenCalledWith(`${PORT}/storage/trash`)
+  })
+
+  it('getStorageUsage', () => {
+    getStorageUsage()
+    expect(http.get).toHaveBeenCalledWith(`${PORT}/storage/usage`)
   })
 })
