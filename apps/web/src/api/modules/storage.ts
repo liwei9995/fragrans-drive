@@ -56,3 +56,14 @@ export const getPath = (fileId: string) => {
 export const getDownloadUrl = (fileId: string) => {
   return http.post<string>(`${PORT}/storage/download/url`, { fileId })
 }
+
+// 设置文件公开直链状态
+export const setPublicStatus = (
+  id: string,
+  params: Storage.ReqSetPublicStatus,
+) => {
+  return http.put<Storage.ResPublicStatus>(
+    `${PORT}/storage/${id}/public`,
+    params,
+  )
+}

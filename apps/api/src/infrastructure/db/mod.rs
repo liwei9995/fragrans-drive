@@ -113,5 +113,19 @@ pub async fn ensure_indexes(db: &Database) -> Result<(), mongodb::error::Error> 
         .build();
     storage.create_index(folder_name_index).await?;
 
+    let public_slug_index = IndexModel::builder()
+        .keys(doc! { "publicSlug": 1 })
+        .options(
+            IndexOptions::builder()
+                .name("storage_public_slug_unique".to_string())
+                .unique(true)
+                .partial_filter_expression(
+                    doc! { "isPublic": true, "publicSlug": { "$type": "string" } },
+                )
+                .build(),
+        )
+        .build();
+    storage.create_index(public_slug_index).await?;
+
     Ok(())
 }

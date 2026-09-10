@@ -5,6 +5,7 @@ use mongodb::{
     bson::{Document, doc, oid::ObjectId},
 };
 
+#[derive(Clone)]
 pub struct StorageRepository {
     collection: Collection<Storage>,
 }
@@ -25,6 +26,65 @@ impl StorageRepository {
 
     pub async fn find_by_id(&self, id: ObjectId) -> Result<Option<Storage>, mongodb::error::Error> {
         self.collection.find_one(doc! { "_id": id }).await
+    }
+
+    pub async fn find_by_public_slug(
+        &self,
+        slug: &str,
+    ) -> Result<Option<Storage>, mongodb::error::Error> {
+        self.collection
+            .find_one(doc! {
+                "publicSlug": slug,
+                "isPublic": true,
+                "trashed": false
+            })
+            .await
+    }
+
+    pub async fn set_public_status(
+        &self,
+        id: ObjectId,
+        user_id: &str,
+        is_public: bool,
+        public_slug: Option<String>,
+        public_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<Option<Storage>, mongodb::error::Error> {
+        let mut set_fields = doc! {
+            "isPublic": is_public,
+            "updatedAt": mongodb::bson::DateTime::now(),
+        };
+        if let Some(slug) = public_slug {
+            set_fields.insert("publicSlug", slug);
+        } else {
+            set_fields.insert("publicSlug", mongodb::bson::Bson::Null);
+        }
+        if let Some(exp) = public_expires_at {
+            set_fields.insert("publicExpiresAt", mongodb::bson::DateTime::from_chrono(exp));
+        } else {
+            set_fields.insert("publicExpiresAt", mongodb::bson::Bson::Null);
+        }
+
+        self.collection
+            .find_one_and_update(
+                doc! { "_id": id, "userId": user_id, "type": "file", "trashed": false },
+                doc! { "$set": set_fields },
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+    }
+
+    pub async fn record_public_access(&self, id: ObjectId) -> Result<(), mongodb::error::Error> {
+        let _ = self
+            .collection
+            .update_one(
+                doc! { "_id": id },
+                doc! {
+                    "$inc": { "publicAccessCount": 1 },
+                    "$set": { "lastPublicAccessedAt": mongodb::bson::DateTime::now() }
+                },
+            )
+            .await?;
+        Ok(())
     }
 
     #[allow(dead_code)]

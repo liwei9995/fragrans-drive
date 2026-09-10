@@ -78,6 +78,20 @@
         height: 100%;
         color: var(--c-primary);
 
+        .filter-item {
+          display: flex;
+          align-items: center;
+          margin-right: 12px;
+
+          .public-filter-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+          }
+        }
+
         .search {
           display: flex;
           padding: 4px;

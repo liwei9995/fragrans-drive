@@ -234,6 +234,11 @@ impl StorageService {
             hash_algorithm: None,
             encryption_format: None,
             share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
             parent_id: parent_id.to_string(),
             r#type: StorageType::Folder,
             user_id: user_id.to_string(),
@@ -318,6 +323,11 @@ impl StorageService {
             hash_algorithm: Some("sha256".to_string()),
             encryption_format: Some(1),
             share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
             parent_id: parent_id.to_string(),
             r#type: StorageType::File,
             user_id: user_id.to_string(),
@@ -329,7 +339,7 @@ impl StorageService {
 
         let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
         let mut thumbnail_item = None;
-        
+
         let mut is_valid_image = false;
         if is_raster_image {
             let mut file = tokio::fs::File::open(temp_file_path).await?;
@@ -373,6 +383,11 @@ impl StorageService {
                 hash_algorithm: Some("sha256".to_string()),
                 encryption_format: Some(1),
                 share_version: 0,
+                is_public: false,
+                public_slug: None,
+                public_expires_at: None,
+                public_access_count: Some(0),
+                last_public_accessed_at: None,
                 parent_id: parent_id.to_string(),
                 r#type: StorageType::Thumbnail,
                 user_id: user_id.to_string(),
@@ -474,6 +489,11 @@ impl StorageService {
             hash_algorithm: Some("sha256".to_string()),
             encryption_format: Some(1),
             share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
             parent_id: parent_id.to_string(),
             r#type: StorageType::File,
             user_id: user_id.to_string(),
@@ -541,6 +561,11 @@ impl StorageService {
                             hash_algorithm: Some("sha256".to_string()),
                             encryption_format: Some(1),
                             share_version: 0,
+                            is_public: false,
+                            public_slug: None,
+                            public_expires_at: None,
+                            public_access_count: Some(0),
+                            last_public_accessed_at: None,
                             parent_id: parent_id.to_string(),
                             r#type: StorageType::Thumbnail,
                             user_id: user_id.to_string(),
@@ -673,13 +698,23 @@ impl StorageService {
                 }
 
                 let total_len = data.len() as u64;
-                let actual_end = std::cmp::min(range_end.unwrap_or(total_len.saturating_sub(1)), total_len.saturating_sub(1));
+                let actual_end = std::cmp::min(
+                    range_end.unwrap_or(total_len.saturating_sub(1)),
+                    total_len.saturating_sub(1),
+                );
                 let range_start = std::cmp::min(range_start, total_len);
-                let range_len = if range_start <= actual_end { actual_end - range_start + 1 } else { 0 };
-                
+                let range_len = if range_start <= actual_end {
+                    actual_end - range_start + 1
+                } else {
+                    0
+                };
+
                 let stream: StorageStream = Box::pin(futures::stream::once(async move {
                     if range_start < total_len {
-                        Ok(axum::body::Bytes::from(data[(range_start as usize)..((range_start + range_len) as usize)].to_vec()))
+                        Ok(axum::body::Bytes::from(
+                            data[(range_start as usize)..((range_start + range_len) as usize)]
+                                .to_vec(),
+                        ))
                     } else {
                         Ok(axum::body::Bytes::new())
                     }

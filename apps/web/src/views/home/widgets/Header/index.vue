@@ -1,5 +1,5 @@
 <script setup lang="ts" name="header">
-import { Search, UserFilled } from '@element-plus/icons-vue'
+import { Link, Search, UserFilled } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -24,6 +24,7 @@ interface HeaderProps {
   actionItems?: Partial<ActionItem>[]
   avatarActionItems?: Partial<ActionItem>[]
   uploadFileLimit?: number
+  onlyPublic?: boolean
   tapActionItem?: (command: string | number | object) => void
   onUploadChange?: UploadProps['onChange']
   onUploadExceed?: UploadProps['onExceed']
@@ -40,7 +41,10 @@ const props = withDefaults(defineProps<HeaderProps>(), {
   breadcrumbItems: () => [],
   actionItems: () => [],
   avatarActionItems: () => [],
+  onlyPublic: false,
 })
+
+const emit = defineEmits<(e: 'toggle-only-public') => void>()
 
 const handleCommand = (command: string | number | object) =>
   props.tapActionItem && props.tapActionItem(command)
@@ -67,6 +71,24 @@ const errorHandler = () => true
           <Breadcrumb :breadcrumb-items="breadcrumbItems" />
         </div>
         <div class="content">
+          <div class="filter-item">
+            <el-tooltip
+              :content="onlyPublic ? '点击显示全部文件' : '仅看已开启公开直链的文件'"
+              placement="bottom"
+            >
+              <el-button
+                class="public-filter-btn"
+                :type="onlyPublic ? 'primary' : 'default'"
+                :plain="!onlyPublic"
+                size="small"
+                round
+                @click="emit('toggle-only-public')"
+              >
+                <el-icon><Link /></el-icon>
+                <span>{{ onlyPublic ? '仅看公开' : '公开文件' }}</span>
+              </el-button>
+            </el-tooltip>
+          </div>
           <div class="search">
             <el-icon :size="24">
               <Search />

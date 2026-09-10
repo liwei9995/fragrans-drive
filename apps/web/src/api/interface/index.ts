@@ -16,6 +16,12 @@ export interface StorageNode {
   type: 'file' | 'folder'
   thumbnail?: string
   url?: string
+  isPublic?: boolean
+  publicSlug?: string
+  publicUrl?: string
+  publicExpiresAt?: string
+  publicAccessCount?: number
+  lastPublicAccessedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -79,12 +85,29 @@ export namespace Storage {
   export interface ReqStorageList {
     query?: Record<string, string>
     pagination?: Record<string, unknown>
+    isPublic?: boolean
   }
 
   export interface ReqStorageUpdateFileName {
     name: string
     parentId: string
     type: string
+  }
+
+  export interface ReqSetPublicStatus {
+    isPublic: boolean
+    refresh?: boolean
+    expiresIn?: number | null
+  }
+
+  export interface ResPublicStatus {
+    id: string
+    isPublic: boolean
+    publicSlug?: string
+    publicUrl?: string
+    publicExpiresAt?: string
+    publicAccessCount?: number
+    lastPublicAccessedAt?: string
   }
 }
 

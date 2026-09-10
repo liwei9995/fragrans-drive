@@ -10,6 +10,7 @@ import {
   getFiles,
   getPath,
   moveFile,
+  setPublicStatus,
   updateFile,
 } from './storage'
 
@@ -70,6 +71,13 @@ describe('storage module api', () => {
     getDownloadUrl('1')
     expect(http.post).toHaveBeenCalledWith(`${PORT}/storage/download/url`, {
       fileId: '1',
+    })
+  })
+
+  it('setPublicStatus', () => {
+    setPublicStatus('1', { isPublic: true })
+    expect(http.put).toHaveBeenCalledWith(`${PORT}/storage/1/public`, {
+      isPublic: true,
     })
   })
 })

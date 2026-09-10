@@ -37,6 +37,36 @@ pub struct StorageListResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     pub trashed: bool,
+    #[serde(rename = "isPublic", default)]
+    pub is_public: bool,
+    #[serde(
+        rename = "publicSlug",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub public_slug: Option<String>,
+    #[serde(rename = "publicUrl", default, skip_serializing_if = "Option::is_none")]
+    pub public_url: Option<String>,
+    #[serde(
+        rename = "publicExpiresAt",
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
+    pub public_expires_at: Option<DateTime<Utc>>,
+    #[serde(
+        rename = "publicAccessCount",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub public_access_count: Option<u64>,
+    #[serde(
+        rename = "lastPublicAccessedAt",
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
+    pub last_public_accessed_at: Option<DateTime<Utc>>,
     #[serde(
         rename = "createdAt",
         serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
@@ -93,6 +123,14 @@ pub struct UpdateStorageResponse {
     #[serde(rename = "userId")]
     pub user_id: String,
     pub trashed: bool,
+    #[serde(rename = "isPublic", default)]
+    pub is_public: bool,
+    #[serde(
+        rename = "publicSlug",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub public_slug: Option<String>,
     #[serde(
         rename = "createdAt",
         serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
@@ -193,6 +231,13 @@ impl StorageListResponse {
             }
             None => None,
         };
+        let public_url = if s.is_public {
+            s.public_slug
+                .as_deref()
+                .map(|slug| format!("{base}/v1/p/{slug}"))
+        } else {
+            None
+        };
         Ok(Self {
             id: s.id,
             name: s.name,
@@ -206,6 +251,12 @@ impl StorageListResponse {
             thumbnail,
             url,
             trashed: s.trashed,
+            is_public: s.is_public,
+            public_slug: s.public_slug,
+            public_url,
+            public_expires_at: s.public_expires_at,
+            public_access_count: s.public_access_count,
+            last_public_accessed_at: s.last_public_accessed_at,
             created_at: s.created_at,
             updated_at: s.updated_at,
         })
@@ -227,6 +278,12 @@ impl From<Storage> for StorageListResponse {
             thumbnail: s.thumbnail,
             url: None,
             trashed: s.trashed,
+            is_public: s.is_public,
+            public_slug: s.public_slug,
+            public_url: None,
+            public_expires_at: s.public_expires_at,
+            public_access_count: s.public_access_count,
+            last_public_accessed_at: s.last_public_accessed_at,
             created_at: s.created_at,
             updated_at: s.updated_at,
         }
@@ -247,6 +304,8 @@ impl From<Storage> for UpdateStorageResponse {
             r#type: s.r#type,
             user_id: s.user_id,
             trashed: s.trashed,
+            is_public: s.is_public,
+            public_slug: s.public_slug,
             created_at: s.created_at,
             updated_at: s.updated_at,
             base_name,
@@ -302,6 +361,39 @@ pub struct Storage {
 
     #[serde(rename = "shareVersion", default)]
     pub share_version: i32,
+
+    #[serde(rename = "isPublic", default)]
+    pub is_public: bool,
+
+    #[serde(
+        rename = "publicSlug",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub public_slug: Option<String>,
+
+    #[serde(
+        rename = "publicExpiresAt",
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
+    pub public_expires_at: Option<DateTime<Utc>>,
+
+    #[serde(
+        rename = "publicAccessCount",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub public_access_count: Option<u64>,
+
+    #[serde(
+        rename = "lastPublicAccessedAt",
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
+    pub last_public_accessed_at: Option<DateTime<Utc>>,
 
     #[serde(rename = "parentId")]
     pub parent_id: String,

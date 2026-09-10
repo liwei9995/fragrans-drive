@@ -38,6 +38,30 @@
           transition: background-color 0.4s ease, border-color 0.4s ease;
         }
 
+        .public-filter-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 16px;
+          margin: 12px 24px 0;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          border-radius: 8px;
+          font-size: 13px;
+          flex-shrink: 0;
+
+          .banner-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            .banner-text {
+              color: #1e40af;
+              font-weight: 500;
+            }
+          }
+        }
+
         .items-wrapper {
           position: relative;
           flex: 1;

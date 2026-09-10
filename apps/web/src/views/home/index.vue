@@ -13,7 +13,12 @@ import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import { LOGIN_URL } from '@/config/config'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
-import { convertItem, sortDocs, useFetchFiles } from '@/hooks/useFetchFiles'
+import {
+  convertItem,
+  type StorageViewItem,
+  sortDocs,
+  useFetchFiles,
+} from '@/hooks/useFetchFiles'
 import { useUploadQueue } from '@/hooks/useUploadQueue'
 import { GlobalStore } from '@/store'
 import { toDownloadHref } from '@/utils/storageUrl'
@@ -26,6 +31,7 @@ import Footer from './widgets/Footer/index.vue'
 import GlobalDropzone from './widgets/GlobalDropzone/index.vue'
 import Header from './widgets/Header/index.vue'
 import Move from './widgets/Move/index.vue'
+import PublicLinkDialog from './widgets/PublicLinkDialog/index.vue'
 import UploadStatus from './widgets/UploadStatus/index.vue'
 
 type BreadcrumbItem = {
@@ -38,6 +44,8 @@ const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
 const renameDialogFormVisible = ref(false)
 const moveDialogFormVisible = ref(false)
+const publicLinkDialogVisible = ref(false)
+const activePublicFile = ref<StorageViewItem | null>(null)
 const videoPlayerVisible = ref(false)
 const videoSrc = ref('')
 const needToMoveId = ref('root')
@@ -56,6 +64,15 @@ const route = useRoute()
 const router = useRouter()
 const { fetchFiles, listData, isFetching, showSkeleton } = useFetchFiles()
 const parentId = ref((route.params.id as string) || 'root')
+const onlyPublic = ref(false)
+
+const handleToggleOnlyPublic = () => {
+  onlyPublic.value = !onlyPublic.value
+  fetchFiles(parentId.value, true, {
+    isPublic: onlyPublic.value ? true : undefined,
+  })
+}
+
 const {
   handleUploadChange,
   handleUploadProgress,
@@ -68,7 +85,10 @@ const {
     isDragging.value = false
     dragCounter = 0
   },
-  onComplete: () => fetchFiles(parentId.value),
+  onComplete: () =>
+    fetchFiles(parentId.value, true, {
+      isPublic: onlyPublic.value ? true : undefined,
+    }),
   showStatus: () => uploadStatusRef.value?.show(),
 })
 const basicActionItems = [
@@ -92,6 +112,11 @@ const fullActionItems = [
   {
     id: 'download',
     name: '下载',
+    divided: false,
+  },
+  {
+    id: 'publicLink',
+    name: '公开直链',
     divided: false,
   },
   ...basicActionItems,
@@ -119,7 +144,9 @@ const avatarActionItems = [
 const load = () => {
   if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
 
-  fetchFiles(parentId.value, false)
+  fetchFiles(parentId.value, false, {
+    isPublic: onlyPublic.value ? true : undefined,
+  })
 }
 
 const fetchPath = async () => {
@@ -147,7 +174,9 @@ const fetchPath = async () => {
 
 onBeforeMount(() => {
   fetchPath()
-  fetchFiles(parentId.value)
+  fetchFiles(parentId.value, true, {
+    isPublic: onlyPublic.value ? true : undefined,
+  })
 })
 
 watch(
@@ -155,7 +184,9 @@ watch(
   () => {
     parentId.value = (route.params.id as string) || 'root'
     handleClearSelection()
-    fetchFiles(parentId.value)
+    fetchFiles(parentId.value, true, {
+      isPublic: onlyPublic.value ? true : undefined,
+    })
     fetchPath()
   },
 )
@@ -176,7 +207,9 @@ const handleMoved = (id: string, parentId: string) => {
 
 const handleFolderCreated = (parentId: string) => {
   if (parentId === (route.params.id || 'root')) {
-    fetchFiles(parentId)
+    fetchFiles(parentId, true, {
+      isPublic: onlyPublic.value ? true : undefined,
+    })
   }
 }
 
@@ -308,6 +341,46 @@ const handleTapCardActionItem = async (
   } else if (command === 'move') {
     needToMoveId.value = id
     moveDialogFormVisible.value = true
+  } else if (command === 'publicLink') {
+    const doc = listData.value.docs.find((item) => item.id === id)
+    if (doc) {
+      activePublicFile.value = doc
+      publicLinkDialogVisible.value = true
+    }
+  }
+}
+
+const handleClosePublicLinkDialog = () => {
+  publicLinkDialogVisible.value = false
+  activePublicFile.value = null
+}
+
+const handlePublicFileUpdated = (updated: {
+  id: string
+  isPublic: boolean
+  publicSlug?: string
+  publicUrl?: string
+  publicExpiresAt?: string
+  publicAccessCount?: number
+  lastPublicAccessedAt?: string
+}) => {
+  const item = listData.value.docs.find((d) => d.id === updated.id)
+  if (item) {
+    item.isPublic = updated.isPublic
+    item.publicSlug = updated.publicSlug
+    item.publicUrl = updated.publicUrl
+    item.publicExpiresAt = updated.publicExpiresAt
+    item.publicAccessCount = updated.publicAccessCount
+    item.lastPublicAccessedAt = updated.lastPublicAccessedAt
+  }
+  if (activePublicFile.value && activePublicFile.value.id === updated.id) {
+    activePublicFile.value = {
+      ...activePublicFile.value,
+      ...updated,
+    }
+  }
+  if (onlyPublic.value && !updated.isPublic) {
+    listData.value.docs = listData.value.docs.filter((d) => d.id !== updated.id)
   }
 }
 
@@ -436,15 +509,28 @@ onUnmounted(() => {
             :action-items="actionItems"
             :avatar-action-items="avatarActionItems"
             :upload-file-limit="uploadFileLimit"
+            :only-public="onlyPublic"
             :tap-action-item="handleTapActionItem"
             :on-upload-change="handleUploadChange"
             :on-upload-exceed="handleUploadExceed"
             :on-upload-progress="handleUploadProgress"
             :before-upload="handelBeforeUpload"
+            @toggle-only-public="handleToggleOnlyPublic"
           />
           <div class="sub-nav-wrapper">
             <Breadcrumb :breadcrumb-items="breadcrumbItems" />
           </div>
+          <transition name="el-fade-in-linear">
+            <div v-if="onlyPublic" class="public-filter-banner">
+              <div class="banner-left">
+                <el-tag size="small" type="primary" effect="light">已开启筛选</el-tag>
+                <span class="banner-text">当前仅显示具有公开直链的文件</span>
+              </div>
+              <el-button type="primary" link size="small" @click="handleToggleOnlyPublic">
+                显示全部文件
+              </el-button>
+            </div>
+          </transition>
           <el-scrollbar class="items-wrapper" @end-reached="load">
             <transition name="el-fade-in-linear">
               <div v-if="showSkeleton" class="items skeleton-container">
@@ -469,6 +555,8 @@ onUnmounted(() => {
                 :tap-action-item="handleTapCardActionItem"
                 :preview-video="handlePreviewVideo"
                 :selected="selectedIds.has(item.id)"
+                :is-public="item.isPublic"
+                :public-slug="item.publicSlug"
                 @toggle-select="handleToggleSelect"
               />
               <div v-for="item in 10" :key="'spacer-' + item" class="empty-card" />
@@ -506,6 +594,12 @@ onUnmounted(() => {
             :on-close="handleCloseMoveDialog"
             :on-moved="handleMoved"
             :on-folder-created="handleFolderCreated"
+          />
+          <PublicLinkDialog
+            v-if="publicLinkDialogVisible"
+            :file="activePublicFile"
+            @close="handleClosePublicLinkDialog"
+            @updated="handlePublicFileUpdated"
           />
           <UploadStatus
             ref="uploadStatusRef"

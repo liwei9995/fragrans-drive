@@ -224,7 +224,8 @@ impl LocalStorage {
     ) -> Result<(), StorageIoError> {
         let plaintext_size = fs::metadata(source).await?.len();
         let in_file = fs::File::open(source).await?;
-        self.store_from_async_read(user_id, content_hash, in_file, plaintext_size).await
+        self.store_from_async_read(user_id, content_hash, in_file, plaintext_size)
+            .await
     }
 
     pub async fn read_all(
@@ -415,13 +416,28 @@ impl LocalStorage {
 
         let master_key = self.master_key.clone();
 
-        let actual_end = std::cmp::min(range_end.unwrap_or(plaintext_size.saturating_sub(1)), plaintext_size.saturating_sub(1));
+        let actual_end = std::cmp::min(
+            range_end.unwrap_or(plaintext_size.saturating_sub(1)),
+            plaintext_size.saturating_sub(1),
+        );
         let range_start = std::cmp::min(range_start, plaintext_size);
-        let range_len = if range_start <= actual_end { actual_end - range_start + 1 } else { 0 };
-        
-        let start_chunk = if range_len == 0 { 0 } else { (range_start / (CHUNK_SIZE as u64)) as u32 };
-        let end_chunk = if range_len == 0 { 0 } else { (actual_end / (CHUNK_SIZE as u64)) as u32 };
-        
+        let range_len = if range_start <= actual_end {
+            actual_end - range_start + 1
+        } else {
+            0
+        };
+
+        let start_chunk = if range_len == 0 {
+            0
+        } else {
+            (range_start / (CHUNK_SIZE as u64)) as u32
+        };
+        let end_chunk = if range_len == 0 {
+            0
+        } else {
+            (actual_end / (CHUNK_SIZE as u64)) as u32
+        };
+
         let file_offset = HEADER_SIZE + (start_chunk as u64 * (CHUNK_SIZE as u64 + 16));
         use std::io::SeekFrom;
         use tokio::io::AsyncSeekExt;
@@ -463,20 +479,41 @@ impl LocalStorage {
 
             let chunk_offset = s.chunk_index as u64 * CHUNK_SIZE as u64;
             let remaining = s.plaintext_size.saturating_sub(chunk_offset);
-            
+
             if remaining == 0 && s.chunk_index > 0 {
                 let mut extra = [0u8; 1];
                 match s.in_file.read(&mut extra).await {
                     Ok(n) if n > 0 => {
                         s.done = true;
-                        let fut = async move { Err(StorageIoError::Format("Extra ciphertext".into())) };
-                        return Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s));
+                        let fut =
+                            async move { Err(StorageIoError::Format("Extra ciphertext".into())) };
+                        return Some((
+                            Box::pin(fut)
+                                as Pin<
+                                    Box<
+                                        dyn std::future::Future<
+                                                Output = Result<axum::body::Bytes, StorageIoError>,
+                                            > + Send,
+                                    >,
+                                >,
+                            s,
+                        ));
                     }
                     Ok(_) => return None,
                     Err(e) => {
                         s.done = true;
                         let fut = async move { Err(StorageIoError::Io(e)) };
-                        return Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s));
+                        return Some((
+                            Box::pin(fut)
+                                as Pin<
+                                    Box<
+                                        dyn std::future::Future<
+                                                Output = Result<axum::body::Bytes, StorageIoError>,
+                                            > + Send,
+                                    >,
+                                >,
+                            s,
+                        ));
                     }
                 }
             }
@@ -488,7 +525,17 @@ impl LocalStorage {
             if let Err(e) = s.in_file.read_exact(&mut ciphertext).await {
                 s.done = true;
                 let fut = async move { Err(StorageIoError::Io(e)) };
-                return Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s));
+                return Some((
+                    Box::pin(fut)
+                        as Pin<
+                            Box<
+                                dyn std::future::Future<
+                                        Output = Result<axum::body::Bytes, StorageIoError>,
+                                    > + Send,
+                            >,
+                        >,
+                    s,
+                ));
             }
 
             let mut nonce_bytes = s.base_nonce;
@@ -511,7 +558,7 @@ impl LocalStorage {
             aad.extend_from_slice(&expected_plaintext_len.to_be_bytes());
 
             let cipher = Aes256Gcm::new(s.master_key.as_ref().into());
-            
+
             let is_last_chunk = s.chunk_index == s.end_chunk;
             let chunk_index = s.chunk_index;
             let range_start = s.range_start;
@@ -531,7 +578,8 @@ impl LocalStorage {
                             aad: &aad,
                         },
                     )
-                }).await;
+                })
+                .await;
 
                 let plaintext = match plaintext_result {
                     Ok(Ok(p)) => p,
@@ -549,14 +597,27 @@ impl LocalStorage {
                 if intersect_start < intersect_end {
                     let start_idx = (intersect_start - current_chunk_offset) as usize;
                     let end_idx = (intersect_end - current_chunk_offset) as usize;
-                    Ok(axum::body::Bytes::from(plaintext[start_idx..end_idx].to_vec()))
+                    Ok(axum::body::Bytes::from(
+                        plaintext[start_idx..end_idx].to_vec(),
+                    ))
                 } else {
                     Ok(axum::body::Bytes::new())
                 }
             };
-            
-            Some((Box::pin(fut) as Pin<Box<dyn std::future::Future<Output = Result<axum::body::Bytes, StorageIoError>> + Send>>, s))
-        }).buffered(4);
+
+            Some((
+                Box::pin(fut)
+                    as Pin<
+                        Box<
+                            dyn std::future::Future<
+                                    Output = Result<axum::body::Bytes, StorageIoError>,
+                                > + Send,
+                        >,
+                    >,
+                s,
+            ))
+        })
+        .buffered(4);
 
         Ok((plaintext_size, range_len, Box::pin(stream)))
     }

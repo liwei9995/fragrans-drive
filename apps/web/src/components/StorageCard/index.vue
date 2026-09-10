@@ -37,6 +37,8 @@ interface StorageCardProps {
   ) => void
   previewVideo?: (videoUrl: string) => void
   selected?: boolean
+  isPublic?: boolean
+  publicSlug?: string
 }
 
 const emit = defineEmits(['toggle-select'])
@@ -73,6 +75,7 @@ const props = withDefaults(defineProps<StorageCardProps>(), {
   thumbPlaceholder: '',
   videoUrl: '',
   isEmpty: false,
+  isPublic: false,
 })
 
 const coverCls = computed(() =>
@@ -132,6 +135,13 @@ const handleLoad = () => (showPlaceholder.value = false)
           >
             <el-icon v-if="selected" class="check-icon"><SuccessFilled /></el-icon>
             <div v-else class="check-placeholder"></div>
+          </div>
+          <div
+            v-if="isPublic"
+            class="public-badge"
+            title="已开启公开直链访问"
+          >
+            <span class="badge-icon">🌐</span>
           </div>
           <div class="action-btn-more-wrapper" @click.stop>
               <el-dropdown

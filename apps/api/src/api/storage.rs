@@ -12,9 +12,10 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use chrono::{DateTime, Utc};
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use mongodb::bson::{Document, doc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Deserialize, ToSchema)]
@@ -62,6 +63,8 @@ pub struct GetFilesDto {
     pub sort_order: i32,
     #[serde(rename = "viewMode", default = "default_view_mode")]
     pub view_mode: String,
+    #[serde(rename = "isPublic", default)]
+    pub is_public: Option<bool>,
     #[serde(default = "default_page")]
     pub page: u64,
     #[serde(default = "default_limit")]
@@ -96,6 +99,10 @@ fn apply_list_filters(query: &mut Document, payload: &GetFilesDto) -> Result<(),
         let limit_kw: String = keyword.chars().take(100).collect();
         let escaped = regex::escape(&limit_kw);
         query.insert("name", doc! { "$regex": escaped, "$options": "i" });
+    }
+
+    if let Some(is_public) = payload.is_public {
+        query.insert("isPublic", is_public);
     }
 
     let mut allowed = Vec::new();
@@ -140,6 +147,126 @@ pub struct GetPathDto {
     /// File or folder id; also accepts `fileId` in the body (NestJS compatibility).
     #[serde(alias = "fileId")]
     pub id: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetPublicStatusDto {
+    #[serde(rename = "isPublic")]
+    pub is_public: bool,
+    #[serde(default)]
+    pub refresh: bool,
+    #[serde(rename = "expiresIn", default)]
+    pub expires_in: Option<i64>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PublicStatusResponse {
+    pub id: String,
+    #[serde(rename = "isPublic")]
+    pub is_public: bool,
+    #[serde(rename = "publicSlug", skip_serializing_if = "Option::is_none")]
+    pub public_slug: Option<String>,
+    #[serde(rename = "publicUrl", skip_serializing_if = "Option::is_none")]
+    pub public_url: Option<String>,
+    #[serde(
+        rename = "publicExpiresAt",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
+    pub public_expires_at: Option<DateTime<Utc>>,
+    #[serde(rename = "publicAccessCount", skip_serializing_if = "Option::is_none")]
+    pub public_access_count: Option<u64>,
+    #[serde(
+        rename = "lastPublicAccessedAt",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_rfc3339"
+    )]
+    pub last_public_accessed_at: Option<DateTime<Utc>>,
+}
+
+pub fn generate_public_slug() -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let mut rng = rand::thread_rng();
+    (0..16)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
+}
+
+pub fn is_safe_inline_mime(mime: &str) -> bool {
+    let m = mime.to_ascii_lowercase();
+    matches!(
+        m.as_str(),
+        "image/jpeg"
+            | "image/png"
+            | "image/webp"
+            | "image/gif"
+            | "image/avif"
+            | "image/bmp"
+            | "image/x-icon"
+            | "image/vnd.microsoft.icon"
+            | "audio/mpeg"
+            | "audio/ogg"
+            | "audio/wav"
+            | "audio/webm"
+            | "audio/aac"
+            | "audio/flac"
+            | "audio/mp4"
+            | "video/mp4"
+            | "video/webm"
+            | "video/ogg"
+            | "video/quicktime"
+    )
+}
+
+pub fn rfc5987_encode(input: &str) -> String {
+    let mut encoded = String::with_capacity(input.len() * 3);
+    for b in input.bytes() {
+        if b.is_ascii_alphanumeric()
+            || matches!(
+                b,
+                b'!' | b'#' | b'$' | b'&' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+            )
+        {
+            encoded.push(b as char);
+        } else {
+            encoded.push_str(&format!("%{:02X}", b));
+        }
+    }
+    encoded
+}
+
+pub fn sanitize_ascii_filename(input: &str) -> String {
+    let sanitized: String = input
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric()
+                || matches!(character, ' ' | '.' | '_' | '-' | '(' | ')' | '[' | ']')
+            {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if sanitized.is_empty() {
+        "file".to_string()
+    } else {
+        sanitized
+    }
+}
+
+pub fn build_content_disposition(disposition_type: &str, filename: &str) -> String {
+    let ascii_fallback = sanitize_ascii_filename(filename);
+    let utf8_encoded = rfc5987_encode(filename);
+    format!(
+        "{}; filename=\"{}\"; filename*=UTF-8''{}",
+        disposition_type, ascii_fallback, utf8_encoded
+    )
 }
 
 fn is_length_limit(e: &(dyn std::error::Error + 'static)) -> bool {
@@ -225,7 +352,10 @@ pub async fn upload_file(
         }
 
         if field.name().is_some_and(|n| n == "hash") {
-            let bytes = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
             if let Ok(value) = String::from_utf8(bytes.to_vec()) {
                 expected_hash = Some(value.trim().to_string());
             }
@@ -233,7 +363,10 @@ pub async fn upload_file(
         }
 
         if field.name().is_some_and(|n| n == "size") {
-            let bytes = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
             if let Ok(value) = String::from_utf8(bytes.to_vec()) {
                 if let Ok(size) = value.trim().parse::<i64>() {
                     expected_size = Some(size);
@@ -265,9 +398,11 @@ pub async fn upload_file(
                 )));
             }
             use futures::StreamExt;
-            let stream = field.map(|res| res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())));
+            let stream = field.map(|res| {
+                res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+            });
             let reader = tokio_util::io::StreamReader::new(stream);
-            
+
             let id = service
                 .upload_stream(
                     &user_ctx.user_id,
@@ -282,7 +417,8 @@ pub async fn upload_file(
             uploaded_ids.push(id);
         } else {
             // Fallback for older clients without hash/size
-            let temp_file = tempfile::NamedTempFile::new().map_err(|e| AppError::InternalError(e.to_string()))?;
+            let temp_file = tempfile::NamedTempFile::new()
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
             let std_file = temp_file
                 .as_file()
                 .try_clone()
@@ -520,23 +656,6 @@ pub async fn get_file(
         token = stripped.to_string();
     }
 
-    let claims = match decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ) {
-        Ok(data) => data.claims,
-        Err(_) => return Err(AppError::Unauthorized("Invalid token".into())),
-    };
-
-    if claims.purpose != TokenPurpose::Download {
-        return Err(AppError::Unauthorized("Invalid token purpose".into()));
-    }
-    if claims.file_id.as_deref() != Some(id.as_str()) {
-        return Err(AppError::Unauthorized(
-            "Token not scoped to this file".into(),
-        ));
-    }
     let repo = StorageRepository::new(&state.db);
     let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
         .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
@@ -544,9 +663,33 @@ pub async fn get_file(
         .find_by_id(obj_id)
         .await?
         .ok_or_else(|| AppError::NotFound("File not found".into()))?;
-    if claims.share_version.unwrap_or(0) != existing.share_version {
-        return Err(AppError::Unauthorized("Share link has been revoked".into()));
-    }
+
+    let owner_user_id = if token.is_empty() {
+        return Err(AppError::Unauthorized("Invalid token".into()));
+    } else {
+        let claims = match decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+            &Validation::default(),
+        ) {
+            Ok(data) => data.claims,
+            Err(_) => return Err(AppError::Unauthorized("Invalid token".into())),
+        };
+
+        if claims.purpose != TokenPurpose::Download {
+            return Err(AppError::Unauthorized("Invalid token purpose".into()));
+        }
+        if claims.file_id.as_deref() != Some(id.as_str()) {
+            return Err(AppError::Unauthorized(
+                "Token not scoped to this file".into(),
+            ));
+        }
+        if claims.share_version.unwrap_or(0) != existing.share_version {
+            return Err(AppError::Unauthorized("Share link has been revoked".into()));
+        }
+        claims.user_id
+    };
+
     let mut range_start = 0;
     let mut range_end = None;
     if let Some(range_header) = headers.get(axum::http::header::RANGE) {
@@ -567,32 +710,19 @@ pub async fn get_file(
 
     let service = StorageService::new(repo, state.local_storage.clone());
 
-    let (filename, mime_type, total_size, range_len, stream) =
-        service.stream_file_content(id, claims.user_id, range_start, range_end).await?;
-    let sanitized_filename: String = filename
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric()
-                || matches!(character, ' ' | '.' | '_' | '-' | '(' | ')' | '[' | ']')
-            {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect();
+    let (filename, mime_type, total_size, range_len, stream) = service
+        .stream_file_content(id, owner_user_id, range_start, range_end)
+        .await?;
+    let disposition = build_content_disposition("attachment", &filename);
 
     use axum::http::header::{
-        CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE, REFERRER_POLICY,
-        X_CONTENT_TYPE_OPTIONS, ACCEPT_RANGES, CONTENT_RANGE
+        ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE,
+        CONTENT_TYPE, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
     };
     let mut res_headers = axum::http::HeaderMap::new();
     res_headers.insert(CONTENT_TYPE, mime_type.parse().unwrap());
     res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
-    res_headers.insert(
-        CONTENT_DISPOSITION,
-        format!("attachment; filename=\"{}\"", sanitized_filename).parse().unwrap(),
-    );
+    res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
     res_headers.insert(CACHE_CONTROL, "private, no-store".parse().unwrap());
     res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
@@ -602,7 +732,9 @@ pub async fn get_file(
         let actual_end = range_start + range_len - 1;
         res_headers.insert(
             CONTENT_RANGE,
-            format!("bytes {}-{}/{}", range_start, actual_end, total_size).parse().unwrap(),
+            format!("bytes {}-{}/{}", range_start, actual_end, total_size)
+                .parse()
+                .unwrap(),
         );
         axum::http::StatusCode::PARTIAL_CONTENT
     } else {
@@ -732,6 +864,301 @@ pub async fn revoke_share(
         "shareVersion": updated.share_version
     }))
     .into_response())
+}
+
+#[utoipa::path(
+    put,
+    path = "/v1/storage/{id}/public",
+    params(
+        ("id" = String, Path, description = "File storage id")
+    ),
+    request_body = SetPublicStatusDto,
+    responses(
+        (status = 200, description = "Public status updated", body = PublicStatusResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 404, description = "File not found")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn set_public_status(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Path(id): Path<String>,
+    Json(payload): Json<SetPublicStatusDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let obj_id = mongodb::bson::oid::ObjectId::parse_str(&id)
+        .map_err(|_| AppError::BadRequest("Invalid fileId".into()))?;
+
+    let existing = repo
+        .find_by_id(obj_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+
+    if existing.user_id != user_ctx.user_id {
+        return Err(AppError::NotFound("File not found".into()));
+    }
+    if existing.trashed {
+        return Err(AppError::BadRequest(
+            "Cannot set public status on trashed file".into(),
+        ));
+    }
+    if existing.r#type != crate::domain::storage::StorageType::File {
+        return Err(AppError::BadRequest("Only files can be made public".into()));
+    }
+
+    let expires_at = if payload.is_public {
+        payload.expires_in.and_then(|secs| {
+            if secs > 0 {
+                Some(Utc::now() + chrono::Duration::seconds(secs))
+            } else {
+                None
+            }
+        })
+    } else {
+        None
+    };
+
+    let updated = if payload.is_public {
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+            let slug = if !payload.refresh && existing.is_public && existing.public_slug.is_some() {
+                existing.public_slug.clone()
+            } else {
+                Some(generate_public_slug())
+            };
+
+            match repo
+                .set_public_status(obj_id, &user_ctx.user_id, true, slug, expires_at)
+                .await
+            {
+                Ok(Some(doc)) => break doc,
+                Ok(None) => return Err(AppError::NotFound("File not found".into())),
+                Err(e) if attempts < 3 && e.to_string().contains("11000") => {
+                    tracing::warn!(
+                        "Slug collision detected on attempt {}, retrying...",
+                        attempts
+                    );
+                    continue;
+                }
+                Err(e) => return Err(AppError::DatabaseError(e)),
+            }
+        }
+    } else {
+        repo.set_public_status(obj_id, &user_ctx.user_id, false, None, None)
+            .await?
+            .ok_or_else(|| AppError::NotFound("File not found".into()))?
+    };
+
+    let domain = state.config.domain.trim_end_matches('/');
+    let public_url = updated
+        .public_slug
+        .as_ref()
+        .map(|s| format!("{}/v1/p/{}", domain, s));
+
+    Ok(Json(PublicStatusResponse {
+        id,
+        is_public: updated.is_public,
+        public_slug: updated.public_slug,
+        public_url,
+        public_expires_at: updated.public_expires_at,
+        public_access_count: updated.public_access_count,
+        last_public_accessed_at: updated.last_public_accessed_at,
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/p/{slug}",
+    params(
+        ("slug" = String, Path, description = "Public file slug"),
+        ("download" = Option<String>, Query, description = "Force download if set to '1' or 'true'")
+    ),
+    responses(
+        (status = 200, description = "File content stream", body = Vec<u8>),
+        (status = 206, description = "Partial content"),
+        (status = 304, description = "Not modified"),
+        (status = 404, description = "File not found")
+    ),
+    tag = "storage"
+)]
+pub async fn get_public_file(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Query(params): Query<Document>,
+    method: axum::http::Method,
+    headers: axum::http::HeaderMap,
+) -> Result<axum::response::Response, AppError> {
+    get_public_file_impl(state, slug, params, method, headers).await
+}
+
+pub async fn get_public_file_with_name(
+    State(state): State<AppState>,
+    Path((slug, _filename)): Path<(String, String)>,
+    Query(params): Query<Document>,
+    method: axum::http::Method,
+    headers: axum::http::HeaderMap,
+) -> Result<axum::response::Response, AppError> {
+    get_public_file_impl(state, slug, params, method, headers).await
+}
+
+async fn get_public_file_impl(
+    state: AppState,
+    slug: String,
+    params: Document,
+    method: axum::http::Method,
+    headers: axum::http::HeaderMap,
+) -> Result<axum::response::Response, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let existing = repo
+        .find_by_public_slug(&slug)
+        .await?
+        .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+
+    if !existing.is_public
+        || existing.trashed
+        || existing.r#type != crate::domain::storage::StorageType::File
+    {
+        return Err(AppError::NotFound("File not found".into()));
+    }
+
+    if let Some(expires_at) = existing.public_expires_at {
+        if expires_at < Utc::now() {
+            return Err(AppError::NotFound("Public direct link has expired".into()));
+        }
+    }
+
+    let etag = existing
+        .content_hash
+        .clone()
+        .or_else(|| existing.md5_hash.clone())
+        .unwrap_or_else(|| existing.id.map(|id| id.to_hex()).unwrap_or_default());
+    let etag_header_val = format!("\"{}\"", etag);
+
+    if let Some(if_none_match) = headers.get(axum::http::header::IF_NONE_MATCH) {
+        if let Ok(inm) = if_none_match.to_str() {
+            let inm_trimmed = inm.trim();
+            if inm_trimmed == etag_header_val || inm_trimmed == "*" || inm_trimmed.contains(&etag) {
+                let mut res = axum::http::StatusCode::NOT_MODIFIED.into_response();
+                res.headers_mut()
+                    .insert(axum::http::header::ETAG, etag_header_val.parse().unwrap());
+                res.headers_mut().insert(
+                    axum::http::header::CACHE_CONTROL,
+                    "public, max-age=86400, stale-while-revalidate=3600"
+                        .parse()
+                        .unwrap(),
+                );
+                return Ok(res);
+            }
+        }
+    }
+
+    let force_download = params
+        .get_str("download")
+        .map(|d| d == "1" || d.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if let Some(file_id) = existing.id {
+        let repo_bg = repo.clone();
+        tokio::spawn(async move {
+            let _ = repo_bg.record_public_access(file_id).await;
+        });
+    }
+
+    let filename = existing.name.clone();
+    let mime_type = existing
+        .mime_type
+        .clone()
+        .unwrap_or_else(|| "application/octet-stream".to_string());
+    let total_size = existing.size.unwrap_or(0) as u64;
+
+    let disposition_type = if !force_download && is_safe_inline_mime(&mime_type) {
+        "inline"
+    } else {
+        "attachment"
+    };
+    let disposition = build_content_disposition(disposition_type, &filename);
+
+    use axum::http::header::{
+        ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE,
+        CONTENT_TYPE, ETAG, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
+    };
+    let mut res_headers = axum::http::HeaderMap::new();
+    res_headers.insert(CONTENT_TYPE, mime_type.parse().unwrap());
+    res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
+    res_headers.insert(
+        CACHE_CONTROL,
+        "public, max-age=86400, stale-while-revalidate=3600"
+            .parse()
+            .unwrap(),
+    );
+    res_headers.insert(ETAG, etag_header_val.parse().unwrap());
+    res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+    res_headers.insert(
+        axum::http::HeaderName::from_static("content-security-policy"),
+        "default-src 'none'; sandbox".parse().unwrap(),
+    );
+    res_headers.insert(
+        REFERRER_POLICY,
+        "strict-origin-when-cross-origin".parse().unwrap(),
+    );
+    res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
+
+    // Fast path for HEAD requests: zero disk I/O, zero AES decryption
+    if method == axum::http::Method::HEAD {
+        res_headers.insert(CONTENT_LENGTH, total_size.to_string().parse().unwrap());
+        return Ok((
+            axum::http::StatusCode::OK,
+            res_headers,
+            axum::body::Body::empty(),
+        )
+            .into_response());
+    }
+
+    let mut range_start = 0;
+    let mut range_end = None;
+    if let Some(range_header) = headers.get(axum::http::header::RANGE) {
+        if let Ok(range_str) = range_header.to_str() {
+            if let Some(stripped) = range_str.strip_prefix("bytes=") {
+                let parts: Vec<&str> = stripped.split('-').collect();
+                if parts.len() == 2 {
+                    if let Ok(start) = parts[0].parse::<u64>() {
+                        range_start = start;
+                    }
+                    if let Ok(end) = parts[1].parse::<u64>() {
+                        range_end = Some(end);
+                    }
+                }
+            }
+        }
+    }
+
+    let service = StorageService::new(repo, state.local_storage.clone());
+    let file_id = existing.id.map(|id| id.to_hex()).unwrap_or_default();
+    let (_fname, _mtype, _tsize, range_len, stream) = service
+        .stream_file_content(file_id, existing.user_id.clone(), range_start, range_end)
+        .await?;
+
+    res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
+
+    let status = if range_len < total_size {
+        let actual_end = range_start + range_len - 1;
+        res_headers.insert(
+            CONTENT_RANGE,
+            format!("bytes {}-{}/{}", range_start, actual_end, total_size)
+                .parse()
+                .unwrap(),
+        );
+        axum::http::StatusCode::PARTIAL_CONTENT
+    } else {
+        axum::http::StatusCode::OK
+    };
+
+    Ok((status, res_headers, axum::body::Body::from_stream(stream)).into_response())
 }
 
 #[utoipa::path(

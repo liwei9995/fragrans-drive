@@ -41,11 +41,13 @@ pub struct AppState {
         storage::restore_trashed_files,
         storage::empty_trash,
         storage::get_path,
+        storage::set_public_status,
+        storage::get_public_file,
     ),
     components(
         schemas(
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::RefreshTokenDto, users::CreateUserResponse,
-            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto,
+            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
         )
@@ -137,6 +139,10 @@ pub fn router(db: Database, config: Config) -> Router {
             axum::routing::post(storage::revoke_share),
         )
         .route(
+            "/{id}/public",
+            axum::routing::put(storage::set_public_status),
+        )
+        .route(
             "/{id}",
             axum::routing::put(storage::update_file).delete(storage::remove_file),
         )
@@ -148,10 +154,18 @@ pub fn router(db: Database, config: Config) -> Router {
         .route("/{id}", axum::routing::get(storage::get_file)) // Move public Get here or keep it outside layer? Legacy had @Public()
         .with_state(state.clone());
 
+    let public_file_routes = Router::new()
+        .route("/{slug}", axum::routing::get(storage::get_public_file))
+        .route(
+            "/{slug}/{filename}",
+            axum::routing::get(storage::get_public_file_with_name),
+        );
+
     let v1 = Router::new()
         .nest("/auth", auth_routes)
         .nest("/users", user_routes)
         .nest("/storage", storage_routes)
+        .nest("/p", public_file_routes)
         .route(
             "/profile",
             axum::routing::get(users::get_profile)

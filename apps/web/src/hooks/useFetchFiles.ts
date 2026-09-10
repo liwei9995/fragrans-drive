@@ -96,7 +96,11 @@ export const useFetchFiles = () => {
 
   const resetListData = () => (listData.value = initialData())
 
-  const fetchFiles = async (parentId: string, init = true) => {
+  const fetchFiles = async (
+    parentId: string,
+    init = true,
+    options?: { isPublic?: boolean },
+  ) => {
     const request = ++latestRequest
     isFetching.value = true
 
@@ -120,6 +124,9 @@ export const useFetchFiles = () => {
             updatedAt: -1,
           },
         },
+        ...(typeof options?.isPublic === 'boolean'
+          ? { isPublic: options.isPublic }
+          : {}),
       })
     } catch (err) {
       if (request === latestRequest) {
