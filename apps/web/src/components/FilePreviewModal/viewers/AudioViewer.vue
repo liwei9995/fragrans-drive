@@ -479,4 +479,51 @@ onBeforeUnmount(() => {
   0% { height: 4px; }
   100% { height: 26px; }
 }
+
+@media (prefers-color-scheme: light) {
+  .audio-viewer {
+    background: radial-gradient(circle at 50% 40%, rgba(248, 250, 252, 0.8) 0%, rgba(226, 232, 240, 0.9) 100%);
+
+    .audio-card {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
+
+      .track-info {
+        .track-title {
+          color: #0f172a;
+        }
+
+        .track-meta {
+          color: #64748b;
+        }
+      }
+
+      .time-scrubber {
+        .scrub-track {
+          background: rgba(0, 0, 0, 0.08);
+        }
+
+        .time-labels {
+          color: #64748b;
+        }
+      }
+
+      .player-controls {
+        .ctrl-btn {
+          color: #64748b;
+
+          &:hover {
+            color: #0f172a;
+            background: rgba(0, 0, 0, 0.06);
+          }
+
+          &.active {
+            color: #ec4899;
+          }
+        }
+      }
+    }
+  }
+}
 </style>

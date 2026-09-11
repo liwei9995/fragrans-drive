@@ -579,7 +579,7 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-color-scheme: light) {
-  .file-preview-modal {
+  .file-preview-overlay {
     background: rgba(241, 245, 249, 0.92);
 
     .preview-backdrop {
@@ -643,9 +643,14 @@ onBeforeUnmount(() => {
               }
             }
 
-            &.close-btn:hover {
-              background: rgba(239, 68, 68, 0.1);
-              color: #ef4444;
+            &.close-btn {
+              background: transparent;
+              border-color: transparent;
+
+              &:hover {
+                background: rgba(239, 68, 68, 0.1);
+                color: #ef4444;
+              }
             }
           }
 

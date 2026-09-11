@@ -620,7 +620,9 @@ onMounted(fetchMarkdown)
     }
 
     .md-content {
-      .render-view {
+      background: #ffffff;
+
+      .rendered-scroll {
         background: #ffffff;
 
         .markdown-body {

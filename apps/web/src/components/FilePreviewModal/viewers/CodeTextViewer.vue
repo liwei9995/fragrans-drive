@@ -504,7 +504,7 @@ onMounted(fetchContent)
 }
 
 @media (prefers-color-scheme: light) {
-  .code-text-viewer {
+  .code-viewer {
     background: #ffffff;
     color: #0f172a;
 
@@ -524,14 +524,31 @@ onMounted(fetchContent)
       }
 
       .actions-right {
+        .search-box {
+          :deep(.el-input__wrapper) {
+            background: #ffffff;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) inset;
+
+            &:hover,
+            &.is-focus {
+              box-shadow: 0 0 0 1px var(--c-primary, #008ffd) inset;
+            }
+
+            .el-input__inner {
+              color: #0f172a;
+            }
+          }
+        }
+
         .tool-btn {
-          background: rgba(0, 0, 0, 0.04);
-          border: 1px solid rgba(0, 0, 0, 0.08);
+          background: #ffffff;
+          border: 1px solid rgba(0, 0, 0, 0.12);
           color: #475569;
 
           &:hover {
-            background: rgba(0, 0, 0, 0.08);
-            color: #0f172a;
+            background: rgba(0, 143, 253, 0.06);
+            border-color: rgba(0, 143, 253, 0.3);
+            color: var(--c-primary, #008ffd);
           }
 
           &.active {
@@ -549,6 +566,11 @@ onMounted(fetchContent)
     }
 
     .code-body {
+      .code-loading,
+      .code-error {
+        color: #64748b;
+      }
+
       .gutter {
         background: #f8fafc;
         color: #94a3b8;
@@ -559,22 +581,22 @@ onMounted(fetchContent)
         color: #1e293b;
       }
     }
-  }
 
-  :deep(.tok-comment) {
-    color: #94a3b8;
-  }
-  :deep(.tok-key) {
-    color: var(--c-primary, #008ffd);
-  }
-  :deep(.tok-string) {
-    color: #059669;
-  }
-  :deep(.tok-keyword) {
-    color: #db2777;
-  }
-  :deep(.tok-number) {
-    color: #d97706;
+    :deep(.tok-comment) {
+      color: #94a3b8;
+    }
+    :deep(.tok-key) {
+      color: #0284c7;
+    }
+    :deep(.tok-string) {
+      color: #059669;
+    }
+    :deep(.tok-keyword) {
+      color: #db2777;
+    }
+    :deep(.tok-number) {
+      color: #d97706;
+    }
   }
 }
 </style>

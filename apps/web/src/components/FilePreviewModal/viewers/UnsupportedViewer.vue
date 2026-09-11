@@ -301,7 +301,7 @@ const handleCopyLink = async () => {
   .unsupported-viewer {
     background: radial-gradient(circle at 50% 50%, rgba(248, 250, 252, 0.8) 0%, rgba(226, 232, 240, 0.9) 100%);
 
-    .unsupported-card {
+    .info-card {
       background: rgba(255, 255, 255, 0.88);
       border: 1px solid rgba(0, 0, 0, 0.08);
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
