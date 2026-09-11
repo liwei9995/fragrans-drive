@@ -694,13 +694,30 @@ onMounted(fetchContent)
       }
 
       .actions-right {
+        .search-box {
+          :deep(.el-input__wrapper) {
+            background: #ffffff;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) inset;
+
+            &:hover,
+            &.is-focus {
+              box-shadow: 0 0 0 1px var(--c-primary, #008ffd) inset;
+            }
+
+            .el-input__inner {
+              color: #0f172a;
+            }
+          }
+        }
+
         .tool-btn {
-          background: rgba(0, 0, 0, 0.04);
-          border: 1px solid rgba(0, 0, 0, 0.08);
+          background: #ffffff;
+          border: 1px solid rgba(0, 0, 0, 0.12);
           color: #475569;
 
           &:hover {
-            background: rgba(0, 0, 0, 0.08);
+            background: rgba(0, 143, 253, 0.06);
+            border-color: rgba(0, 143, 253, 0.3);
             color: var(--c-primary, #008ffd);
           }
         }

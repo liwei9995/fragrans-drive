@@ -589,32 +589,44 @@ onMounted(fetchMarkdown)
       background: #f8fafc;
       border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 
-      .view-toggle {
-        background: rgba(0, 0, 0, 0.04);
-        border: 1px solid rgba(0, 0, 0, 0.08);
+      .meta-left {
+        .md-tag {
+          background: rgba(6, 182, 212, 0.1);
+          color: #0891b2;
+        }
 
-        .toggle-btn {
-          color: #64748b;
+        .view-toggle {
+          background: rgba(0, 0, 0, 0.04);
+          border: 1px solid rgba(0, 0, 0, 0.08);
 
-          &:hover {
-            color: #0f172a;
-          }
+          .toggle-btn {
+            color: #64748b;
 
-          &.active {
-            background: var(--c-primary, #008ffd);
-            color: #ffffff;
+            &:hover {
+              color: #0f172a;
+              background: rgba(0, 0, 0, 0.04);
+            }
+
+            &.active {
+              background: var(--c-primary, #008ffd);
+              color: #ffffff;
+              box-shadow: 0 1px 3px rgba(0, 143, 253, 0.25);
+            }
           }
         }
       }
 
-      .tool-btn {
-        background: rgba(0, 0, 0, 0.04);
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        color: #475569;
+      .actions-right {
+        .tool-btn {
+          background: #ffffff;
+          border: 1px solid rgba(0, 0, 0, 0.12);
+          color: #475569;
 
-        &:hover {
-          background: rgba(0, 0, 0, 0.08);
-          color: var(--c-primary, #008ffd);
+          &:hover {
+            background: rgba(0, 143, 253, 0.06);
+            border-color: rgba(0, 143, 253, 0.3);
+            color: var(--c-primary, #008ffd);
+          }
         }
       }
     }
