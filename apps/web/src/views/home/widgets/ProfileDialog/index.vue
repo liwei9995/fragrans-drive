@@ -367,6 +367,7 @@ const handleChangePassword = async () => {
   overflow: hidden;
   max-width: calc(100vw - 20px);
   margin: 16px auto !important;
+  text-align: left;
 
   .el-dialog__header {
     margin-right: 0;
@@ -395,6 +396,7 @@ const handleChangePassword = async () => {
 .user-overview {
   display: flex;
   align-items: center;
+  text-align: left;
   gap: 16px;
   padding-bottom: 20px;
   margin-bottom: 8px;
@@ -413,17 +415,21 @@ const handleChangePassword = async () => {
   .user-overview-info {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
     gap: 4px;
 
     .user-name {
       font-size: 18px;
       font-weight: 600;
       color: #222;
+      text-align: left;
     }
 
     .user-email {
       font-size: 13px;
       color: #888;
+      text-align: left;
     }
   }
 }
