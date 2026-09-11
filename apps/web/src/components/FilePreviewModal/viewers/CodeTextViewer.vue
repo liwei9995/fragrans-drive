@@ -190,8 +190,8 @@ onMounted(fetchContent)
       <div class="meta-left">
         <span class="lang-tag">{{ languageLabel }}</span>
         <span class="stat-tag">{{ lines.length }} 行</span>
-        <span class="stat-tag">{{ charCount }} 字符</span>
-        <span class="stat-tag">UTF-8</span>
+        <span class="stat-tag desktop-only">{{ charCount }} 字符</span>
+        <span class="stat-tag desktop-only">UTF-8</span>
       </div>
 
       <div class="actions-right">
@@ -213,7 +213,8 @@ onMounted(fetchContent)
           title="格式化 JSON (2空格缩进)"
           @click="handleFormatJson"
         >
-          <span>格式化 JSON</span>
+          <span class="full-text">格式化 JSON</span>
+          <span class="short-text">格式化</span>
         </button>
 
         <!-- Wrap Toggle -->
@@ -223,7 +224,8 @@ onMounted(fetchContent)
           :title="isWordWrap ? '取消自动折行' : '开启自动折行'"
           @click="isWordWrap = !isWordWrap"
         >
-          {{ isWordWrap ? '折行已开启' : '自动折行' }}
+          <span class="full-text">{{ isWordWrap ? '折行已开启' : '自动折行' }}</span>
+          <span class="short-text">{{ isWordWrap ? '已折行' : '折行' }}</span>
         </button>
 
         <!-- Copy Button -->
@@ -232,7 +234,8 @@ onMounted(fetchContent)
             <Check v-if="copied" />
             <DocumentCopy v-else />
           </el-icon>
-          <span>{{ copied ? '已复制' : '复制全部' }}</span>
+          <span class="full-text">{{ copied ? '已复制' : '复制全部' }}</span>
+          <span class="short-text">{{ copied ? '已复制' : '复制' }}</span>
         </button>
       </div>
     </div>
@@ -291,10 +294,37 @@ onMounted(fetchContent)
     background: #1e293b;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
+    @media (max-width: 768px) {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+    }
+
+    .short-text {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .full-text {
+        display: none;
+      }
+      .short-text {
+        display: inline;
+      }
+      .desktop-only {
+        display: none;
+      }
+    }
+
     .meta-left {
       display: flex;
       align-items: center;
       gap: 10px;
+      min-width: 0;
+
+      @media (max-width: 768px) {
+        gap: 6px;
+      }
 
       .lang-tag {
         font-size: 12px;
@@ -303,11 +333,15 @@ onMounted(fetchContent)
         background: rgba(56, 189, 248, 0.12);
         padding: 2px 8px;
         border-radius: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .stat-tag {
         font-size: 12px;
         color: #94a3b8;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
     }
 
@@ -315,9 +349,21 @@ onMounted(fetchContent)
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
+
+      @media (max-width: 768px) {
+        width: 100%;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
 
       .search-box {
         width: 180px;
+
+        @media (max-width: 768px) {
+          width: 100%;
+          order: 2;
+        }
       }
 
       .tool-btn {
@@ -332,6 +378,13 @@ onMounted(fetchContent)
         border-radius: 6px;
         cursor: pointer;
         transition: all 0.2s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        @media (max-width: 640px) {
+          padding: 4px 8px;
+          font-size: 11px;
+        }
 
         &:hover {
           background: rgba(255, 255, 255, 0.15);

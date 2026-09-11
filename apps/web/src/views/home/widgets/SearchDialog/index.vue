@@ -280,6 +280,12 @@ const getHighlightSegments = (
   justify-content: center;
   align-items: flex-start;
   padding-top: 14vh;
+
+  @media (max-width: 640px) {
+    padding-top: 5vh;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
 
 .search-modal {
@@ -292,6 +298,11 @@ const getHighlightSegments = (
   overflow: hidden;
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 640px) {
+    width: 100%;
+    border-radius: 12px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -308,6 +319,15 @@ const getHighlightSegments = (
   padding: 16px 20px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   gap: 12px;
+
+  @media (max-width: 640px) {
+    padding: 12px 14px;
+    gap: 8px;
+
+    .shortcut-badge {
+      display: none;
+    }
+  }
 
   .search-icon {
     font-size: 22px;

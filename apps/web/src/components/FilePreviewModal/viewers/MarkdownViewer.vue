@@ -196,7 +196,8 @@ onMounted(fetchMarkdown)
             @click="viewMode = 'rendered'"
           >
             <el-icon :size="14"><View /></el-icon>
-            <span>渲染视图</span>
+            <span class="full-text">渲染视图</span>
+            <span class="short-text">渲染</span>
           </button>
           <button
             class="toggle-btn"
@@ -204,7 +205,8 @@ onMounted(fetchMarkdown)
             @click="viewMode = 'source'"
           >
             <el-icon :size="14"><Edit /></el-icon>
-            <span>源码视图</span>
+            <span class="full-text">源码视图</span>
+            <span class="short-text">源码</span>
           </button>
         </div>
       </div>
@@ -215,7 +217,8 @@ onMounted(fetchMarkdown)
             <Check v-if="copied" />
             <DocumentCopy v-else />
           </el-icon>
-          <span>{{ copied ? '已复制' : '复制源码' }}</span>
+          <span class="full-text">{{ copied ? '已复制' : '复制源码' }}</span>
+          <span class="short-text">{{ copied ? '已复制' : '复制' }}</span>
         </button>
       </div>
     </div>
@@ -267,10 +270,31 @@ onMounted(fetchMarkdown)
     background: #1e293b;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
+    @media (max-width: 640px) {
+      padding: 8px 12px;
+    }
+
+    .short-text {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .full-text {
+        display: none;
+      }
+      .short-text {
+        display: inline;
+      }
+    }
+
     .meta-left {
       display: flex;
       align-items: center;
       gap: 12px;
+
+      @media (max-width: 640px) {
+        gap: 6px;
+      }
 
       .md-tag {
         font-size: 12px;
@@ -279,6 +303,12 @@ onMounted(fetchMarkdown)
         background: rgba(6, 182, 212, 0.12);
         padding: 2px 8px;
         border-radius: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        @media (max-width: 500px) {
+          display: none;
+        }
       }
 
       .view-toggle {
@@ -287,6 +317,8 @@ onMounted(fetchMarkdown)
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 6px;
         padding: 2px;
+        white-space: nowrap;
+        flex-shrink: 0;
 
         .toggle-btn {
           display: flex;
@@ -300,6 +332,13 @@ onMounted(fetchMarkdown)
           border-radius: 4px;
           cursor: pointer;
           transition: all 0.2s;
+          white-space: nowrap;
+          flex-shrink: 0;
+
+          @media (max-width: 640px) {
+            padding: 4px 8px;
+            font-size: 11px;
+          }
 
           &:hover {
             color: #f8fafc;
@@ -325,6 +364,13 @@ onMounted(fetchMarkdown)
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+
+      @media (max-width: 640px) {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
 
       &:hover {
         background: rgba(255, 255, 255, 0.15);
@@ -357,9 +403,14 @@ onMounted(fetchMarkdown)
       width: 100%;
       height: 100%;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       padding: 32px 24px;
       display: flex;
       justify-content: center;
+
+      @media (max-width: 640px) {
+        padding: 16px 12px;
+      }
 
       .markdown-body {
         width: 100%;

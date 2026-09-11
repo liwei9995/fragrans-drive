@@ -365,11 +365,17 @@ const handleChangePassword = async () => {
 :deep(.profile-dialog) {
   border-radius: 16px;
   overflow: hidden;
+  max-width: calc(100vw - 20px);
+  margin: 16px auto !important;
 
   .el-dialog__header {
     margin-right: 0;
     padding: 18px 24px;
     border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+
+    @media (max-width: 540px) {
+      padding: 14px 16px;
+    }
 
     .el-dialog__title {
       font-size: 17px;
@@ -379,6 +385,10 @@ const handleChangePassword = async () => {
 
   .el-dialog__body {
     padding: 20px 24px 28px;
+
+    @media (max-width: 540px) {
+      padding: 14px 16px 20px;
+    }
   }
 }
 
@@ -389,6 +399,11 @@ const handleChangePassword = async () => {
   padding-bottom: 20px;
   margin-bottom: 8px;
   border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+
+  @media (max-width: 540px) {
+    gap: 12px;
+    padding-bottom: 14px;
+  }
 
   .user-avatar {
     border: 2px solid var(--c-primary, #409eff);
@@ -468,6 +483,11 @@ const handleChangePassword = async () => {
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
 
+    @media (max-width: 540px) {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
     .stat-box {
       background-color: rgba(0, 0, 0, 0.02);
       border: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
@@ -499,6 +519,11 @@ const handleChangePassword = async () => {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
+
+    @media (max-width: 540px) {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
   }
 
   .form-actions {

@@ -80,11 +80,20 @@ const openInNewTab = () => {
     .pdf-tip {
       font-size: 12px;
       color: #94a3b8;
+
+      @media (max-width: 640px) {
+        display: none;
+      }
     }
 
     .actions {
       display: flex;
       gap: 8px;
+
+      @media (max-width: 640px) {
+        width: 100%;
+        justify-content: flex-end;
+      }
     }
   }
 

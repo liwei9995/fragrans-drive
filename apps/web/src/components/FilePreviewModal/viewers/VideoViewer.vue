@@ -443,12 +443,21 @@ onBeforeUnmount(() => {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
+
+      @media (max-width: 600px) {
+        gap: 6px;
+      }
 
       .left-controls,
       .right-controls {
         display: flex;
         align-items: center;
         gap: 12px;
+
+        @media (max-width: 600px) {
+          gap: 6px;
+        }
       }
 
       .ctrl-btn {
@@ -463,6 +472,11 @@ onBeforeUnmount(() => {
         color: #f1f5f9;
         cursor: pointer;
         transition: all 0.2s ease;
+
+        @media (max-width: 600px) {
+          width: 28px;
+          height: 28px;
+        }
 
         &:hover {
           background: rgba(255, 255, 255, 0.15);
@@ -482,6 +496,12 @@ onBeforeUnmount(() => {
         align-items: center;
         gap: 4px;
         margin-left: 4px;
+        white-space: nowrap;
+
+        @media (max-width: 600px) {
+          font-size: 11px;
+          margin-left: 0;
+        }
 
         .sep {
           color: #64748b;
@@ -497,6 +517,12 @@ onBeforeUnmount(() => {
         border-radius: 4px;
         cursor: pointer;
         transition: all 0.2s;
+        white-space: nowrap;
+
+        @media (max-width: 600px) {
+          padding: 2px 6px;
+          font-size: 11px;
+        }
 
         &:hover {
           border-color: #38bdf8;
@@ -514,6 +540,10 @@ onBeforeUnmount(() => {
           height: 4px;
           accent-color: #38bdf8;
           cursor: pointer;
+
+          @media (max-width: 600px) {
+            display: none;
+          }
         }
       }
     }

@@ -246,6 +246,23 @@ onBeforeUnmount(() => {
     border-radius: 9999px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
     z-index: 10;
+    white-space: nowrap;
+    max-width: 95vw;
+
+    @media (max-width: 640px) {
+      bottom: 16px;
+      padding: 4px 10px;
+      gap: 4px;
+
+      .dimension-tag {
+        display: none;
+      }
+
+      .tool-btn {
+        width: 28px;
+        height: 28px;
+      }
+    }
 
     .dimension-tag,
     .scale-tag {
@@ -253,6 +270,7 @@ onBeforeUnmount(() => {
       color: #cbd5e1;
       font-variant-numeric: tabular-nums;
       padding: 0 4px;
+      white-space: nowrap;
     }
 
     .divider {
@@ -274,6 +292,7 @@ onBeforeUnmount(() => {
       color: #f1f5f9;
       cursor: pointer;
       transition: all 0.2s ease;
+      flex-shrink: 0;
 
       &:hover {
         background: rgba(255, 255, 255, 0.15);

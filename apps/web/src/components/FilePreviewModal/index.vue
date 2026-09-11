@@ -342,6 +342,13 @@ onBeforeUnmount(() => {
       padding: 0 20px;
       user-select: none;
       z-index: 10;
+      gap: 10px;
+
+      @media (max-width: 768px) {
+        height: 50px;
+        padding: 0 10px;
+        gap: 6px;
+      }
 
       .file-meta {
         display: flex;
@@ -349,6 +356,22 @@ onBeforeUnmount(() => {
         gap: 10px;
         min-width: 0;
         max-width: 45%;
+
+        @media (max-width: 768px) {
+          max-width: none;
+          flex: 1 1 auto;
+          gap: 6px;
+
+          .size-tag {
+            display: none;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .type-badge {
+            display: none;
+          }
+        }
 
         .header-thumb {
           width: 24px;
@@ -364,6 +387,7 @@ onBeforeUnmount(() => {
 
         .title-wrapper {
           min-width: 0;
+          flex: 1;
 
           .file-title {
             font-size: 14px;
@@ -373,6 +397,10 @@ onBeforeUnmount(() => {
             overflow: hidden;
             text-overflow: ellipsis;
             display: block;
+
+            @media (max-width: 768px) {
+              font-size: 13px;
+            }
           }
         }
 
@@ -384,6 +412,7 @@ onBeforeUnmount(() => {
           border: 1px solid transparent;
           flex-shrink: 0;
           letter-spacing: 0.5px;
+          white-space: nowrap;
         }
 
         .size-tag {
@@ -391,6 +420,7 @@ onBeforeUnmount(() => {
           color: #94a3b8;
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
+          white-space: nowrap;
         }
       }
 
@@ -402,6 +432,23 @@ onBeforeUnmount(() => {
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 9999px;
         padding: 4px 10px;
+        flex-shrink: 0;
+        white-space: nowrap;
+
+        @media (max-width: 768px) {
+          padding: 2px 6px;
+          gap: 4px;
+
+          .nav-btn {
+            width: 22px;
+            height: 22px;
+          }
+
+          .nav-indicator {
+            font-size: 11px;
+            padding: 0 2px;
+          }
+        }
 
         .nav-btn {
           display: flex;
@@ -415,6 +462,7 @@ onBeforeUnmount(() => {
           color: #f1f5f9;
           cursor: pointer;
           transition: all 0.2s;
+          flex-shrink: 0;
 
           &:hover:not(:disabled) {
             background: rgba(255, 255, 255, 0.15);
@@ -432,6 +480,7 @@ onBeforeUnmount(() => {
           color: #cbd5e1;
           font-variant-numeric: tabular-nums;
           padding: 0 4px;
+          white-space: nowrap;
         }
       }
 
@@ -439,6 +488,30 @@ onBeforeUnmount(() => {
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-shrink: 0;
+        white-space: nowrap;
+
+        @media (max-width: 768px) {
+          gap: 4px;
+
+          .action-btn {
+            height: 28px;
+            padding: 0 6px;
+            font-size: 12px;
+
+            &.download-btn {
+              padding: 0 8px;
+
+              span {
+                display: none;
+              }
+            }
+          }
+
+          .divider {
+            display: none;
+          }
+        }
 
         .action-btn {
           display: flex;
@@ -453,6 +526,8 @@ onBeforeUnmount(() => {
           font-size: 13px;
           cursor: pointer;
           transition: all 0.2s ease;
+          white-space: nowrap;
+          flex-shrink: 0;
 
           &:hover {
             background: rgba(255, 255, 255, 0.12);

@@ -191,7 +191,8 @@ onMounted(fetchContent)
             @click="viewMode = 'table'"
           >
             <el-icon :size="14"><Grid /></el-icon>
-            <span>表格视图</span>
+            <span class="btn-text full-text">表格视图</span>
+            <span class="btn-text short-text">表格</span>
           </button>
           <button
             class="toggle-btn"
@@ -199,7 +200,8 @@ onMounted(fetchContent)
             @click="viewMode = 'raw'"
           >
             <el-icon :size="14"><Document /></el-icon>
-            <span>纯文本视图</span>
+            <span class="btn-text full-text">纯文本视图</span>
+            <span class="btn-text short-text">文本</span>
           </button>
         </div>
       </div>
@@ -222,7 +224,8 @@ onMounted(fetchContent)
             <Check v-if="copied" />
             <DocumentCopy v-else />
           </el-icon>
-          <span>{{ copied ? '已复制' : '复制数据' }}</span>
+          <span class="copy-text full-text">{{ copied ? '已复制' : '复制数据' }}</span>
+          <span class="copy-text short-text">{{ copied ? '已复制' : '复制' }}</span>
         </button>
       </div>
     </div>
@@ -332,10 +335,36 @@ onMounted(fetchContent)
     background: #1e293b;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
+    @media (max-width: 768px) {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+    }
+
+    .short-text {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .full-text {
+        display: none;
+      }
+      .short-text {
+        display: inline;
+      }
+    }
+
     .meta-left {
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
+
+      @media (max-width: 768px) {
+        gap: 8px;
+        flex: 1;
+        justify-content: space-between;
+      }
 
       .type-tag {
         font-size: 12px;
@@ -344,11 +373,23 @@ onMounted(fetchContent)
         background: rgba(16, 185, 129, 0.12);
         padding: 2px 8px;
         border-radius: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        @media (max-width: 640px) {
+          display: none;
+        }
       }
 
       .stat-tag {
         font-size: 12px;
         color: #94a3b8;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        @media (max-width: 480px) {
+          font-size: 11px;
+        }
       }
 
       .view-toggle {
@@ -357,6 +398,8 @@ onMounted(fetchContent)
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 6px;
         padding: 2px;
+        flex-shrink: 0;
+        white-space: nowrap;
 
         .toggle-btn {
           display: flex;
@@ -370,6 +413,13 @@ onMounted(fetchContent)
           border-radius: 4px;
           cursor: pointer;
           transition: all 0.2s;
+          white-space: nowrap;
+          flex-shrink: 0;
+
+          @media (max-width: 640px) {
+            padding: 3px 8px;
+            font-size: 11px;
+          }
 
           &:hover {
             color: #f8fafc;
@@ -387,9 +437,20 @@ onMounted(fetchContent)
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
+
+      @media (max-width: 768px) {
+        width: 100%;
+        gap: 8px;
+      }
 
       .search-box {
         width: 180px;
+
+        @media (max-width: 768px) {
+          flex: 1;
+          width: auto;
+        }
       }
 
       .tool-btn {
@@ -404,6 +465,13 @@ onMounted(fetchContent)
         border-radius: 6px;
         cursor: pointer;
         transition: all 0.2s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        @media (max-width: 640px) {
+          padding: 4px 8px;
+          font-size: 11px;
+        }
 
         &:hover {
           background: rgba(255, 255, 255, 0.15);
@@ -448,12 +516,17 @@ onMounted(fetchContent)
         flex: 1;
         overflow: auto;
         position: relative;
+        -webkit-overflow-scrolling: touch;
 
         .data-table {
           width: 100%;
           border-collapse: collapse;
           font-size: 13px;
           color: #e2e8f0;
+
+          @media (max-width: 768px) {
+            font-size: 12px;
+          }
 
           thead {
             position: sticky;
@@ -470,6 +543,10 @@ onMounted(fetchContent)
               white-space: nowrap;
               border-right: 1px solid rgba(255, 255, 255, 0.06);
               border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+              @media (max-width: 768px) {
+                padding: 8px 10px;
+              }
 
               &.col-index {
                 width: 50px;
@@ -511,6 +588,11 @@ onMounted(fetchContent)
                 max-width: 360px;
                 overflow: hidden;
                 text-overflow: ellipsis;
+
+                @media (max-width: 768px) {
+                  padding: 6px 10px;
+                  max-width: 220px;
+                }
               }
             }
           }
@@ -525,14 +607,29 @@ onMounted(fetchContent)
         background: #1e293b;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
 
+        @media (max-width: 640px) {
+          padding: 6px 10px;
+
+          .pagination-info {
+            font-size: 11px;
+          }
+
+          .pagination-btns .page-btn {
+            padding: 3px 8px;
+            font-size: 11px;
+          }
+        }
+
         .pagination-info {
           font-size: 12px;
           color: #94a3b8;
+          white-space: nowrap;
         }
 
         .pagination-btns {
           display: flex;
           gap: 8px;
+          white-space: nowrap;
 
           .page-btn {
             display: flex;
@@ -546,6 +643,7 @@ onMounted(fetchContent)
             color: #cbd5e1;
             cursor: pointer;
             transition: all 0.2s;
+            white-space: nowrap;
 
             &:hover:not(:disabled) {
               background: rgba(255, 255, 255, 0.15);

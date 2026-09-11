@@ -365,11 +365,17 @@ const handleEmptyTrash = () => {
 :deep(.trash-dialog) {
   border-radius: 16px;
   overflow: hidden;
+  max-width: calc(100vw - 20px);
+  margin: 16px auto !important;
 
   .el-dialog__header {
     margin-right: 0;
     padding: 18px 24px;
     border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+
+    @media (max-width: 640px) {
+      padding: 14px 16px;
+    }
 
     .el-dialog__title {
       font-size: 17px;
@@ -395,6 +401,13 @@ const handleEmptyTrash = () => {
   background-color: rgba(0, 0, 0, 0.02);
   border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
 
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
   .toolbar-left {
     display: flex;
     align-items: center;
@@ -404,6 +417,7 @@ const handleEmptyTrash = () => {
       font-size: 13px;
       color: #666;
       font-weight: 500;
+      white-space: nowrap;
     }
   }
 
@@ -411,6 +425,12 @@ const handleEmptyTrash = () => {
     display: flex;
     align-items: center;
     gap: 8px;
+
+    @media (max-width: 640px) {
+      width: 100%;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
   }
 }
 
@@ -523,6 +543,11 @@ const handleEmptyTrash = () => {
   text-align: right;
   padding-right: 16px;
   flex-shrink: 0;
+
+  @media (max-width: 640px) {
+    width: 65px;
+    padding-right: 8px;
+  }
 }
 
 .col-date {
@@ -530,6 +555,10 @@ const handleEmptyTrash = () => {
   font-size: 12px;
   color: #777;
   flex-shrink: 0;
+
+  @media (max-width: 640px) {
+    display: none;
+  }
 }
 
 .col-action {
