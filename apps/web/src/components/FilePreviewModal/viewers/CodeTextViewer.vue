@@ -102,46 +102,81 @@ const handleCopy = async () => {
   }
 }
 
-// Simple syntax tokenization for keywords, strings, comments
-const highlightLine = (text: string) => {
-  if (!text) return ' '
-
-  // Escape HTML entities first to prevent XSS
-  const escaped = text
+const escapeHtml = (str: string): string => {
+  return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
-  // If searching, highlight query
+// Single-pass tokenizer: matches comments, object keys, strings, numbers, keywords
+// Running in a single pass prevents injected HTML tags (e.g. class="tok-string") from being matched as keywords
+const TOKEN_REGEX =
+  /(\/\/[^\n]*|#[^\n]*|--[^\n]*)|("(?:[^"\\]|\\.)*"(?=\s*:))|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\b(?:true|false|null|import|export|from|default|const|let|var|function|return|if|else|switch|case|break|continue|for|while|do|class|interface|type|extends|implements|new|this|async|await|try|catch|finally|throw|pub|fn|struct|enum|impl|mut|match|use|mod|trait|where|def|self|None|True|False|package|select|insert|update|delete)\b)/g
+
+// Tokenization for keywords, keys, strings, comments
+const highlightLine = (text: string): string => {
+  if (!text) return ' '
+
+  // If searching, highlight query safely without breaking HTML entities
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.trim()
     const regex = new RegExp(
       `(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
       'gi',
     )
-    return escaped.replace(regex, '<mark class="code-match">$1</mark>')
+    let res = ''
+    let last = 0
+    while (true) {
+      const m = regex.exec(text)
+      if (!m) break
+      if (m.index > last) {
+        res += escapeHtml(text.slice(last, m.index))
+      }
+      res += `<mark class="code-match">${escapeHtml(m[0])}</mark>`
+      last = m.index + m[0].length
+    }
+    if (last < text.length) {
+      res += escapeHtml(text.slice(last))
+    }
+    return res
   }
 
-  // Lightweight syntax colorizer
-  return (
-    escaped
-      // Single line comments
-      .replace(
-        /(\/\/[^\n]*|#[^\n]*|--[^\n]*)/g,
-        '<span class="tok-comment">$1</span>',
-      )
-      // Double-quoted strings
-      .replace(/(&quot;.*?&quot;|".*?")/g, '<span class="tok-string">$1</span>')
-      // Single-quoted strings
-      .replace(/('.*?')/g, '<span class="tok-string">$1</span>')
-      // Common language keywords
-      .replace(
-        /\b(import|export|from|default|const|let|var|function|return|if|else|switch|case|break|continue|for|while|do|class|interface|type|extends|implements|new|this|async|await|try|catch|finally|throw|pub|fn|struct|enum|impl|mut|match|use|mod|trait|where|def|self|None|True|False|package|select|insert|update|delete)\b/g,
-        '<span class="tok-keyword">$1</span>',
-      )
-      // Numbers
-      .replace(/\b(\d+)\b/g, '<span class="tok-number">$1</span>')
-  )
+  // Single-pass syntax colorizer
+  TOKEN_REGEX.lastIndex = 0
+  let html = ''
+  let lastIndex = 0
+
+  while (true) {
+    const match = TOKEN_REGEX.exec(text)
+    if (!match) break
+    if (match.index > lastIndex) {
+      html += escapeHtml(text.slice(lastIndex, match.index))
+    }
+    const [raw, comment, key, str, num, kw] = match
+    if (comment) {
+      html += `<span class="tok-comment">${escapeHtml(raw)}</span>`
+    } else if (key) {
+      html += `<span class="tok-key">${escapeHtml(raw)}</span>`
+    } else if (str) {
+      html += `<span class="tok-string">${escapeHtml(raw)}</span>`
+    } else if (num) {
+      html += `<span class="tok-number">${escapeHtml(raw)}</span>`
+    } else if (kw) {
+      html += `<span class="tok-keyword">${escapeHtml(raw)}</span>`
+    } else {
+      html += escapeHtml(raw)
+    }
+    lastIndex = match.index + raw.length
+  }
+
+  if (lastIndex < text.length) {
+    html += escapeHtml(text.slice(lastIndex))
+  }
+
+  return html
 }
 
 watch(() => props.src, fetchContent)
@@ -393,6 +428,10 @@ onMounted(fetchContent)
 :deep(.tok-comment) {
   color: #64748b;
   font-style: italic;
+}
+:deep(.tok-key) {
+  color: #38bdf8;
+  font-weight: 500;
 }
 :deep(.tok-string) {
   color: #34d399;
