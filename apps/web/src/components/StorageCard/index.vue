@@ -41,7 +41,7 @@ interface StorageCardProps {
   publicSlug?: string
 }
 
-const emit = defineEmits(['toggle-select'])
+const emit = defineEmits(['toggle-select', 'preview'])
 
 const props = withDefaults(defineProps<StorageCardProps>(), {
   title: '',
@@ -96,12 +96,17 @@ const handleCommand = (command: string | number | object) =>
 const handleClickCard = () => {
   if (props.type === 'folder') {
     router.push(`${HOME_URL}/${props.id}`)
+  } else {
+    emit('preview', props.id)
   }
 }
 
 const handleClickIcon = () => {
-  if (props.mimeType?.startsWith('video/')) {
-    props.previewVideo && props.previewVideo(props.videoUrl)
+  if (props.type !== 'folder') {
+    emit('preview', props.id)
+    if (props.previewVideo && props.mimeType?.startsWith('video/')) {
+      props.previewVideo(props.videoUrl)
+    }
   }
 }
 
@@ -116,8 +121,8 @@ const handleLoad = () => (showPlaceholder.value = false)
       <el-dropdown trigger="contextmenu" @command="handleCommand" placement="bottom-start" popper-class="premium-context-menu">
         <div
           class="card-container"
-          :role="type === 'folder' ? 'button' : undefined"
-          :tabindex="type === 'folder' ? 0 : undefined"
+          role="button"
+          tabindex="0"
           @click="handleClickCard"
           @keydown.enter.space.prevent="handleClickCard"
         >
@@ -165,13 +170,18 @@ const handleLoad = () => (showPlaceholder.value = false)
           <div class="node-card">
             <div class="cover" @click="handleClickIcon">
               <div :class="coverCls">
-                <div class="file-icon" :class="{ thumb: !showPlaceholder && previewSrcList.length > 0 }">
+                <div
+                  class="file-icon"
+                  :class="{
+                    thumb: !showPlaceholder && (previewSrcList.length > 0 || (mimeType && mimeType.startsWith('image/'))),
+                  }"
+                >
                   <el-image
                     class="icon"
                     :class="{ show: !showPlaceholder }"
                     alt="source"
                     :src="thumbUrl"
-                    :preview-src-list="previewSrcList"
+                    :preview-src-list="previewSrcList.length > 0 ? previewSrcList : undefined"
                     :initial-index="0"
                     preview-teleported
                     hide-on-click-modal

@@ -22,6 +22,8 @@ export interface StorageNode {
   publicExpiresAt?: string
   publicAccessCount?: number
   lastPublicAccessedAt?: string
+  contentHash?: string
+  md5Hash?: string
   createdAt: string
   updatedAt: string
 }

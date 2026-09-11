@@ -93,13 +93,63 @@ export const FILE_TYPE_THUMBS = {
     'https://img.alicdn.com/imgextra/i4/O1CN01FkWoEz1Q5EhTaCJfg_!!6000000001924-2-tps-140-140.png',
   [FILE_TYPE_UNKNOWN]:
     'https://img.alicdn.com/imgextra/i1/O1CN01NVSzRz25VFRGlsewQ_!!6000000007531-2-tps-140-140.png',
+  '.mp3':
+    'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
+  '.wav':
+    'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
+  '.ogg':
+    'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
+  '.flac':
+    'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
+  '.aac':
+    'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
+  '.m4a':
+    'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
+  '.ts':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.tsx':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.vue':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.jsx':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.py':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.rs':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.go':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.java':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.c': 'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.cpp':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.css':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.scss':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.sql':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.sh':
+    'https://img.alicdn.com/imgextra/i1/O1CN013zMVdx25JnWnWO9cN_!!6000000007506-2-tps-140-140.png',
+  '.yaml':
+    'https://img.alicdn.com/imgextra/i4/O1CN01E88OQe1JrbCSYAAZt_!!6000000001082-2-tps-140-140.png',
+  '.yml':
+    'https://img.alicdn.com/imgextra/i4/O1CN01E88OQe1JrbCSYAAZt_!!6000000001082-2-tps-140-140.png',
+  '.toml':
+    'https://img.alicdn.com/imgextra/i4/O1CN01E88OQe1JrbCSYAAZt_!!6000000001082-2-tps-140-140.png',
+  '.markdown':
+    'https://img.alicdn.com/imgextra/i1/O1CN013Vi8M91rnej9zTLrG_!!6000000005676-2-tps-140-140.png',
 }
 
 export const getThumb = (extName = '', type = 'file') => {
   if (type === 'folder') {
     return FOLDER_THUMB
   } else {
-    const lowerCaseExtName = extName?.toLowerCase()
+    let lowerCaseExtName = extName?.toLowerCase() || ''
+    if (lowerCaseExtName && !lowerCaseExtName.startsWith('.')) {
+      lowerCaseExtName = `.${lowerCaseExtName}`
+    }
 
     return (
       FILE_TYPE_THUMBS[lowerCaseExtName as keyof typeof FILE_TYPE_THUMBS] ||

@@ -1,8 +1,16 @@
 <script setup lang="ts" name="home">
 import type { UploadProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  computed,
+  onBeforeMount,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { StorageNode } from '@/api/interface'
 import {
   deleteFile,
   getDownloadUrl,
@@ -10,6 +18,8 @@ import {
   updateFile,
 } from '@/api/modules/storage'
 import { getProfile } from '@/api/modules/user'
+import FilePreviewModal from '@/components/FilePreviewModal/index.vue'
+import type { FilePreviewItem } from '@/components/FilePreviewModal/types'
 import Card from '@/components/StorageCard/index.vue'
 import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import { HOME_URL, LOGIN_URL } from '@/config/config'
@@ -22,7 +32,8 @@ import {
 } from '@/hooks/useFetchFiles'
 import { useUploadQueue } from '@/hooks/useUploadQueue'
 import { GlobalStore } from '@/store'
-import { toDownloadHref } from '@/utils/storageUrl'
+import { toDownloadHref, toProxyStorageUrl } from '@/utils/storageUrl'
+import { getThumb } from '@/utils/thumb/index'
 import Breadcrumb from './widgets/Breadcrumb/index.vue'
 import Dialog from './widgets/Dialog/index.vue'
 import Empty from './widgets/Empty/index.vue'
@@ -52,6 +63,8 @@ const publicLinkDialogVisible = ref(false)
 const searchDialogVisible = ref(false)
 const trashDialogVisible = ref(false)
 const profileDialogVisible = ref(false)
+const previewModalVisible = ref(false)
+const activePreviewFile = ref<FilePreviewItem | null>(null)
 const activePublicFile = ref<StorageViewItem | null>(null)
 const videoPlayerVisible = ref(false)
 const videoSrc = ref('')
@@ -116,6 +129,11 @@ const basicActionItems = [
   },
 ]
 const fullActionItems = [
+  {
+    id: 'preview',
+    name: '在线预览',
+    divided: false,
+  },
   {
     id: 'download',
     name: '下载',
@@ -340,7 +358,9 @@ const handleTapCardActionItem = async (
   thumb?: string,
   extName = '',
 ) => {
-  if (command === 'download') {
+  if (command === 'preview') {
+    handleOpenFile(id)
+  } else if (command === 'download') {
     download(id, name)
   } else if (command === 'delete') {
     ElMessageBox.confirm(
@@ -390,6 +410,88 @@ const handleTapCardActionItem = async (
 const handleClosePublicLinkDialog = () => {
   publicLinkDialogVisible.value = false
   activePublicFile.value = null
+}
+
+const handleOpenFile = (id: string) => {
+  const doc = listData.value.docs.find((item) => item.id === id)
+  if (doc && doc.type === 'file') {
+    activePreviewFile.value = {
+      id: doc.id,
+      name: doc.name,
+      size: doc.size,
+      extName: doc.extName,
+      mimeType: doc.mimeType,
+      url: toProxyStorageUrl(doc.url),
+      thumb: doc.thumb,
+      thumbnail: doc.thumbnail,
+      isPublic: doc.isPublic,
+      publicSlug: doc.publicSlug,
+      publicUrl: doc.publicUrl,
+      updatedAt: doc.updatedAt,
+      createdAt: doc.createdAt,
+      contentHash: doc.contentHash,
+      parentId: doc.parentId,
+    }
+    previewModalVisible.value = true
+  }
+}
+
+const handleOpenFileFromNode = (item: StorageNode) => {
+  activePreviewFile.value = {
+    id: item.id,
+    name: item.name,
+    size: item.size,
+    extName: item.extName,
+    mimeType: item.mimeType,
+    url: toProxyStorageUrl(item.url),
+    thumb: item.thumbnail
+      ? toProxyStorageUrl(item.thumbnail)
+      : getThumb(item.extName, item.type),
+    thumbnail: item.thumbnail,
+    isPublic: item.isPublic,
+    publicSlug: item.publicSlug,
+    publicUrl: item.publicUrl,
+    updatedAt: item.updatedAt,
+    createdAt: item.createdAt,
+    contentHash: item.contentHash,
+    parentId: item.parentId,
+  }
+  previewModalVisible.value = true
+}
+
+const previewFileList = computed<FilePreviewItem[]>(() => {
+  return (listData.value?.docs || [])
+    .filter((doc) => doc.type === 'file')
+    .map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      size: doc.size,
+      extName: doc.extName,
+      mimeType: doc.mimeType,
+      url: toProxyStorageUrl(doc.url),
+      thumb: doc.thumb,
+      thumbnail: doc.thumbnail,
+      isPublic: doc.isPublic,
+      publicSlug: doc.publicSlug,
+      publicUrl: doc.publicUrl,
+      updatedAt: doc.updatedAt,
+      createdAt: doc.createdAt,
+      contentHash: doc.contentHash,
+      parentId: doc.parentId,
+    }))
+})
+
+const handlePreviewDownload = (file: FilePreviewItem) => {
+  download(file.id, file.name)
+}
+
+const handlePreviewChangeFile = (file: FilePreviewItem) => {
+  activePreviewFile.value = file
+}
+
+const handleClosePreviewModal = () => {
+  previewModalVisible.value = false
+  activePreviewFile.value = null
 }
 
 const handlePublicFileUpdated = (updated: {
@@ -602,15 +704,15 @@ onUnmounted(() => {
                 :ext-name="item.extName"
                 :thumb-url="item.thumb"
                 :thumb-placeholder="item.thumbPlaceholder"
-                :preview-src-list="item.previewSrcList"
+                :preview-src-list="[]"
                 :video-url="item.videoUrl"
                 :action-items="item.type === 'file' ? fullActionItems : basicActionItems"
                 :tap-action-item="handleTapCardActionItem"
-                :preview-video="handlePreviewVideo"
                 :selected="selectedIds.has(item.id)"
                 :is-public="item.isPublic"
                 :public-slug="item.publicSlug"
                 @toggle-select="handleToggleSelect"
+                @preview="handleOpenFile"
               />
               <div v-for="item in 10" :key="'spacer-' + item" class="empty-card" />
             </div>
@@ -658,6 +760,7 @@ onUnmounted(() => {
             :visible="searchDialogVisible"
             @close="searchDialogVisible = false"
             @navigate="handleSearchNavigate"
+            @open-file="handleOpenFileFromNode"
           />
           <TrashDialog
             :visible="trashDialogVisible"
@@ -688,6 +791,14 @@ onUnmounted(() => {
             :selected-count="selectedIds.size"
             @delete="handleBatchDelete"
             @clear="handleClearSelection"
+          />
+          <FilePreviewModal
+            :visible="previewModalVisible"
+            :file="activePreviewFile"
+            :file-list="previewFileList"
+            @close="handleClosePreviewModal"
+            @change-file="handlePreviewChangeFile"
+            @download="handlePreviewDownload"
           />
         </div>
       </div>

@@ -198,7 +198,16 @@ pub fn generate_public_slug() -> String {
 }
 
 pub fn is_safe_inline_mime(mime: &str) -> bool {
-    let m = mime.to_ascii_lowercase();
+    let base = mime.split(';').next().unwrap_or(mime).trim();
+    let m = base.to_ascii_lowercase();
+    if m == "text/html"
+        || m == "application/xhtml+xml"
+        || m == "text/javascript"
+        || m == "application/javascript"
+        || m == "application/x-javascript"
+    {
+        return false;
+    }
     matches!(
         m.as_str(),
         "image/jpeg"
@@ -220,7 +229,18 @@ pub fn is_safe_inline_mime(mime: &str) -> bool {
             | "video/webm"
             | "video/ogg"
             | "video/quicktime"
-    )
+            | "application/pdf"
+            | "application/json"
+            | "application/xml"
+            | "text/plain"
+            | "text/markdown"
+            | "text/csv"
+            | "text/css"
+            | "text/xml"
+    ) || (m.starts_with("image/") && m != "image/svg+xml")
+        || m.starts_with("audio/")
+        || m.starts_with("video/")
+        || (m.starts_with("text/") && m != "text/html" && m != "text/javascript")
 }
 
 pub fn rfc5987_encode(input: &str) -> String {
@@ -724,7 +744,17 @@ pub async fn get_file(
     let (filename, mime_type, total_size, range_len, stream) = service
         .stream_file_content(id, owner_user_id, range_start, range_end)
         .await?;
-    let disposition = build_content_disposition("attachment", &filename);
+    let force_download = params
+        .get_str("download")
+        .map(|d| d == "1" || d.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    let disposition_type = if !force_download && is_safe_inline_mime(&mime_type) {
+        "inline"
+    } else {
+        "attachment"
+    };
+    let disposition = build_content_disposition(disposition_type, &filename);
 
     use axum::http::header::{
         ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE,
@@ -735,6 +765,10 @@ pub async fn get_file(
     res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
     res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
     res_headers.insert(CACHE_CONTROL, "private, no-store".parse().unwrap());
+    res_headers.insert(
+        axum::http::HeaderName::from_static("content-security-policy"),
+        "default-src 'none'; sandbox".parse().unwrap(),
+    );
     res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
     res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
