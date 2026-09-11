@@ -95,14 +95,14 @@ const errorHandler = () => true
           </div>
           <div class="search" @click="emit('open-search')">
             <el-tooltip content="全局搜索 (Cmd+K)" placement="bottom">
-              <el-icon :size="24">
+              <el-icon :size="18">
                 <Search />
               </el-icon>
             </el-tooltip>
           </div>
           <div class="trash-btn" @click="emit('open-trash')">
             <el-tooltip content="回收站" placement="bottom">
-              <el-icon :size="24">
+              <el-icon :size="18">
                 <Delete />
               </el-icon>
             </el-tooltip>
@@ -123,8 +123,8 @@ const errorHandler = () => true
           </div>
           <el-dropdown trigger="click" @command="handleCommand">
             <div class="avatar">
-              <el-avatar :src="avatar" :size="32" @error="errorHandler">
-                <el-avatar :icon="UserFilled" />
+              <el-avatar :src="avatar" :size="34" @error="errorHandler">
+                <el-avatar :icon="UserFilled" :size="34" />
               </el-avatar>
             </div>
             <template #dropdown>
@@ -143,7 +143,7 @@ const errorHandler = () => true
     <ActionButton
       :action-items="actionItems"
       :upload-file-limit="uploadFileLimit"
-      :icon-size="64"
+      :icon-size="28"
       :tap-action-item="handleCommand"
       :on-upload-change="onUploadChange"
       :on-upload-exceed="onUploadExceed"

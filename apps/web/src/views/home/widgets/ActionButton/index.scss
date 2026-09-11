@@ -6,17 +6,24 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--c-primary);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--c-primary, #008ffd);
+      color: #ffffff;
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 143, 253, 0.3);
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
       &:hover {
-        color: var(--c-primary-hover);
-        transform: scale(1.1);
+        background: var(--c-primary-hover, #007ceb);
+        box-shadow: 0 4px 14px rgba(0, 143, 253, 0.45);
+        transform: scale(1.06);
       }
 
       &:active {
-        transform: scale(0.92);
+        transform: scale(0.95);
+        box-shadow: 0 1px 4px rgba(0, 143, 253, 0.2);
       }
     }
   }

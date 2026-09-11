@@ -1,5 +1,5 @@
 <script setup lang="ts" name="action-button">
-import { CirclePlusFilled } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
 import Upload from '../Upload/index.vue'
@@ -28,7 +28,7 @@ interface ActionButtonProps {
 const props = withDefaults(defineProps<ActionButtonProps>(), {
   uploadFileLimit: () => 10,
   actionItems: () => [],
-  iconSize: () => 32,
+  iconSize: () => 18,
 })
 
 const handleCommand = (command: string | number | object) =>
@@ -38,9 +38,9 @@ const handleCommand = (command: string | number | object) =>
 <template>
   <div class="action-button-wrapper">
     <el-dropdown trigger="click" @command="handleCommand">
-      <div class="action">
+      <div class="action" role="button" aria-label="新建或上传" title="新建 / 上传">
         <el-icon :size="iconSize">
-          <CirclePlusFilled />
+          <Plus />
         </el-icon>
       </div>
       <template #dropdown>

@@ -175,40 +175,54 @@
           height: 34px;
           cursor: pointer;
           border-radius: 50%;
-          color: var(--text-color);
-          background: transparent;
+          color: #64748b;
+          background: rgba(0, 0, 0, 0.04);
+          border: 1px solid rgba(0, 0, 0, 0.06);
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
           &:hover {
             background-color: rgba(0, 143, 253, 0.1);
-            color: var(--c-primary);
-            transform: scale(1.08);
+            border-color: rgba(0, 143, 253, 0.25);
+            color: var(--c-primary, #008ffd);
+            transform: scale(1.06);
           }
 
           &:active {
-            transform: scale(0.92);
+            transform: scale(0.95);
             background-color: rgba(0, 143, 253, 0.2);
           }
         }
 
         .trash-btn {
-          margin-left: 8px;
+          margin-left: 10px;
         }
 
         .action {
-          margin-left: 16px;
+          margin-left: 10px;
         }
 
         .avatar {
-          height: 32px;
-          margin-left: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 34px;
+          height: 34px;
+          margin-left: 10px;
           cursor: pointer;
           border-radius: 50%;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          overflow: hidden;
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
+          :deep(.el-avatar) {
+            background: rgba(0, 0, 0, 0.05);
+            color: #64748b;
+          }
+
           &:hover {
-            transform: scale(1.08);
-            box-shadow: 0 0 0 2px var(--c-primary);
+            transform: scale(1.06);
+            border-color: var(--c-primary, #008ffd);
+            box-shadow: 0 0 0 2px rgba(0, 143, 253, 0.25);
           }
 
           &:active {
@@ -297,6 +311,28 @@
 
     &:active {
       background: rgba(0, 143, 253, 0.25) !important;
+    }
+  }
+
+  .search,
+  .trash-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+
+    &:hover {
+      background-color: rgba(0, 143, 253, 0.15);
+      border-color: rgba(0, 143, 253, 0.35);
+      color: var(--c-primary-light, #33a5fd);
+    }
+  }
+
+  .avatar {
+    border-color: rgba(255, 255, 255, 0.12);
+
+    :deep(.el-avatar) {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
     }
   }
 }
