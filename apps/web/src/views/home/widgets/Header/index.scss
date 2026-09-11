@@ -56,17 +56,40 @@
           cursor: pointer;
           background: transparent;
           border: 0;
-          outline: none;
+          padding: 4px 10px;
+          border-radius: 10px;
+          outline: none !important;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+          &:focus:not(:focus-visible) {
+            outline: none !important;
+          }
+
+          &:focus-visible {
+            outline: 2px solid var(--c-primary) !important;
+            outline-offset: 2px !important;
+          }
 
           &:hover {
-            opacity: 0.6;
+            background-color: rgba(0, 143, 253, 0.08);
+            transform: translateY(-1px);
+
+            .logo-name {
+              color: var(--c-primary-hover);
+            }
+          }
+
+          &:active {
+            transform: scale(0.96);
+            background-color: rgba(0, 143, 253, 0.16);
           }
 
           .logo-name {
             margin-left: 8px;
             font-size: 16px;
-            font-weight: 500;
+            font-weight: 600;
             color: var(--c-primary);
+            transition: color 0.2s ease;
           }
         }
       }
@@ -251,6 +274,16 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  .header-title .logo-container {
+    &:hover {
+      background-color: rgba(56, 189, 248, 0.12);
+    }
+
+    &:active {
+      background-color: rgba(56, 189, 248, 0.2);
+    }
+  }
+
   .public-filter-btn.el-button--default {
     background: rgba(255, 255, 255, 0.06) !important;
     border-color: rgba(255, 255, 255, 0.14) !important;
