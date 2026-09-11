@@ -273,39 +273,45 @@ const getHighlightSegments = (
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background-color: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 12vh;
+  padding-top: 14vh;
 }
 
 .search-modal {
   width: 90%;
   max-width: 640px;
-  background-color: var(--bg-glass, rgba(255, 255, 255, 0.95));
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-modal {
+    background-color: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
 }
 
 .search-header {
   display: flex;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   gap: 12px;
 
   .search-icon {
-    font-size: 20px;
-    color: var(--c-primary, #409eff);
+    font-size: 22px;
+    color: #008ffd;
     flex-shrink: 0;
   }
 
@@ -316,43 +322,74 @@ const getHighlightSegments = (
     background: transparent;
     font-size: 16px;
     font-weight: 500;
-    color: var(--text-color, #2c3e50);
+    color: #0f172a;
 
     &::placeholder {
-      color: rgba(140, 140, 140, 0.7);
-      font-size: 14px;
+      color: #94a3b8;
+      font-size: 14.5px;
     }
   }
 
   .loading-icon {
     font-size: 18px;
-    color: var(--c-primary, #409eff);
+    color: #008ffd;
   }
 
   .clear-btn {
     border: none;
     background: transparent;
     cursor: pointer;
-    color: #999;
+    color: #64748b;
     padding: 4px;
     display: flex;
     align-items: center;
     border-radius: 50%;
+    transition: all 0.15s ease;
 
     &:hover {
       background-color: rgba(0, 0, 0, 0.06);
-      color: #333;
+      color: #0f172a;
     }
   }
 
   .shortcut-badge {
-    padding: 2px 7px;
+    padding: 3px 8px;
     font-size: 11px;
     font-weight: 600;
-    color: #888;
-    background: rgba(0, 0, 0, 0.06);
+    color: #475569;
+    background: #f1f5f9;
     border-radius: 6px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    border: 1px solid #cbd5e1;
+    user-select: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-header {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+
+    .search-input {
+      color: #f8fafc;
+
+      &::placeholder {
+        color: #64748b;
+      }
+    }
+
+    .clear-btn {
+      color: #94a3b8;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #f8fafc;
+      }
+    }
+
+    .shortcut-badge {
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
   }
 }
 
@@ -369,7 +406,7 @@ const getHighlightSegments = (
   justify-content: center;
   padding: 40px 20px;
   gap: 12px;
-  color: #888;
+  color: #64748b;
   font-size: 14px;
 
   &.empty {
@@ -380,18 +417,29 @@ const getHighlightSegments = (
     .empty-title {
       font-size: 15px;
       font-weight: 600;
-      color: #444;
+      color: #334155;
     }
     .empty-desc {
       font-size: 13px;
-      color: #999;
+      color: #64748b;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-state.empty {
+    .empty-title {
+      color: #e2e8f0;
+    }
+    .empty-desc {
+      color: #94a3b8;
     }
   }
 }
 
 .results-count {
   font-size: 12px;
-  color: #999;
+  color: #64748b;
   padding: 6px 12px;
   font-weight: 500;
 }
@@ -413,7 +461,7 @@ const getHighlightSegments = (
 
   &:hover,
   &.active {
-    background-color: rgba(64, 158, 255, 0.1);
+    background-color: #f0f9ff;
   }
 
   .item-icon-wrapper {
@@ -441,14 +489,14 @@ const getHighlightSegments = (
     .item-name {
       font-size: 14px;
       font-weight: 500;
-      color: #222;
+      color: #0f172a;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
 
       :deep(.highlight) {
-        background-color: #ffe066;
-        color: #111;
+        background-color: #fef08a;
+        color: #854d0e;
         font-weight: 600;
         border-radius: 2px;
         padding: 0 2px;
@@ -460,7 +508,7 @@ const getHighlightSegments = (
       align-items: center;
       gap: 6px;
       font-size: 12px;
-      color: #888;
+      color: #64748b;
 
       .meta-tag {
         font-size: 10px;
@@ -469,14 +517,14 @@ const getHighlightSegments = (
         font-weight: 500;
 
         &.folder {
-          background-color: #f0f5ff;
-          color: #2f54eb;
+          background-color: #eff6ff;
+          color: #2563eb;
         }
 
         &.public {
-          background-color: #f6ffed;
-          color: #52c41a;
-          border: 1px solid #b7eb8f;
+          background-color: #f0fdf4;
+          color: #16a34a;
+          border: 1px solid #bbf7d0;
         }
       }
 
@@ -487,27 +535,84 @@ const getHighlightSegments = (
   }
 
   .item-action-hint {
-    color: #bbb;
+    color: #94a3b8;
     font-size: 14px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .result-item {
+    &:hover,
+    &.active {
+      background-color: rgba(0, 143, 253, 0.12);
+    }
+
+    .item-info {
+      .item-name {
+        color: #f8fafc;
+
+        :deep(.highlight) {
+          background-color: rgba(254, 240, 138, 0.25);
+          color: #fef08a;
+        }
+      }
+
+      .item-meta {
+        color: #94a3b8;
+
+        .meta-tag {
+          &.folder {
+            background-color: rgba(37, 99, 235, 0.15);
+            color: #60a5fa;
+          }
+
+          &.public {
+            background-color: rgba(22, 163, 74, 0.15);
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.3);
+          }
+        }
+      }
+    }
+
+    .item-action-hint {
+      color: #64748b;
+    }
   }
 }
 
 .search-footer-hint {
   padding: 12px 20px;
-  background-color: rgba(0, 0, 0, 0.02);
-  border-top: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+  background-color: #f8fafc;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
   font-size: 12px;
-  color: #888;
+  color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
 
   strong {
-    background: rgba(0, 0, 0, 0.06);
-    padding: 1px 5px;
+    background: #e2e8f0;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    padding: 1px 6px;
     border-radius: 4px;
     font-weight: 600;
     margin: 0 2px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-footer-hint {
+    background-color: #0f172a;
+    border-top-color: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+
+    strong {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+      border-color: rgba(255, 255, 255, 0.15);
+    }
   }
 }
 
@@ -516,7 +621,7 @@ const getHighlightSegments = (
   transition: opacity 0.2s ease;
 
   .search-modal {
-    transition: transform 0.2s ease;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 
@@ -525,7 +630,7 @@ const getHighlightSegments = (
   opacity: 0;
 
   .search-modal {
-    transform: scale(0.96) translateY(-10px);
+    transform: scale(0.96) translateY(-12px);
   }
 }
 </style>
