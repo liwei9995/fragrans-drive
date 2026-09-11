@@ -536,7 +536,7 @@ const handleClose = () => emit('close')
 
         .icon-link {
           font-size: 16px;
-          color: #3b82f6;
+          color: var(--c-primary, #008ffd);
         }
       }
 
@@ -577,7 +577,7 @@ const handleClose = () => emit('close')
 
           .section-icon {
             font-size: 15px;
-            color: #3b82f6;
+            color: var(--c-primary, #008ffd);
           }
         }
       }
@@ -635,7 +635,7 @@ const handleClose = () => emit('close')
 
           &.highlight {
             font-size: 15px;
-            color: #2563eb;
+            color: var(--c-primary, #008ffd);
           }
 
           .unit {
@@ -671,11 +671,12 @@ const handleClose = () => emit('close')
           align-items: center;
           gap: 2px;
           font-size: 12px;
-          color: #3b82f6;
+          color: var(--c-primary, #008ffd);
           text-decoration: none;
 
           &:hover {
             text-decoration: underline;
+            color: var(--c-primary-hover, #007ceb);
           }
         }
       }
@@ -686,14 +687,14 @@ const handleClose = () => emit('close')
       align-items: center;
       justify-content: space-between;
       padding: 10px 12px;
-      background: #eff6ff;
+      background: rgba(0, 143, 253, 0.06);
       border-radius: 6px;
-      border: 1px dashed #bfdbfe;
+      border: 1px dashed rgba(0, 143, 253, 0.25);
       margin-top: 6px;
 
       .tip-text {
         font-size: 11px;
-        color: #1e40af;
+        color: var(--c-primary-hover, #007ceb);
         line-height: 1.4;
         flex: 1;
       }

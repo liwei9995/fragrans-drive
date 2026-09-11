@@ -329,8 +329,8 @@ onMounted(fetchContent)
       .lang-tag {
         font-size: 12px;
         font-weight: 600;
-        color: #38bdf8;
-        background: rgba(56, 189, 248, 0.12);
+        color: var(--c-primary-light, #33a5fd);
+        background: rgba(0, 143, 253, 0.15);
         padding: 2px 8px;
         border-radius: 4px;
         white-space: nowrap;
@@ -392,14 +392,14 @@ onMounted(fetchContent)
         }
 
         &.active {
-          background: #0284c7;
-          border-color: #0284c7;
+          background: var(--c-primary, #008ffd);
+          border-color: var(--c-primary, #008ffd);
           color: #fff;
         }
 
         &.copy-btn:hover {
-          border-color: #38bdf8;
-          color: #38bdf8;
+          border-color: var(--c-primary-light, #33a5fd);
+          color: var(--c-primary-light, #33a5fd);
         }
       }
     }
@@ -483,7 +483,7 @@ onMounted(fetchContent)
   font-style: italic;
 }
 :deep(.tok-key) {
-  color: #38bdf8;
+  color: var(--c-primary-light, #33a5fd);
   font-weight: 500;
 }
 :deep(.tok-string) {

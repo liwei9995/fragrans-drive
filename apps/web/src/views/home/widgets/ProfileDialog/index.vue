@@ -406,8 +406,8 @@ const handleChangePassword = async () => {
   }
 
   .user-avatar {
-    border: 2px solid var(--c-primary, #409eff);
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+    border: 2px solid var(--c-primary, #008ffd);
+    box-shadow: 0 4px 12px rgba(0, 143, 253, 0.2);
   }
 
   .user-overview-info {
@@ -442,8 +442,8 @@ const handleChangePassword = async () => {
   padding-top: 8px;
 
   .quota-card {
-    background-color: rgba(64, 158, 255, 0.04);
-    border: 1px solid rgba(64, 158, 255, 0.12);
+    background-color: rgba(0, 143, 253, 0.04);
+    border: 1px solid rgba(0, 143, 253, 0.12);
     border-radius: 12px;
     padding: 18px;
     display: flex;
@@ -466,7 +466,7 @@ const handleChangePassword = async () => {
         color: #666;
 
         strong {
-          color: var(--c-primary, #409eff);
+          color: var(--c-primary, #008ffd);
           font-weight: 700;
         }
       }

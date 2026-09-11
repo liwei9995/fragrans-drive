@@ -475,7 +475,7 @@ onMounted(fetchContent)
 
         &:hover {
           background: rgba(255, 255, 255, 0.15);
-          color: #38bdf8;
+          color: var(--c-primary-light, #33a5fd);
         }
       }
     }
@@ -647,7 +647,7 @@ onMounted(fetchContent)
 
             &:hover:not(:disabled) {
               background: rgba(255, 255, 255, 0.15);
-              color: #38bdf8;
+              color: var(--c-primary-light, #33a5fd);
             }
 
             &:disabled {

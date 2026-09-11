@@ -481,7 +481,7 @@ const getHighlightSegments = (
 
   &:hover,
   &.active {
-    background-color: #f0f9ff;
+    background-color: rgba(0, 143, 253, 0.08);
   }
 
   .item-icon-wrapper {
@@ -537,8 +537,8 @@ const getHighlightSegments = (
         font-weight: 500;
 
         &.folder {
-          background-color: #eff6ff;
-          color: #2563eb;
+          background-color: rgba(0, 143, 253, 0.1);
+          color: var(--c-primary, #008ffd);
         }
 
         &.public {
@@ -582,8 +582,8 @@ const getHighlightSegments = (
 
         .meta-tag {
           &.folder {
-            background-color: rgba(37, 99, 235, 0.15);
-            color: #60a5fa;
+            background-color: rgba(0, 143, 253, 0.15);
+            color: var(--c-primary-light, #33a5fd);
           }
 
           &.public {

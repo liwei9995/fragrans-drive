@@ -496,11 +496,11 @@ const handleEmptyTrash = () => {
   transition: background-color 0.15s ease;
 
   &:hover {
-    background-color: rgba(64, 158, 255, 0.04);
+    background-color: rgba(0, 143, 253, 0.04);
   }
 
   &.selected {
-    background-color: rgba(64, 158, 255, 0.08);
+    background-color: rgba(0, 143, 253, 0.08);
   }
 }
 

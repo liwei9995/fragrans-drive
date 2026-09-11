@@ -466,7 +466,7 @@ onBeforeUnmount(() => {
 
           &:hover:not(:disabled) {
             background: rgba(255, 255, 255, 0.15);
-            color: #38bdf8;
+            color: var(--c-primary-light, #33a5fd);
           }
 
           &:disabled {
@@ -535,13 +535,13 @@ onBeforeUnmount(() => {
           }
 
           &.download-btn {
-            background: rgba(56, 189, 248, 0.12);
-            border-color: rgba(56, 189, 248, 0.3);
-            color: #38bdf8;
+            background: rgba(0, 143, 253, 0.15);
+            border-color: rgba(0, 143, 253, 0.35);
+            color: var(--c-primary-light, #33a5fd);
 
             &:hover {
-              background: #0284c7;
-              border-color: #0284c7;
+              background: var(--c-primary, #008ffd);
+              border-color: var(--c-primary, #008ffd);
               color: #fff;
             }
           }

@@ -276,11 +276,11 @@
 @media (prefers-color-scheme: dark) {
   .header-title .logo-container {
     &:hover {
-      background-color: rgba(56, 189, 248, 0.12);
+      background-color: rgba(0, 143, 253, 0.15);
     }
 
     &:active {
-      background-color: rgba(56, 189, 248, 0.2);
+      background-color: rgba(0, 143, 253, 0.25);
     }
   }
 
@@ -290,13 +290,13 @@
     color: #e2e8f0 !important;
 
     &:hover {
-      color: #38bdf8 !important;
-      border-color: #38bdf8 !important;
-      background: rgba(56, 189, 248, 0.12) !important;
+      color: var(--c-primary-light, #33a5fd) !important;
+      border-color: var(--c-primary-light, #33a5fd) !important;
+      background: rgba(0, 143, 253, 0.15) !important;
     }
 
     &:active {
-      background: rgba(56, 189, 248, 0.2) !important;
+      background: rgba(0, 143, 253, 0.25) !important;
     }
   }
 }

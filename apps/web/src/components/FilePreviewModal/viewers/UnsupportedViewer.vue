@@ -289,8 +289,8 @@ const handleCopyLink = async () => {
 
         &:hover {
           background: rgba(255, 255, 255, 0.1);
-          color: #38bdf8;
-          border-color: #38bdf8;
+          color: var(--c-primary-light, #33a5fd);
+          border-color: var(--c-primary-light, #33a5fd);
         }
       }
     }

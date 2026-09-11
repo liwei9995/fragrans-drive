@@ -360,7 +360,7 @@ onBeforeUnmount(() => {
 
     .center-spinner {
       position: absolute;
-      color: #38bdf8;
+      color: var(--c-primary, #008ffd);
       pointer-events: none;
     }
 
@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
           left: 0;
           top: 0;
           bottom: 0;
-          background: #38bdf8;
+          background: var(--c-primary, #008ffd);
           border-radius: 2px;
           display: flex;
           align-items: center;
@@ -480,7 +480,7 @@ onBeforeUnmount(() => {
 
         &:hover {
           background: rgba(255, 255, 255, 0.15);
-          color: #38bdf8;
+          color: var(--c-primary-light, #33a5fd);
         }
 
         .pip-icon {
@@ -525,8 +525,8 @@ onBeforeUnmount(() => {
         }
 
         &:hover {
-          border-color: #38bdf8;
-          color: #38bdf8;
+          border-color: var(--c-primary-light, #33a5fd);
+          color: var(--c-primary-light, #33a5fd);
         }
       }
 
@@ -538,7 +538,7 @@ onBeforeUnmount(() => {
         .volume-slider {
           width: 70px;
           height: 4px;
-          accent-color: #38bdf8;
+          accent-color: var(--c-primary, #008ffd);
           cursor: pointer;
 
           @media (max-width: 600px) {

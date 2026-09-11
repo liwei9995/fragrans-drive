@@ -345,7 +345,7 @@ onMounted(fetchMarkdown)
           }
 
           &.active {
-            background: #0284c7;
+            background: var(--c-primary, #008ffd);
             color: #fff;
           }
         }
@@ -374,7 +374,7 @@ onMounted(fetchMarkdown)
 
       &:hover {
         background: rgba(255, 255, 255, 0.15);
-        color: #38bdf8;
+        color: var(--c-primary-light, #33a5fd);
       }
     }
   }
@@ -468,8 +468,8 @@ onMounted(fetchMarkdown)
     margin: 24px 0;
   }
   .md-quote {
-    border-left: 4px solid #38bdf8;
-    background: rgba(56, 189, 248, 0.08);
+    border-left: 4px solid var(--c-primary, #008ffd);
+    background: rgba(0, 143, 253, 0.08);
     padding: 8px 16px;
     margin: 16px 0;
     color: #cbd5e1;
@@ -493,11 +493,11 @@ onMounted(fetchMarkdown)
     }
   }
   .md-link {
-    color: #38bdf8;
+    color: var(--c-primary-light, #33a5fd);
     text-decoration: underline;
     text-underline-offset: 2px;
     &:hover {
-      color: #7dd3fc;
+      color: #66bdfe;
     }
   }
   .md-inline-code {
@@ -531,7 +531,7 @@ onMounted(fetchMarkdown)
       overflow-x: auto;
       font-size: 13px;
       line-height: 1.6;
-      color: #38bdf8;
+      color: #e2e8f0;
       font-family: monospace;
     }
   }
