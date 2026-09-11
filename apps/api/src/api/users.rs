@@ -329,10 +329,14 @@ pub async fn update_profile(
         has_update = true;
     }
     if let Some(av) = payload.avatar {
-        if av.len() > 2048 {
+        if av.len() > 1024 * 1024 {
             return (StatusCode::BAD_REQUEST, "Invalid avatar").into_response();
         }
-        update.insert("avatar", av);
+        if av.trim().is_empty() {
+            update.insert("avatar", Bson::Null);
+        } else {
+            update.insert("avatar", av);
+        }
         has_update = true;
     }
 

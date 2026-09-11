@@ -99,6 +99,7 @@ describe('ProfileDialog.vue', () => {
           'el-option': true,
           'el-button': true,
           'el-icon': true,
+          AvatarCropper: true,
         },
       },
     })
@@ -107,5 +108,50 @@ describe('ProfileDialog.vue', () => {
       dialog.vm.$emit('close')
       expect(wrapper.emitted('close')).toBeTruthy()
     }
+  })
+
+  it('updates avatar and saves profile when avatar is cropped', async () => {
+    const wrapper = mount(ProfileDialog, {
+      props: { visible: true },
+      global: {
+        stubs: {
+          'el-dialog': {
+            template: '<div class="el-dialog"><slot /></div>',
+            props: ['modelValue'],
+          },
+          'el-avatar': true,
+          'el-tabs': true,
+          'el-tab-pane': true,
+          'el-progress': true,
+          'el-form': true,
+          'el-form-item': true,
+          'el-input': true,
+          'el-input-number': true,
+          'el-select': true,
+          'el-option': true,
+          'el-button': true,
+          'el-icon': true,
+          AvatarCropper: {
+            name: 'avatar-cropper',
+            template: '<div class="avatar-cropper-stub"></div>',
+            props: ['modelValue'],
+            emits: ['crop'],
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    const cropper = wrapper.findComponent({ name: 'avatar-cropper' })
+    expect(cropper.exists()).toBe(true)
+
+    await cropper.vm.$emit('crop', 'data:image/png;base64,mockcroppeddata')
+    await flushPromises()
+
+    expect(updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatar: 'data:image/png;base64,mockcroppeddata',
+      }),
+    )
   })
 })

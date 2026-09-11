@@ -1,10 +1,13 @@
 <script setup lang="ts" name="profile-dialog">
 import {
+  Camera,
   Check,
   CircleCheck,
+  Delete,
   Folder,
   Key,
   PieChart,
+  Upload,
   User,
   UserFilled,
 } from '@element-plus/icons-vue'
@@ -13,6 +16,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { Storage, User as UserType } from '@/api/interface'
 import { getStorageUsage } from '@/api/modules/storage'
 import { getProfile, updatePassword, updateProfile } from '@/api/modules/user'
+import AvatarCropper from '@/components/AvatarCropper/index.vue'
 import { GlobalStore } from '@/store'
 
 interface ProfileDialogProps {
@@ -30,6 +34,7 @@ const activeTab = ref('storage')
 const loading = ref(false)
 const savingProfile = ref(false)
 const savingPassword = ref(false)
+const cropperVisible = ref(false)
 
 const profile = ref<UserType.UserProfile | null>(null)
 const usage = ref<Storage.StorageUsage>({
@@ -121,11 +126,12 @@ const handleSaveProfile = async () => {
     const updated = await updateProfile({
       firstName: profileForm.firstName.trim() || undefined,
       lastName: profileForm.lastName.trim() || undefined,
-      avatar: profileForm.avatar.trim() || undefined,
+      avatar: profileForm.avatar.trim(),
       gender: profileForm.gender,
       age: profileForm.age > 0 ? profileForm.age : undefined,
     })
     profile.value = updated
+    profileForm.avatar = updated.avatar || ''
     globalStore.setUserInfo(updated)
     ElMessage.success('个人资料保存成功')
     emit('updated', updated)
@@ -135,6 +141,16 @@ const handleSaveProfile = async () => {
   } finally {
     savingProfile.value = false
   }
+}
+
+const handleAvatarCrop = async (dataUrl: string) => {
+  profileForm.avatar = dataUrl
+  await handleSaveProfile()
+}
+
+const handleClearAvatar = async () => {
+  profileForm.avatar = ''
+  await handleSaveProfile()
 }
 
 const handleChangePassword = async () => {
@@ -187,13 +203,23 @@ const handleChangePassword = async () => {
     <div v-loading="loading" class="profile-container">
       <!-- User Overview Header -->
       <div class="user-overview">
-        <el-avatar
-          :size="64"
-          :src="profileForm.avatar || profile?.avatar"
-          class="user-avatar"
+        <div
+          class="user-avatar-wrapper"
+          title="点击更换头像"
+          @click="cropperVisible = true"
         >
-          <el-icon :size="32"><UserFilled /></el-icon>
-        </el-avatar>
+          <el-avatar
+            :size="68"
+            :src="profileForm.avatar || profile?.avatar"
+            class="user-avatar"
+          >
+            <el-icon :size="34"><UserFilled /></el-icon>
+          </el-avatar>
+          <div class="avatar-hover-overlay">
+            <el-icon :size="18"><Camera /></el-icon>
+            <span>更换头像</span>
+          </div>
+        </div>
         <div class="user-overview-info">
           <div class="user-name">
             {{ userName }}
@@ -268,12 +294,55 @@ const handleChangePassword = async () => {
               </el-form-item>
             </div>
 
-            <el-form-item label="头像图片 URL">
-              <el-input
-                v-model="profileForm.avatar"
-                placeholder="https://example.com/avatar.png"
-                clearable
-              />
+            <el-form-item label="个人头像">
+              <div class="avatar-setting-row">
+                <div
+                  class="avatar-thumbnail-wrapper"
+                  title="点击更换头像"
+                  @click="cropperVisible = true"
+                >
+                  <el-avatar
+                    :size="56"
+                    :src="profileForm.avatar || profile?.avatar"
+                    class="thumbnail-avatar"
+                  >
+                    <el-icon :size="28"><UserFilled /></el-icon>
+                  </el-avatar>
+                  <div class="thumbnail-hover-overlay">
+                    <el-icon :size="16"><Camera /></el-icon>
+                  </div>
+                </div>
+
+                <div class="avatar-controls-col">
+                  <div class="avatar-actions">
+                    <el-button
+                      type="primary"
+                      plain
+                      :icon="Upload"
+                      @click="cropperVisible = true"
+                    >
+                      上传并裁剪头像
+                    </el-button>
+                    <el-button
+                      v-if="profileForm.avatar"
+                      text
+                      type="danger"
+                      :icon="Delete"
+                      @click="handleClearAvatar"
+                    >
+                      清除头像
+                    </el-button>
+                  </div>
+                  <div class="avatar-url-row">
+                    <el-input
+                      v-model="profileForm.avatar"
+                      placeholder="或输入外部图片 URL (https://...)"
+                      clearable
+                      size="small"
+                    />
+                  </div>
+                </div>
+              </div>
             </el-form-item>
 
             <div class="form-row">
@@ -358,6 +427,13 @@ const handleChangePassword = async () => {
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- Avatar Cropper Modal -->
+    <AvatarCropper
+      v-model="cropperVisible"
+      :initial-image="profileForm.avatar || profile?.avatar"
+      @crop="handleAvatarCrop"
+    />
   </el-dialog>
 </template>
 
@@ -407,9 +483,46 @@ const handleChangePassword = async () => {
     padding-bottom: 14px;
   }
 
-  .user-avatar {
-    border: 2px solid var(--c-primary, #008ffd);
-    box-shadow: 0 4px 12px rgba(0, 143, 253, 0.2);
+  .user-avatar-wrapper {
+    position: relative;
+    border-radius: 50%;
+    cursor: pointer;
+    overflow: hidden;
+    display: inline-flex;
+    flex-shrink: 0;
+
+    .user-avatar {
+      border: 2px solid var(--c-primary, #008ffd);
+      box-shadow: 0 4px 12px rgba(0, 143, 253, 0.2);
+      transition: transform 0.2s ease;
+    }
+
+    .avatar-hover-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.62);
+      backdrop-filter: blur(2px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      gap: 2px;
+      opacity: 0;
+      border-radius: 50%;
+      transition: opacity 0.2s ease;
+      user-select: none;
+    }
+
+    &:hover {
+      .user-avatar {
+        transform: scale(1.02);
+      }
+      .avatar-hover-overlay {
+        opacity: 1;
+      }
+    }
   }
 
   .user-overview-info {
@@ -529,6 +642,78 @@ const handleChangePassword = async () => {
     @media (max-width: 540px) {
       grid-template-columns: 1fr;
       gap: 0;
+    }
+  }
+
+  .avatar-setting-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 10px 14px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+    border-radius: 12px;
+
+    @media (max-width: 540px) {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .avatar-thumbnail-wrapper {
+      position: relative;
+      border-radius: 50%;
+      cursor: pointer;
+      overflow: hidden;
+      display: inline-flex;
+      flex-shrink: 0;
+
+      .thumbnail-avatar {
+        border: 2px solid var(--c-primary, #008ffd);
+        transition: transform 0.2s ease;
+      }
+
+      .thumbnail-hover-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        opacity: 0;
+        border-radius: 50%;
+        transition: opacity 0.2s ease;
+      }
+
+      &:hover {
+        .thumbnail-avatar {
+          transform: scale(1.04);
+        }
+        .thumbnail-hover-overlay {
+          opacity: 1;
+        }
+      }
+    }
+
+    .avatar-controls-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      width: 100%;
+
+      .avatar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .avatar-url-row {
+        width: 100%;
+      }
     }
   }
 
