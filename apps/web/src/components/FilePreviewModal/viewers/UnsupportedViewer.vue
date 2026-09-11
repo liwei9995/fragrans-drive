@@ -296,4 +296,63 @@ const handleCopyLink = async () => {
     }
   }
 }
+
+@media (prefers-color-scheme: light) {
+  .unsupported-viewer {
+    background: radial-gradient(circle at 50% 50%, rgba(248, 250, 252, 0.8) 0%, rgba(226, 232, 240, 0.9) 100%);
+
+    .unsupported-card {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
+
+      .file-name {
+        color: #0f172a;
+      }
+
+      .notice-text {
+        color: #64748b;
+      }
+
+      .meta-grid {
+        background: #f8fafc;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+
+        .meta-row {
+          .meta-label {
+            color: #64748b;
+          }
+
+          .meta-value {
+            color: #0f172a;
+
+            &.hash-code {
+              color: #64748b;
+            }
+          }
+        }
+      }
+
+      .action-buttons {
+        .office-tip {
+          background: #f8fafc;
+          border-color: rgba(0, 0, 0, 0.08);
+          color: #64748b;
+        }
+
+        .link-btn {
+          background: rgba(0, 0, 0, 0.04);
+          border-color: rgba(0, 0, 0, 0.1);
+          color: #334155;
+
+          &:hover {
+            background: rgba(0, 0, 0, 0.08);
+            color: var(--c-primary, #008ffd);
+            border-color: var(--c-primary, #008ffd);
+          }
+        }
+      }
+    }
+  }
+}
 </style>

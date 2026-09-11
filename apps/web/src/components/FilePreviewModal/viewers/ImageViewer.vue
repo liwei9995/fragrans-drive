@@ -306,4 +306,44 @@ onBeforeUnmount(() => {
     }
   }
 }
+
+@media (prefers-color-scheme: light) {
+  .image-viewer {
+    background: radial-gradient(circle at 50% 50%, rgba(248, 250, 252, 0.8) 0%, rgba(226, 232, 240, 0.9) 100%);
+
+    .image-viewport {
+      .preview-image {
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      }
+
+      .image-loading {
+        color: #64748b;
+      }
+    }
+
+    .image-toolbar {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.12);
+
+      .dimension-tag,
+      .scale-tag {
+        color: #475569;
+      }
+
+      .divider {
+        background: rgba(0, 0, 0, 0.1);
+      }
+
+      .tool-btn {
+        color: #334155;
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.06);
+          color: var(--c-primary, #008ffd);
+        }
+      }
+    }
+  }
+}
 </style>

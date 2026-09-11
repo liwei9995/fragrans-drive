@@ -313,13 +313,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0b0f19;
+  background: rgba(13, 15, 20, 0.94);
 
   .preview-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(10, 14, 23, 0.88);
-    backdrop-filter: blur(12px);
+    background: rgba(13, 15, 20, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
 
   .preview-container {
@@ -573,6 +574,86 @@ onBeforeUnmount(() => {
       height: calc(100vh - 56px);
       overflow: hidden;
       position: relative;
+    }
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .file-preview-modal {
+    background: rgba(241, 245, 249, 0.92);
+
+    .preview-backdrop {
+      background: rgba(248, 250, 252, 0.85);
+    }
+
+    .preview-container {
+      .preview-header {
+        background: rgba(255, 255, 255, 0.88);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+
+        .file-meta {
+          .title-wrapper .file-title {
+            color: #0f172a;
+          }
+
+          .header-fallback-icon,
+          .size-tag {
+            color: #64748b;
+          }
+        }
+
+        .file-navigation {
+          background: rgba(0, 0, 0, 0.04);
+          border-color: rgba(0, 0, 0, 0.08);
+
+          .nav-btn {
+            color: #334155;
+
+            &:hover:not(:disabled) {
+              background: rgba(0, 0, 0, 0.06);
+              color: var(--c-primary, #008ffd);
+            }
+          }
+
+          .nav-indicator {
+            color: #475569;
+          }
+        }
+
+        .header-actions {
+          .action-btn {
+            background: rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 0, 0, 0.08);
+            color: #475569;
+
+            &:hover {
+              background: rgba(0, 0, 0, 0.08);
+              color: #0f172a;
+            }
+
+            &.download-btn {
+              background: rgba(0, 143, 253, 0.1);
+              border-color: rgba(0, 143, 253, 0.25);
+              color: var(--c-primary, #008ffd);
+
+              &:hover {
+                background: var(--c-primary, #008ffd);
+                border-color: var(--c-primary, #008ffd);
+                color: #ffffff;
+              }
+            }
+
+            &.close-btn:hover {
+              background: rgba(239, 68, 68, 0.1);
+              color: #ef4444;
+            }
+          }
+
+          .divider {
+            background: rgba(0, 0, 0, 0.1);
+          }
+        }
+      }
     }
   }
 }

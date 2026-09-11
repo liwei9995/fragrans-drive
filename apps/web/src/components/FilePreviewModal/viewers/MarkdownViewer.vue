@@ -567,13 +567,139 @@ onMounted(fetchMarkdown)
           }
 
           &:hover {
-            background: rgba(56, 189, 248, 0.08);
+            background: rgba(0, 143, 253, 0.08);
           }
 
           td {
             padding: 8px 14px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             border-right: 1px solid rgba(255, 255, 255, 0.05);
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .markdown-viewer {
+    background: #ffffff;
+
+    .md-toolbar {
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+
+      .view-toggle {
+        background: rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+
+        .toggle-btn {
+          color: #64748b;
+
+          &:hover {
+            color: #0f172a;
+          }
+
+          &.active {
+            background: var(--c-primary, #008ffd);
+            color: #ffffff;
+          }
+        }
+      }
+
+      .tool-btn {
+        background: rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        color: #475569;
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.08);
+          color: var(--c-primary, #008ffd);
+        }
+      }
+    }
+
+    .md-content {
+      .render-view {
+        background: #ffffff;
+
+        .markdown-body {
+          color: #334155;
+        }
+      }
+    }
+  }
+
+  :deep(.markdown-body) {
+    .md-h1,
+    .md-h2,
+    .md-h3,
+    .md-h4,
+    .md-h5,
+    .md-h6 {
+      color: #0f172a;
+      border-bottom-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .md-hr {
+      border-top-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .md-quote {
+      border-left: 4px solid var(--c-primary, #008ffd);
+      background: rgba(0, 143, 253, 0.06);
+      color: #475569;
+    }
+
+    .md-inline-code {
+      background: rgba(0, 0, 0, 0.06);
+      color: #be185d;
+    }
+
+    .md-code-block {
+      background: #f8fafc;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+
+      .code-header {
+        background: rgba(0, 0, 0, 0.03);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        color: #64748b;
+      }
+
+      .code-body {
+        color: #1e293b;
+      }
+    }
+
+    .md-table-wrapper {
+      border: 1px solid rgba(0, 0, 0, 0.08);
+
+      .md-table {
+        thead {
+          background: #f1f5f9;
+
+          th {
+            color: #0f172a;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            border-right: 1px solid rgba(0, 0, 0, 0.06);
+          }
+        }
+
+        tbody {
+          tr {
+            &:nth-child(even) {
+              background: #f8fafc;
+            }
+
+            &:hover {
+              background: rgba(0, 143, 253, 0.06);
+            }
+
+            td {
+              color: #334155;
+              border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+              border-right: 1px solid rgba(0, 0, 0, 0.05);
+            }
           }
         }
       }

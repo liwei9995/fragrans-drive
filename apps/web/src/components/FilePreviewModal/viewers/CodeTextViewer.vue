@@ -502,4 +502,79 @@ onMounted(fetchContent)
   padding: 1px 3px;
   border-radius: 2px;
 }
+
+@media (prefers-color-scheme: light) {
+  .code-text-viewer {
+    background: #ffffff;
+    color: #0f172a;
+
+    .code-toolbar {
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+
+      .meta-left {
+        .lang-tag {
+          background: rgba(0, 143, 253, 0.1);
+          color: var(--c-primary, #008ffd);
+        }
+
+        .stat-tag {
+          color: #64748b;
+        }
+      }
+
+      .actions-right {
+        .tool-btn {
+          background: rgba(0, 0, 0, 0.04);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          color: #475569;
+
+          &:hover {
+            background: rgba(0, 0, 0, 0.08);
+            color: #0f172a;
+          }
+
+          &.active {
+            background: var(--c-primary, #008ffd);
+            border-color: var(--c-primary, #008ffd);
+            color: #fff;
+          }
+
+          &.copy-btn:hover {
+            border-color: var(--c-primary, #008ffd);
+            color: var(--c-primary, #008ffd);
+          }
+        }
+      }
+    }
+
+    .code-body {
+      .gutter {
+        background: #f8fafc;
+        color: #94a3b8;
+        border-right: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
+      .code-lines {
+        color: #1e293b;
+      }
+    }
+  }
+
+  :deep(.tok-comment) {
+    color: #94a3b8;
+  }
+  :deep(.tok-key) {
+    color: var(--c-primary, #008ffd);
+  }
+  :deep(.tok-string) {
+    color: #059669;
+  }
+  :deep(.tok-keyword) {
+    color: #db2777;
+  }
+  :deep(.tok-number) {
+    color: #d97706;
+  }
+}
 </style>

@@ -124,4 +124,24 @@ const openInNewTab = () => {
     }
   }
 }
+
+@media (prefers-color-scheme: light) {
+  .pdf-viewer {
+    .pdf-action-bar {
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+
+      .pdf-tip {
+        color: #64748b;
+      }
+    }
+
+    .pdf-viewport {
+      .pdf-loading {
+        background: #f8fafc;
+        color: #64748b;
+      }
+    }
+  }
+}
 </style>
