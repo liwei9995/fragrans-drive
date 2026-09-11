@@ -11,10 +11,18 @@
   cursor: pointer;
   background: rgb(132 133 141 / 8%);
   border-radius: 10px;
-  transition: all 0.3s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    background: rgb(0 0 0 / 8%);
+    background: rgba(0, 143, 253, 0.08);
+    color: var(--c-primary);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  &:active {
+    transform: scale(0.96);
+    background: rgba(0, 143, 253, 0.14);
   }
 
   .icon {

@@ -3,8 +3,21 @@
 
   .el-dropdown {
     .action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: var(--c-primary);
       cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &:hover {
+        color: var(--c-primary-hover);
+        transform: scale(1.1);
+      }
+
+      &:active {
+        transform: scale(0.92);
+      }
     }
   }
 }

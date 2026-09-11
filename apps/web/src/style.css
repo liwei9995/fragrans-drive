@@ -83,24 +83,74 @@ h1 {
 }
 
 button {
-  padding: 0.6em 1.2em;
   font-family: inherit;
-  font-size: 1em;
-  font-weight: 500;
   cursor: pointer;
-  background-color: #1a1a1a;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  transition: border-color 0.25s;
+  border: none;
+  background: transparent;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
-button:hover {
-  border-color: #646cff;
+button:focus {
+  outline: none;
 }
 
-button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+/* Global Element Plus Button Modern Styling & Tactile Feedback */
+.el-button {
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none !important;
+
+  &:focus:not(:focus-visible) {
+    outline: none !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--c-primary) !important;
+    outline-offset: 2px !important;
+  }
+
+  &:active:not(.is-disabled) {
+    transform: scale(0.96);
+  }
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--c-primary);
+  --el-button-border-color: var(--c-primary);
+  --el-button-hover-bg-color: var(--c-primary-hover, #007ceb);
+  --el-button-hover-border-color: var(--c-primary-hover, #007ceb);
+  --el-button-active-bg-color: #006ecf;
+  --el-button-active-border-color: #006ecf;
+
+  &:hover:not(.is-disabled) {
+    filter: brightness(1.05);
+    box-shadow: 0 4px 12px rgba(0, 143, 253, 0.3);
+  }
+
+  &:active:not(.is-disabled) {
+    transform: scale(0.96);
+    box-shadow: 0 1px 3px rgba(0, 143, 253, 0.2);
+  }
+}
+
+.el-button--default:not(.is-disabled) {
+  &:hover {
+    color: var(--c-primary);
+    border-color: var(--c-primary);
+    background-color: rgba(0, 143, 253, 0.08);
+  }
+
+  &:active {
+    transform: scale(0.96);
+    background-color: rgba(0, 143, 253, 0.16);
+  }
 }
 
 .card {
@@ -171,11 +221,6 @@ button:focus-visible {
 
   a:hover {
     color: var(--c-primary-hover);
-  }
-
-  button {
-    background-color: #ffffff;
-    border-color: #e2e8f0;
   }
 }
 

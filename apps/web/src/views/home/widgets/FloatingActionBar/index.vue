@@ -107,18 +107,30 @@ const emit = defineEmits(['delete', 'clear'])
       cursor: pointer;
       background: transparent;
       border: 0;
-      transition: all 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       font-size: 14px;
       font-weight: 500;
 
       &:hover {
-        background-color: var(--border-color);
+        background-color: rgba(0, 143, 253, 0.1);
         color: var(--c-primary);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: scale(0.95);
+        background-color: rgba(0, 143, 253, 0.2);
       }
 
       &.delete:hover {
         color: #f87171;
-        background-color: rgba(248, 113, 113, 0.1);
+        background-color: rgba(248, 113, 113, 0.12);
+        transform: translateY(-1px);
+      }
+
+      &.delete:active {
+        transform: scale(0.95);
+        background-color: rgba(248, 113, 113, 0.2);
       }
     }
   }
@@ -135,11 +147,16 @@ const emit = defineEmits(['delete', 'clear'])
     background: transparent;
     border: 0;
     opacity: 0.6;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {
       opacity: 1;
       background-color: var(--border-color);
+      transform: scale(1.1);
+    }
+
+    &:active {
+      transform: scale(0.92);
     }
   }
 }
