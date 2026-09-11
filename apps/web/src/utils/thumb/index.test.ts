@@ -13,6 +13,15 @@ describe('getThumb', () => {
     expect(getThumb('.pdf', 'file')).toBe(FILE_TYPE_THUMBS['.pdf'])
   })
 
+  it('returns thumb for image extensions including case-insensitive', () => {
+    expect(getThumb('.jpg', 'file')).toBe(FILE_TYPE_THUMBS['.jpg'])
+    expect(getThumb('JPG', 'file')).toBe(FILE_TYPE_THUMBS['.jpg'])
+    expect(getThumb('.JPG', 'file')).toBe(FILE_TYPE_THUMBS['.jpg'])
+    expect(getThumb('.png', 'file')).toBe(FILE_TYPE_THUMBS['.png'])
+    expect(getThumb('.PNG', 'file')).toBe(FILE_TYPE_THUMBS['.png'])
+    expect(getThumb('png', 'file')).toBe(FILE_TYPE_THUMBS['.png'])
+  })
+
   it('returns UNKNOWN thumb for unknown file extension', () => {
     expect(getThumb('.xyz', 'file')).toBe(FILE_TYPE_THUMBS.unknown)
     expect(getThumb('', 'file')).toBe(FILE_TYPE_THUMBS.unknown)

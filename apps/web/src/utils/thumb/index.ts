@@ -1,3 +1,5 @@
+import fileUnknownThumb from '@/assets/icons/file_unknown.png'
+
 const FILE_TYPE_TXT = '.txt'
 const FILE_TYPE_PDF = '.pdf'
 const FILE_TYPE_JS = '.js'
@@ -27,6 +29,17 @@ const FILE_TYPE_MOV = '.mov'
 const FILE_TYPE_WMV = '.wmv'
 const FILE_TYPE_FLV = '.flv'
 const FILE_TYPE_MKV = '.mkv'
+const FILE_TYPE_JPG = '.jpg'
+const FILE_TYPE_JPEG = '.jpeg'
+const FILE_TYPE_PNG = '.png'
+const FILE_TYPE_GIF = '.gif'
+const FILE_TYPE_WEBP = '.webp'
+const FILE_TYPE_BMP = '.bmp'
+const FILE_TYPE_ICO = '.ico'
+const FILE_TYPE_HEIC = '.heic'
+const FILE_TYPE_RAW = '.raw'
+const FILE_TYPE_TIFF = '.tiff'
+const FILE_TYPE_TIF = '.tif'
 const FILE_TYPE_UNKNOWN = 'unknown'
 
 export const FOLDER_THUMB =
@@ -77,8 +90,18 @@ export const FILE_TYPE_THUMBS = {
     'https://img.alicdn.com/imgextra/i3/O1CN01iGK86t1XF2UJeHczd_!!6000000002893-2-tps-140-140.png',
   [FILE_TYPE_KEY]:
     'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
-  [FILE_TYPE_SVG]:
-    'https://img.alicdn.com/imgextra/i4/O1CN01LJkSQb1rZurCPWBE2_!!6000000005646-2-tps-140-140.png',
+  [FILE_TYPE_SVG]: fileUnknownThumb,
+  [FILE_TYPE_JPG]: fileUnknownThumb,
+  [FILE_TYPE_JPEG]: fileUnknownThumb,
+  [FILE_TYPE_PNG]: fileUnknownThumb,
+  [FILE_TYPE_GIF]: fileUnknownThumb,
+  [FILE_TYPE_WEBP]: fileUnknownThumb,
+  [FILE_TYPE_BMP]: fileUnknownThumb,
+  [FILE_TYPE_ICO]: fileUnknownThumb,
+  [FILE_TYPE_HEIC]: fileUnknownThumb,
+  [FILE_TYPE_RAW]: fileUnknownThumb,
+  [FILE_TYPE_TIFF]: fileUnknownThumb,
+  [FILE_TYPE_TIF]: fileUnknownThumb,
   [FILE_TYPE_MP4]:
     'https://img.alicdn.com/imgextra/i4/O1CN01FkWoEz1Q5EhTaCJfg_!!6000000001924-2-tps-140-140.png',
   [FILE_TYPE_AVI]:
@@ -91,8 +114,7 @@ export const FILE_TYPE_THUMBS = {
     'https://img.alicdn.com/imgextra/i4/O1CN01FkWoEz1Q5EhTaCJfg_!!6000000001924-2-tps-140-140.png',
   [FILE_TYPE_MKV]:
     'https://img.alicdn.com/imgextra/i4/O1CN01FkWoEz1Q5EhTaCJfg_!!6000000001924-2-tps-140-140.png',
-  [FILE_TYPE_UNKNOWN]:
-    'https://img.alicdn.com/imgextra/i1/O1CN01NVSzRz25VFRGlsewQ_!!6000000007531-2-tps-140-140.png',
+  [FILE_TYPE_UNKNOWN]: fileUnknownThumb,
   '.mp3':
     'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
   '.wav':
