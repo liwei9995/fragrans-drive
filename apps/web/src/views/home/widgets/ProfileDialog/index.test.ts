@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { getStorageUsage } from '@/api/modules/storage'
 import { getProfile, updatePassword, updateProfile } from '@/api/modules/user'
@@ -74,6 +74,8 @@ describe('ProfileDialog.vue', () => {
     expect(wrapper.find('.profile-container').exists()).toBe(true)
     expect(getProfile).toHaveBeenCalled()
     expect(getStorageUsage).toHaveBeenCalled()
+    await flushPromises()
+    expect(wrapper.find('.user-name').text()).toBe('Alex Li')
   })
 
   it('emits close when dialog is closed', async () => {

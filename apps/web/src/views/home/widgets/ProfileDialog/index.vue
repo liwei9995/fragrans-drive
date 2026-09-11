@@ -72,6 +72,13 @@ const progressStatus = computed(() => {
   return 'success'
 })
 
+const userName = computed(() => {
+  const first = profile.value?.firstName?.trim() || ''
+  const last = profile.value?.lastName?.trim() || ''
+  const full = [first, last].filter(Boolean).join(' ')
+  return full || profile.value?.email || '未设置昵称'
+})
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -189,7 +196,7 @@ const handleChangePassword = async () => {
         </el-avatar>
         <div class="user-overview-info">
           <div class="user-name">
-            {{ (profile?.firstName || '') + ' ' + (profile?.lastName || '') || '未设置昵称' }}
+            {{ userName }}
           </div>
           <div class="user-email">{{ profile?.email }}</div>
         </div>
