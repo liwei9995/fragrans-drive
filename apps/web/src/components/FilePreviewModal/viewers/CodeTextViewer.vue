@@ -571,14 +571,20 @@ onMounted(fetchContent)
         color: #64748b;
       }
 
-      .gutter {
-        background: #f8fafc;
-        color: #94a3b8;
-        border-right: 1px solid rgba(0, 0, 0, 0.08);
-      }
+      .code-container {
+        .gutter {
+          background: #f8fafc;
+          color: #94a3b8;
+          border-right: 1px solid rgba(0, 0, 0, 0.08);
 
-      .code-lines {
-        color: #1e293b;
+          .line-num {
+            color: #94a3b8;
+          }
+        }
+
+        .code-lines {
+          color: #1e293b;
+        }
       }
     }
 
