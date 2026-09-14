@@ -8,6 +8,7 @@ import {
   TopRight,
 } from '@element-plus/icons-vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { toProxyStorageUrl } from '@/utils/storageUrl'
 import {
   formatFileSize,
   getPreviewBadge,
@@ -81,6 +82,61 @@ const currentIndex = computed(() => {
   if (!activeFile.value || onlyFiles.value.length === 0) return -1
   return onlyFiles.value.findIndex((f) => f.id === activeFile.value?.id)
 })
+
+const activeImageThumb = computed(() => {
+  if (!activeFile.value) return ''
+  if (activeFile.value.thumbnail) {
+    return toProxyStorageUrl(activeFile.value.thumbnail)
+  }
+  if (
+    activeFile.value.thumb &&
+    !activeFile.value.thumb.includes('assets/icons/') &&
+    !activeFile.value.thumb.includes('file_unknown') &&
+    !activeFile.value.thumb.includes('file_image') &&
+    !activeFile.value.thumb.includes('img.alicdn.com')
+  ) {
+    return activeFile.value.thumb
+  }
+  return ''
+})
+
+// Preload neighboring images in idle time so flipping left/right is instantaneous
+const preloadedUrls = new Set<string>()
+
+const preloadImageFile = (item?: FilePreviewItem) => {
+  if (!item || !item.url) return
+  const isImage =
+    item.mimeType?.startsWith('image/') ||
+    ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'].some((ext) =>
+      item.name.toLowerCase().endsWith(ext),
+    )
+  if (isImage && !preloadedUrls.has(item.url)) {
+    preloadedUrls.add(item.url)
+    const img = new Image()
+    img.src = item.url
+  }
+}
+
+const preloadNeighbors = () => {
+  const idx = currentIndex.value
+  if (idx < 0) return
+  if (idx + 1 < onlyFiles.value.length) {
+    preloadImageFile(onlyFiles.value[idx + 1])
+  }
+  if (idx - 1 >= 0) {
+    preloadImageFile(onlyFiles.value[idx - 1])
+  }
+}
+
+watch(
+  () => [props.visible, currentIndex.value],
+  ([visible]) => {
+    if (visible) {
+      preloadNeighbors()
+    }
+  },
+  { immediate: true },
+)
 
 const hasPrev = computed(() => currentIndex.value > 0)
 const hasNext = computed(
@@ -280,6 +336,7 @@ onBeforeUnmount(() => {
             v-if="previewType === 'image'"
             :src="activeFile.url || ''"
             :name="activeFile.name"
+            :thumb="activeImageThumb"
           />
 
           <!-- Video -->

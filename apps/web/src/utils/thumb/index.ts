@@ -1,3 +1,4 @@
+import fileImageThumb from '@/assets/icons/file_image.png'
 import fileUnknownThumb from '@/assets/icons/file_unknown.png'
 
 const FILE_TYPE_TXT = '.txt'
@@ -90,18 +91,18 @@ export const FILE_TYPE_THUMBS = {
     'https://img.alicdn.com/imgextra/i3/O1CN01iGK86t1XF2UJeHczd_!!6000000002893-2-tps-140-140.png',
   [FILE_TYPE_KEY]:
     'https://img.alicdn.com/imgextra/i1/O1CN01obpWj31QWG3V8dpU8_!!6000000001983-2-tps-140-140.png',
-  [FILE_TYPE_SVG]: fileUnknownThumb,
-  [FILE_TYPE_JPG]: fileUnknownThumb,
-  [FILE_TYPE_JPEG]: fileUnknownThumb,
-  [FILE_TYPE_PNG]: fileUnknownThumb,
-  [FILE_TYPE_GIF]: fileUnknownThumb,
-  [FILE_TYPE_WEBP]: fileUnknownThumb,
-  [FILE_TYPE_BMP]: fileUnknownThumb,
-  [FILE_TYPE_ICO]: fileUnknownThumb,
-  [FILE_TYPE_HEIC]: fileUnknownThumb,
-  [FILE_TYPE_RAW]: fileUnknownThumb,
-  [FILE_TYPE_TIFF]: fileUnknownThumb,
-  [FILE_TYPE_TIF]: fileUnknownThumb,
+  [FILE_TYPE_SVG]: fileImageThumb,
+  [FILE_TYPE_JPG]: fileImageThumb,
+  [FILE_TYPE_JPEG]: fileImageThumb,
+  [FILE_TYPE_PNG]: fileImageThumb,
+  [FILE_TYPE_GIF]: fileImageThumb,
+  [FILE_TYPE_WEBP]: fileImageThumb,
+  [FILE_TYPE_BMP]: fileImageThumb,
+  [FILE_TYPE_ICO]: fileImageThumb,
+  [FILE_TYPE_HEIC]: fileImageThumb,
+  [FILE_TYPE_RAW]: fileImageThumb,
+  [FILE_TYPE_TIFF]: fileImageThumb,
+  [FILE_TYPE_TIF]: fileImageThumb,
   [FILE_TYPE_MP4]:
     'https://img.alicdn.com/imgextra/i4/O1CN01FkWoEz1Q5EhTaCJfg_!!6000000001924-2-tps-140-140.png',
   [FILE_TYPE_AVI]:

@@ -201,4 +201,34 @@ describe('FilePreviewModal', () => {
     backSpy.mockRestore()
     wrapper.unmount()
   })
+
+  it('passes activeImageThumb to ImageViewer when previewing image file', () => {
+    const fileWithThumb: FilePreviewItem = {
+      ...mockFile,
+      thumbnail: '/api/v1/storage/thumb_123',
+    }
+
+    const wrapper = mount(FilePreviewModal, {
+      props: {
+        visible: true,
+        file: fileWithThumb,
+        fileList: [fileWithThumb],
+      },
+      global: {
+        stubs: {
+          ...commonStubs,
+          ImageViewer: {
+            props: ['src', 'name', 'thumb'],
+            template:
+              '<div class="stub-image-viewer" :data-thumb="thumb" :data-src="src"></div>',
+          },
+        },
+      },
+    })
+
+    const viewer = wrapper.find('.stub-image-viewer')
+    expect(viewer.exists()).toBe(true)
+    expect(viewer.attributes('data-thumb')).toBe('/api/v1/storage/thumb_123')
+    expect(viewer.attributes('data-src')).toBe(mockFile.url)
+  })
 })

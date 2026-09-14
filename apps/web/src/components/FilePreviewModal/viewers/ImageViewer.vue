@@ -11,11 +11,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 interface Props {
   src: string
   name?: string
+  thumb?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   src: '',
   name: '',
+  thumb: '',
 })
 
 const scale = ref(1)
@@ -28,7 +30,23 @@ const dragStart = ref({ x: 0, y: 0 })
 const naturalWidth = ref(0)
 const naturalHeight = ref(0)
 const loading = ref(true)
+const highResLoaded = ref(false)
 const loadError = ref(false)
+const imageSrc = ref(props.src)
+
+const hasRealThumb = computed(() => {
+  if (!props.thumb) return false
+  const t = props.thumb.toLowerCase()
+  if (
+    t.includes('assets/icons/') ||
+    t.includes('file_unknown') ||
+    t.includes('file_image') ||
+    t.includes('img.alicdn.com')
+  ) {
+    return false
+  }
+  return true
+})
 
 const transformStyle = computed(() => {
   const sx = flipH.value ? -1 : 1
@@ -50,11 +68,16 @@ const resetTransform = () => {
 
 watch(
   () => props.src,
-  () => {
+  (newSrc) => {
+    imageSrc.value = newSrc
     loading.value = true
+    highResLoaded.value = false
     loadError.value = false
+    naturalWidth.value = 0
+    naturalHeight.value = 0
     resetTransform()
   },
+  { immediate: true },
 )
 
 const handleZoomIn = () => {
@@ -105,6 +128,7 @@ const handleMouseUp = () => {
 
 const handleImageLoaded = (e: Event) => {
   loading.value = false
+  highResLoaded.value = true
   loadError.value = false
   const img = e.target as HTMLImageElement
   naturalWidth.value = img.naturalWidth
@@ -114,6 +138,14 @@ const handleImageLoaded = (e: Event) => {
 const handleImageError = () => {
   loading.value = false
   loadError.value = true
+}
+
+const handleRetry = () => {
+  loadError.value = false
+  loading.value = true
+  highResLoaded.value = false
+  const sep = props.src.includes('?') ? '&' : '?'
+  imageSrc.value = `${props.src}${sep}_retry=${Date.now()}`
 }
 
 onMounted(() => {
@@ -130,26 +162,48 @@ onBeforeUnmount(() => {
 <template>
   <div class="image-viewer" @wheel="handleWheel">
     <div class="image-viewport" @mousedown="handleMouseDown">
-      <div v-if="loading" class="image-loading">
+      <!-- Full blocking spinner fallback ONLY when no LQIP thumbnail is available -->
+      <div v-if="loading && !hasRealThumb && !loadError" class="image-loading">
         <el-icon class="is-loading" :size="32"><Refresh /></el-icon>
         <span>正在载入高分辨率原图...</span>
       </div>
 
+      <!-- Error State with Retry -->
       <div v-else-if="loadError" class="image-error">
         <el-icon :size="48"><Refresh /></el-icon>
         <span>图片加载失败，请检查网络或刷新重试</span>
+        <button class="retry-btn" @click="handleRetry">重新加载</button>
       </div>
 
+      <!-- Thumbnail / LQIP layer: shown immediately while high-res image is loading -->
       <img
-        v-show="!loading && !loadError"
-        :src="src"
+        v-if="hasRealThumb && !loadError"
+        :src="thumb"
         :alt="name"
-        class="preview-image"
+        class="preview-image preview-thumb"
+        :class="{ 'is-fading-out': highResLoaded }"
+        :style="transformStyle"
+        draggable="false"
+      />
+
+      <!-- High-Res Original: rendered immediately, fades in smoothly once loaded -->
+      <img
+        v-show="!loadError"
+        :src="imageSrc"
+        :alt="name"
+        class="preview-image main-image"
+        :class="{ 'is-loading': !highResLoaded }"
         :style="transformStyle"
         draggable="false"
         @load="handleImageLoaded"
         @error="handleImageError"
       />
+
+      <!-- Non-blocking floating status badge when previewing with thumbnail placeholder -->
+      <div v-if="loading && hasRealThumb && !loadError" class="image-loading-badge">
+        <el-icon class="is-loading" :size="14"><Refresh /></el-icon>
+        <span>高清载入中...</span>
+      </div>
     </div>
 
     <!-- Floating bottom toolbar -->
@@ -211,12 +265,38 @@ onBeforeUnmount(() => {
     overflow: hidden;
 
     .preview-image {
+      width: 90%;
+      height: 85%;
       max-width: 90%;
       max-height: 85%;
       object-fit: contain;
       transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1);
       box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
       border-radius: 6px;
+
+      &.preview-thumb {
+        position: absolute;
+        filter: blur(8px);
+        transform-origin: center center;
+        opacity: 1;
+        transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.35s ease;
+
+        &.is-fading-out {
+          opacity: 0;
+          pointer-events: none;
+        }
+      }
+
+      &.main-image {
+        position: relative;
+        opacity: 1;
+        transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease;
+
+        &.is-loading {
+          opacity: 0;
+          pointer-events: none;
+        }
+      }
     }
 
     .image-loading,
@@ -228,8 +308,62 @@ onBeforeUnmount(() => {
       color: #94a3b8;
       font-size: 14px;
     }
+
     .image-error {
       color: #f87171;
+
+      .retry-btn {
+        margin-top: 4px;
+        padding: 6px 16px;
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: rgba(239, 68, 68, 0.25);
+          color: #ffffff;
+        }
+      }
+    }
+
+    .image-loading-badge {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      border-radius: 9999px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      color: #cbd5e1;
+      font-size: 13px;
+      z-index: 10;
+      pointer-events: none;
+      animation: fadeInBadge 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+      .is-loading {
+        color: var(--c-primary, #008ffd);
+      }
+    }
+  }
+
+  @keyframes fadeInBadge {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -8px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
     }
   }
 
@@ -318,6 +452,17 @@ onBeforeUnmount(() => {
 
       .image-loading {
         color: #64748b;
+      }
+
+      .image-loading-badge {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        color: #475569;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+        .is-loading {
+          color: var(--c-primary, #008ffd);
+        }
       }
     }
 

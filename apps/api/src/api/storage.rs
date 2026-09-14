@@ -695,7 +695,7 @@ pub async fn get_file(
         .await?
         .ok_or_else(|| AppError::NotFound("File not found".into()))?;
 
-    let owner_user_id = if token.is_empty() {
+    let (owner_user_id, token_exp) = if token.is_empty() {
         return Err(AppError::Unauthorized("Invalid token".into()));
     } else {
         let claims = match decode::<Claims>(
@@ -718,7 +718,7 @@ pub async fn get_file(
         if claims.share_version.unwrap_or(0) != existing.share_version {
             return Err(AppError::Unauthorized("Share link has been revoked".into()));
         }
-        claims.user_id
+        (claims.user_id, claims.exp)
     };
 
     let mut range_start = 0;
@@ -764,7 +764,12 @@ pub async fn get_file(
     res_headers.insert(CONTENT_TYPE, mime_type.parse().unwrap());
     res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
     res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
-    res_headers.insert(CACHE_CONTROL, "private, no-store".parse().unwrap());
+    let now = chrono::Utc::now().timestamp() as usize;
+    let max_age = token_exp.saturating_sub(now).clamp(60, 86400);
+    res_headers.insert(
+        CACHE_CONTROL,
+        format!("private, max-age={}", max_age).parse().unwrap(),
+    );
     res_headers.insert(
         axum::http::HeaderName::from_static("content-security-policy"),
         "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
