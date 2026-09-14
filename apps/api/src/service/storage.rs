@@ -4,7 +4,7 @@ use crate::domain::storage::{
     TrashRestoreResponse, UpdateStorageResponse,
 };
 use crate::infrastructure::db::storage_repo::StorageRepository;
-use crate::infrastructure::image::thumbnail::generate_thumbnail;
+use crate::infrastructure::image::thumbnail::{generate_preview, generate_thumbnail};
 use crate::infrastructure::storage::local::{LocalStorage, StorageStream, legacy::LegacyReader};
 use chrono::Utc;
 use mongodb::bson::{DateTime as BsonDateTime, Document, doc, oid::ObjectId};
@@ -689,6 +689,95 @@ impl StorageService {
             }
         }
         Err(AppError::NotFound("File not found".into()))
+    }
+
+    pub async fn get_or_generate_preview(
+        &self,
+        file_id: &str,
+        user_id: &str,
+    ) -> Result<(Vec<u8>, String), AppError> {
+        let id_oid =
+            ObjectId::parse_str(file_id).map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+
+        let doc = self.repo.find_by_id(id_oid).await?;
+        let item = match doc {
+            Some(i) if i.user_id == user_id && !i.trashed => i,
+            _ => return Err(AppError::NotFound("File not found".into())),
+        };
+
+        let mime = item
+            .mime_type
+            .clone()
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+
+        // Only raster images can be resized to preview (SVG is vector, not resizable)
+        if !mime.starts_with("image/") || mime == "image/svg+xml" {
+            return Err(AppError::BadRequest("File is not a resizable image".into()));
+        }
+
+        if let Some(ref hash) = item.content_hash {
+            let preview_path = self
+                .local_storage
+                .get_preview_path(user_id, hash)
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+            if preview_path.exists() {
+                let bytes = tokio::fs::read(&preview_path)
+                    .await
+                    .map_err(|e| AppError::InternalError(e.to_string()))?;
+                return Ok((bytes, "image/jpeg".to_string()));
+            }
+
+            let orig_bytes = self
+                .local_storage
+                .read_all(user_id, hash)
+                .await
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+            let (preview_bytes, preview_mime) = tokio::task::spawn_blocking(move || {
+                generate_preview(&orig_bytes, 1600)
+            })
+            .await
+            .map_err(|e| AppError::InternalError(e.to_string()))??;
+
+            if let Err(e) = tokio::fs::write(&preview_path, &preview_bytes).await {
+                tracing::warn!(error = %e, "Failed to cache preview to disk");
+            }
+
+            Ok((preview_bytes, preview_mime.to_string()))
+        } else if let Some(ref md5_hash) = item.md5_hash {
+            let legacy_reader = LegacyReader::new(&self.local_storage);
+            let preview_path = legacy_reader
+                .get_legacy_preview_path(md5_hash)
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+            if preview_path.exists() {
+                let bytes = tokio::fs::read(&preview_path)
+                    .await
+                    .map_err(|e| AppError::InternalError(e.to_string()))?;
+                return Ok((bytes, "image/jpeg".to_string()));
+            }
+
+            let orig_bytes = legacy_reader
+                .fetch(md5_hash, item.iv.as_deref(), None)
+                .await
+                .map_err(|e| AppError::InternalError(e.to_string()))?
+                .ok_or_else(|| AppError::NotFound("File not found".into()))?;
+
+            let (preview_bytes, preview_mime) = tokio::task::spawn_blocking(move || {
+                generate_preview(&orig_bytes, 1600)
+            })
+            .await
+            .map_err(|e| AppError::InternalError(e.to_string()))??;
+
+            if let Err(e) = tokio::fs::write(&preview_path, &preview_bytes).await {
+                tracing::warn!(error = %e, "Failed to cache legacy preview to disk");
+            }
+
+            Ok((preview_bytes, preview_mime.to_string()))
+        } else {
+            Err(AppError::NotFound("File content missing".into()))
+        }
     }
 
     pub async fn move_file(

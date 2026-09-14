@@ -744,3 +744,114 @@ async fn expire_in_seconds_rejects_out_of_range() {
 
     ctx.teardown().await;
 }
+
+fn multipart_upload_image_request(
+    uri: &str,
+    token: &str,
+    filename: &str,
+    mime: &str,
+    file_content: &[u8],
+) -> Request<Body> {
+    let boundary = "----Boundary123";
+    let mut body = Vec::new();
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(b"Content-Disposition: form-data; name=\"parentId\"\r\n\r\nroot\r\n");
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(
+        format!(
+            "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
+            filename
+        )
+        .as_bytes(),
+    );
+    body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", mime).as_bytes());
+    body.extend_from_slice(file_content);
+    body.extend_from_slice(b"\r\n");
+    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(
+            header::CONTENT_TYPE,
+            format!("multipart/form-data; boundary={}", boundary),
+        )
+        .body(Body::from(body))
+        .unwrap()
+}
+
+#[tokio::test]
+#[serial]
+async fn download_with_preview_returns_resized_image_and_caches() {
+    let ctx = setup().await;
+
+    // Create a 2000x2000 JPEG image
+    let img = image::RgbImage::new(2000, 2000);
+    let mut jpeg_bytes = Vec::new();
+    img.write_to(
+        &mut std::io::Cursor::new(&mut jpeg_bytes),
+        image::ImageFormat::Jpeg,
+    )
+    .unwrap();
+
+    let req = multipart_upload_image_request(
+        "/v1/storage/upload",
+        &ctx.auth_token,
+        "large_sample.jpg",
+        "image/jpeg",
+        &jpeg_bytes,
+    );
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let data: Vec<String> = serde_json::from_slice(&response_bytes(res).await).unwrap();
+    let file_id = data[0].clone();
+
+    let (status, url) = download_url(&ctx, &format!(r#"{{"fileId":"{file_id}"}}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    let token = url.split("token=").last().unwrap();
+
+    // 1. Download original (without preview=1)
+    let orig_req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={token}"))
+        .body(Body::empty())
+        .unwrap();
+    let orig_res = ctx.app.clone().oneshot(orig_req).await.unwrap();
+    assert_eq!(orig_res.status(), StatusCode::OK);
+    let orig_data = response_bytes(orig_res).await;
+    assert_eq!(orig_data.len(), jpeg_bytes.len());
+
+    // 2. Download preview (with preview=1)
+    let prev_req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={token}&preview=1"))
+        .body(Body::empty())
+        .unwrap();
+    let prev_res = ctx.app.clone().oneshot(prev_req).await.unwrap();
+    assert_eq!(prev_res.status(), StatusCode::OK);
+    assert_eq!(
+        prev_res.headers().get("content-type").unwrap(),
+        "image/jpeg"
+    );
+    let prev_data = response_bytes(prev_res).await;
+
+    // Verify it was resized to long edge 1600px (so 1600x1600)
+    let decoded = image::load_from_memory(&prev_data).unwrap();
+    assert_eq!(decoded.width(), 1600);
+    assert_eq!(decoded.height(), 1600);
+
+    // 3. Second preview request returns the exact same cached preview bytes
+    let prev_req2 = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={token}&preview=1"))
+        .body(Body::empty())
+        .unwrap();
+    let prev_res2 = ctx.app.clone().oneshot(prev_req2).await.unwrap();
+    assert_eq!(prev_res2.status(), StatusCode::OK);
+    let prev_data2 = response_bytes(prev_res2).await;
+    assert_eq!(prev_data, prev_data2);
+
+    ctx.teardown().await;
+}
+

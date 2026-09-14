@@ -150,4 +150,47 @@ describe('ImageViewer', () => {
     await resetBtn.trigger('click')
     expect(wrapper.find('.scale-tag').text()).toBe('100%')
   })
+
+  it('emits loaded event when image loads successfully', async () => {
+    const wrapper = mount(ImageViewer, {
+      props: {
+        src: '/api/v1/storage/photo.jpg',
+        name: 'photo.jpg',
+      },
+      global: {
+        stubs: commonStubs,
+      },
+    })
+
+    const mainImg = wrapper.find('.main-image')
+    await mainImg.trigger('load')
+    expect(wrapper.emitted('loaded')).toBeTruthy()
+  })
+
+  it('renders View Original button and loads original on click', async () => {
+    const wrapper = mount(ImageViewer, {
+      props: {
+        src: '/api/v1/storage/photo.jpg?preview=1',
+        originalSrc: '/api/v1/storage/photo.jpg',
+        name: 'photo.jpg',
+      },
+      global: {
+        stubs: commonStubs,
+      },
+    })
+
+    const viewOriginalBtn = wrapper.find('.text-tool-btn')
+    expect(viewOriginalBtn.exists()).toBe(true)
+    expect(viewOriginalBtn.text()).toContain('查看原图')
+
+    await viewOriginalBtn.trigger('click')
+
+    const mainImg = wrapper.find('.main-image')
+    expect(mainImg.attributes('src')).toBe('/api/v1/storage/photo.jpg')
+
+    // Simulate original image load
+    await mainImg.trigger('load')
+    expect(viewOriginalBtn.text()).toContain('已是原图')
+    expect(viewOriginalBtn.classes()).toContain('active')
+  })
 })

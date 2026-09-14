@@ -218,9 +218,9 @@ describe('FilePreviewModal', () => {
         stubs: {
           ...commonStubs,
           ImageViewer: {
-            props: ['src', 'name', 'thumb'],
+            props: ['src', 'name', 'thumb', 'originalSrc'],
             template:
-              '<div class="stub-image-viewer" :data-thumb="thumb" :data-src="src"></div>',
+              '<div class="stub-image-viewer" :data-thumb="thumb" :data-src="src" :data-orig="originalSrc"></div>',
           },
         },
       },
@@ -229,6 +229,7 @@ describe('FilePreviewModal', () => {
     const viewer = wrapper.find('.stub-image-viewer')
     expect(viewer.exists()).toBe(true)
     expect(viewer.attributes('data-thumb')).toBe('/api/v1/storage/thumb_123')
-    expect(viewer.attributes('data-src')).toBe(mockFile.url)
+    expect(viewer.attributes('data-src')).toBe(`${mockFile.url}?preview=1`)
+    expect(viewer.attributes('data-orig')).toBe(mockFile.url)
   })
 })

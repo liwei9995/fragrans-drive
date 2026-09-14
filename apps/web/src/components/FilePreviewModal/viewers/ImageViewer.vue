@@ -12,13 +12,17 @@ interface Props {
   src: string
   name?: string
   thumb?: string
+  originalSrc?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   src: '',
   name: '',
   thumb: '',
+  originalSrc: '',
 })
+
+const emit = defineEmits<(e: 'loaded') => void>()
 
 const scale = ref(1)
 const rotate = ref(0)
@@ -33,6 +37,8 @@ const loading = ref(true)
 const highResLoaded = ref(false)
 const loadError = ref(false)
 const imageSrc = ref(props.src)
+const isShowingOriginal = ref(false)
+const loadingOriginal = ref(false)
 
 const hasRealThumb = computed(() => {
   if (!props.thumb) return false
@@ -67,9 +73,11 @@ const resetTransform = () => {
 }
 
 watch(
-  () => props.src,
-  (newSrc) => {
+  () => [props.src, props.originalSrc],
+  ([newSrc, newOrig]) => {
     imageSrc.value = newSrc
+    isShowingOriginal.value = Boolean(newOrig && newSrc === newOrig)
+    loadingOriginal.value = false
     loading.value = true
     highResLoaded.value = false
     loadError.value = false
@@ -79,6 +87,13 @@ watch(
   },
   { immediate: true },
 )
+
+const handleViewOriginal = () => {
+  if (!props.originalSrc || isShowingOriginal.value || loadingOriginal.value)
+    return
+  loadingOriginal.value = true
+  imageSrc.value = props.originalSrc
+}
 
 const handleZoomIn = () => {
   scale.value = Math.min(5, Number((scale.value + 0.25).toFixed(2)))
@@ -130,13 +145,19 @@ const handleImageLoaded = (e: Event) => {
   loading.value = false
   highResLoaded.value = true
   loadError.value = false
+  if (loadingOriginal.value) {
+    loadingOriginal.value = false
+    isShowingOriginal.value = true
+  }
   const img = e.target as HTMLImageElement
   naturalWidth.value = img.naturalWidth
   naturalHeight.value = img.naturalHeight
+  emit('loaded')
 }
 
 const handleImageError = () => {
   loading.value = false
+  loadingOriginal.value = false
   loadError.value = true
 }
 
@@ -144,8 +165,10 @@ const handleRetry = () => {
   loadError.value = false
   loading.value = true
   highResLoaded.value = false
-  const sep = props.src.includes('?') ? '&' : '?'
-  imageSrc.value = `${props.src}${sep}_retry=${Date.now()}`
+  const targetSrc =
+    isShowingOriginal.value && props.originalSrc ? props.originalSrc : props.src
+  const sep = targetSrc.includes('?') ? '&' : '?'
+  imageSrc.value = `${targetSrc}${sep}_retry=${Date.now()}`
 }
 
 onMounted(() => {
@@ -238,6 +261,25 @@ onBeforeUnmount(() => {
           <el-icon :size="16"><RefreshRight /></el-icon>
         </button>
       </el-tooltip>
+
+      <template v-if="props.originalSrc && props.originalSrc !== props.src">
+        <div class="divider"></div>
+
+        <el-tooltip
+          :content="isShowingOriginal ? '当前已是原始无损画质' : '加载 100% 原始无损画质图片'"
+          placement="top"
+        >
+          <button
+            class="tool-btn text-tool-btn"
+            :class="{ active: isShowingOriginal, 'is-loading': loadingOriginal }"
+            :disabled="isShowingOriginal || loadingOriginal"
+            @click="handleViewOriginal"
+          >
+            <el-icon v-if="loadingOriginal" class="is-loading"><Refresh /></el-icon>
+            <span>{{ isShowingOriginal ? '已是原图' : loadingOriginal ? '载入原图中...' : '查看原图' }}</span>
+          </button>
+        </el-tooltip>
+      </template>
     </div>
   </div>
 </template>
@@ -437,6 +479,29 @@ onBeforeUnmount(() => {
       &:active {
         transform: scale(0.95);
       }
+
+      &.text-tool-btn {
+        width: auto;
+        border-radius: 9999px;
+        padding: 0 10px;
+        font-size: 12px;
+        gap: 4px;
+
+        &:hover {
+          transform: none;
+        }
+
+        &.active {
+          color: var(--c-primary, #008ffd);
+          background: rgba(0, 143, 253, 0.15);
+          cursor: default;
+        }
+
+        &:disabled:not(.active) {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
     }
   }
 }
@@ -486,6 +551,11 @@ onBeforeUnmount(() => {
         &:hover {
           background: rgba(0, 0, 0, 0.06);
           color: var(--c-primary, #008ffd);
+        }
+
+        &.text-tool-btn.active {
+          color: var(--c-primary, #008ffd);
+          background: rgba(0, 143, 253, 0.12);
         }
       }
     }

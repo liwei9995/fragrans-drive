@@ -100,8 +100,37 @@ const activeImageThumb = computed(() => {
   return ''
 })
 
-// Preload neighboring images in idle time so flipping left/right is instantaneous
+const isSvg = computed(() => {
+  if (!activeFile.value) return false
+  return (
+    activeFile.value.mimeType === 'image/svg+xml' ||
+    activeFile.value.name.toLowerCase().endsWith('.svg')
+  )
+})
+
+const activeImageSrc = computed(() => {
+  if (!activeFile.value?.url) return ''
+  if (isSvg.value) return activeFile.value.url
+  const sep = activeFile.value.url.includes('?') ? '&' : '?'
+  return `${activeFile.value.url}${sep}preview=1`
+})
+
+const activeImageOriginalSrc = computed(() => {
+  if (!activeFile.value?.url) return ''
+  if (isSvg.value) return ''
+  return activeFile.value.url
+})
+
+// Preload neighboring preview images only after active image finishes loading (Plan B)
 const preloadedUrls = new Set<string>()
+let preloadTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearPreloadTimer = () => {
+  if (preloadTimer !== null) {
+    clearTimeout(preloadTimer)
+    preloadTimer = null
+  }
+}
 
 const preloadImageFile = (item?: FilePreviewItem) => {
   if (!item || !item.url) return
@@ -110,10 +139,19 @@ const preloadImageFile = (item?: FilePreviewItem) => {
     ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'].some((ext) =>
       item.name.toLowerCase().endsWith(ext),
     )
-  if (isImage && !preloadedUrls.has(item.url)) {
-    preloadedUrls.add(item.url)
+  if (!isImage) return
+
+  const isItemSvg =
+    item.mimeType === 'image/svg+xml' ||
+    item.name.toLowerCase().endsWith('.svg')
+  const targetUrl = isItemSvg
+    ? item.url
+    : `${item.url}${item.url.includes('?') ? '&' : '?'}preview=1`
+
+  if (!preloadedUrls.has(targetUrl)) {
+    preloadedUrls.add(targetUrl)
     const img = new Image()
-    img.src = item.url
+    img.src = targetUrl
   }
 }
 
@@ -128,14 +166,19 @@ const preloadNeighbors = () => {
   }
 }
 
+const handleActiveImageLoaded = () => {
+  clearPreloadTimer()
+  // Wait 600ms idle delay before preloading neighbor so current view gets 100% bandwidth
+  preloadTimer = setTimeout(() => {
+    preloadNeighbors()
+  }, 600)
+}
+
 watch(
-  () => [props.visible, currentIndex.value],
-  ([visible]) => {
-    if (visible) {
-      preloadNeighbors()
-    }
+  () => [props.visible, activeFile.value?.id],
+  () => {
+    clearPreloadTimer()
   },
-  { immediate: true },
 )
 
 const hasPrev = computed(() => currentIndex.value > 0)
@@ -243,6 +286,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearPreloadTimer()
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('popstate', handlePopState)
 })
@@ -334,9 +378,11 @@ onBeforeUnmount(() => {
           <!-- Image -->
           <ImageViewer
             v-if="previewType === 'image'"
-            :src="activeFile.url || ''"
+            :src="activeImageSrc"
+            :original-src="activeImageOriginalSrc"
             :name="activeFile.name"
             :thumb="activeImageThumb"
+            @loaded="handleActiveImageLoaded"
           />
 
           <!-- Video -->

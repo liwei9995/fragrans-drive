@@ -741,6 +741,47 @@ pub async fn get_file(
 
     let service = StorageService::new(repo, state.local_storage.clone());
 
+    let is_preview = params
+        .get_str("preview")
+        .map(|p| p == "1" || p.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if is_preview {
+        if let Ok((preview_data, preview_mime)) =
+            service.get_or_generate_preview(&id, &owner_user_id).await
+        {
+            use axum::http::header::{
+                ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
+                REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
+            };
+            let mut res_headers = axum::http::HeaderMap::new();
+            res_headers.insert(CONTENT_TYPE, preview_mime.parse().unwrap());
+            res_headers.insert(CONTENT_LENGTH, preview_data.len().to_string().parse().unwrap());
+            let disposition = build_content_disposition("inline", &existing.name);
+            res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
+            let now = chrono::Utc::now().timestamp() as usize;
+            let max_age = token_exp.saturating_sub(now).clamp(60, 86400);
+            res_headers.insert(
+                CACHE_CONTROL,
+                format!("private, max-age={}", max_age).parse().unwrap(),
+            );
+            res_headers.insert(
+                axum::http::HeaderName::from_static("content-security-policy"),
+                "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
+            );
+            res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
+            res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+            res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
+
+            return Ok((
+                axum::http::StatusCode::OK,
+                res_headers,
+                axum::body::Body::from(preview_data),
+            )
+                .into_response());
+        }
+    }
+
     let (filename, mime_type, total_size, range_len, stream) = service
         .stream_file_content(id, owner_user_id, range_start, range_end)
         .await?;
@@ -791,7 +832,7 @@ pub async fn get_file(
         axum::http::StatusCode::OK
     };
 
-    Ok((status, res_headers, axum::body::Body::from_stream(stream)))
+    Ok((status, res_headers, axum::body::Body::from_stream(stream)).into_response())
 }
 
 #[utoipa::path(
@@ -1125,6 +1166,55 @@ async fn get_public_file_impl(
         .clone()
         .unwrap_or_else(|| "application/octet-stream".to_string());
     let total_size = existing.size.unwrap_or(0) as u64;
+
+    let is_preview = params
+        .get_str("preview")
+        .map(|p| p == "1" || p.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if is_preview {
+        let service = StorageService::new(repo.clone(), state.local_storage.clone());
+        if let Some(file_id) = existing.id {
+            if let Ok((preview_data, preview_mime)) = service
+                .get_or_generate_preview(&file_id.to_hex(), &existing.user_id)
+                .await
+            {
+                use axum::http::header::{
+                    ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH,
+                    CONTENT_TYPE, ETAG, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
+                };
+                let mut res_headers = axum::http::HeaderMap::new();
+                res_headers.insert(CONTENT_TYPE, preview_mime.parse().unwrap());
+                res_headers.insert(CONTENT_LENGTH, preview_data.len().to_string().parse().unwrap());
+                let disposition = build_content_disposition("inline", &filename);
+                res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
+                res_headers.insert(
+                    CACHE_CONTROL,
+                    "public, max-age=86400, stale-while-revalidate=3600"
+                        .parse()
+                        .unwrap(),
+                );
+                res_headers.insert(ETAG, etag_header_val.parse().unwrap());
+                res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+                res_headers.insert(
+                    axum::http::HeaderName::from_static("content-security-policy"),
+                    "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
+                );
+                res_headers.insert(
+                    REFERRER_POLICY,
+                    "strict-origin-when-cross-origin".parse().unwrap(),
+                );
+                res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
+
+                return Ok((
+                    axum::http::StatusCode::OK,
+                    res_headers,
+                    axum::body::Body::from(preview_data),
+                )
+                    .into_response());
+            }
+        }
+    }
 
     let disposition_type = if !force_download && is_safe_inline_mime(&mime_type) {
         "inline"

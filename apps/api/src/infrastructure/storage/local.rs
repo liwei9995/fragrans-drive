@@ -88,6 +88,17 @@ impl LocalStorage {
         Ok(path)
     }
 
+    pub fn get_preview_path(&self, user_id: &str, sha256_hash: &str) -> Result<PathBuf, StorageIoError> {
+        let mut path = self.get_path(user_id, sha256_hash)?;
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| StorageIoError::Format("Invalid path".into()))?
+            .to_string_lossy()
+            .to_string();
+        path.set_file_name(format!("{}.preview", file_name));
+        Ok(path)
+    }
+
     pub async fn store_from_async_read<R: tokio::io::AsyncRead + Unpin>(
         &self,
         user_id: &str,
@@ -356,7 +367,12 @@ impl LocalStorage {
     pub async fn remove(&self, user_id: &str, content_hash: &str) -> Result<(), StorageIoError> {
         let path = self.get_path(user_id, content_hash)?;
         if path.exists() {
-            fs::remove_file(path).await?;
+            fs::remove_file(&path).await?;
+        }
+        if let Ok(preview_path) = self.get_preview_path(user_id, content_hash) {
+            if preview_path.exists() {
+                let _ = fs::remove_file(preview_path).await;
+            }
         }
         Ok(())
     }
@@ -651,6 +667,17 @@ pub mod legacy {
             p.push(&md5_hash[4..6]);
             p.push(md5_hash);
             Ok(p)
+        }
+
+        pub fn get_legacy_preview_path(&self, md5_hash: &str) -> Result<std::path::PathBuf, StorageIoError> {
+            let mut path = self.get_legacy_path(md5_hash)?;
+            let file_name = path
+                .file_name()
+                .ok_or_else(|| StorageIoError::Format("Invalid path".into()))?
+                .to_string_lossy()
+                .to_string();
+            path.set_file_name(format!("{}.preview", file_name));
+            Ok(path)
         }
 
         pub async fn fetch(
