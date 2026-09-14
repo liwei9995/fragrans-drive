@@ -40,6 +40,9 @@ const imageSrc = ref(props.src)
 const isShowingOriginal = ref(false)
 const loadingOriginal = ref(false)
 
+const thumbWidth = ref(0)
+const thumbHeight = ref(0)
+
 const hasRealThumb = computed(() => {
   if (!props.thumb) return false
   const t = props.thumb.toLowerCase()
@@ -54,14 +57,48 @@ const hasRealThumb = computed(() => {
   return true
 })
 
-const transformStyle = computed(() => {
+const handleThumbLoaded = (e: Event) => {
+  const img = e.target as HTMLImageElement
+  if (img.naturalWidth && img.naturalHeight) {
+    thumbWidth.value = img.naturalWidth
+    thumbHeight.value = img.naturalHeight
+  }
+}
+
+const currentAspect = computed(() => {
+  if (naturalWidth.value && naturalHeight.value) {
+    return naturalWidth.value / naturalHeight.value
+  }
+  if (thumbWidth.value && thumbHeight.value) {
+    return thumbWidth.value / thumbHeight.value
+  }
+  return null
+})
+
+const stageStyle = computed(() => {
   const sx = flipH.value ? -1 : 1
   const sy = flipV.value ? -1 : 1
-  return {
+  const style: Record<string, string> = {
     transform: `translate(${position.value.x}px, ${position.value.y}px) scale(${scale.value}) rotate(${rotate.value}deg) scale(${sx}, ${sy})`,
     cursor:
       scale.value > 1 ? (isDragging.value ? 'grabbing' : 'grab') : 'default',
   }
+  if (currentAspect.value) {
+    style.aspectRatio = `${currentAspect.value}`
+    if (naturalWidth.value && naturalHeight.value) {
+      style.width = `min(${naturalWidth.value}px, min(90vw, calc(85vh * ${currentAspect.value})))`
+      style.height = `min(${naturalHeight.value}px, min(85vh, calc(90vw / ${currentAspect.value})))`
+    } else {
+      style.width = `min(90vw, calc(85vh * ${currentAspect.value}))`
+      style.height = `min(85vh, calc(90vw / ${currentAspect.value}))`
+    }
+  } else {
+    style.width = 'auto'
+    style.height = 'auto'
+    style.maxWidth = '90%'
+    style.maxHeight = '85%'
+  }
+  return style
 })
 
 const resetTransform = () => {
@@ -73,8 +110,8 @@ const resetTransform = () => {
 }
 
 watch(
-  () => [props.src, props.originalSrc],
-  ([newSrc, newOrig]) => {
+  () => [props.src, props.originalSrc, props.thumb],
+  ([newSrc, newOrig, newThumb]) => {
     imageSrc.value = newSrc
     isShowingOriginal.value = Boolean(newOrig && newSrc === newOrig)
     loadingOriginal.value = false
@@ -83,7 +120,20 @@ watch(
     loadError.value = false
     naturalWidth.value = 0
     naturalHeight.value = 0
+    thumbWidth.value = 0
+    thumbHeight.value = 0
     resetTransform()
+
+    if (newThumb && hasRealThumb.value) {
+      const img = new Image()
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          thumbWidth.value = img.naturalWidth
+          thumbHeight.value = img.naturalHeight
+        }
+      }
+      img.src = newThumb
+    }
   },
   { immediate: true },
 )
@@ -198,29 +248,35 @@ onBeforeUnmount(() => {
         <button class="retry-btn" @click="handleRetry">重新加载</button>
       </div>
 
-      <!-- Thumbnail / LQIP layer: shown immediately while high-res image is loading -->
-      <img
-        v-if="hasRealThumb && !loadError"
-        :src="thumb"
-        :alt="name"
-        class="preview-image preview-thumb"
-        :class="{ 'is-fading-out': highResLoaded }"
-        :style="transformStyle"
-        draggable="false"
-      />
-
-      <!-- High-Res Original: rendered immediately, fades in smoothly once loaded -->
-      <img
+      <!-- Stage container shrinkwrapped to photo aspect ratio -->
+      <div
         v-show="!loadError"
-        :src="imageSrc"
-        :alt="name"
-        class="preview-image main-image"
-        :class="{ 'is-loading': !highResLoaded }"
-        :style="transformStyle"
-        draggable="false"
-        @load="handleImageLoaded"
-        @error="handleImageError"
-      />
+        class="image-stage"
+        :class="{ 'is-invisible': loading && !hasRealThumb }"
+        :style="stageStyle"
+      >
+        <!-- Thumbnail / LQIP layer: shown immediately while high-res image is loading -->
+        <img
+          v-if="hasRealThumb"
+          :src="thumb"
+          :alt="name"
+          class="preview-image preview-thumb"
+          :class="{ 'is-fading-out': highResLoaded }"
+          draggable="false"
+          @load="handleThumbLoaded"
+        />
+
+        <!-- High-Res Original: rendered immediately, fades in smoothly once loaded -->
+        <img
+          :src="imageSrc"
+          :alt="name"
+          class="preview-image main-image"
+          :class="{ 'is-loading': !highResLoaded }"
+          draggable="false"
+          @load="handleImageLoaded"
+          @error="handleImageError"
+        />
+      </div>
 
       <!-- Non-blocking floating status badge when previewing with thumbnail placeholder -->
       <div v-if="loading && hasRealThumb && !loadError" class="image-loading-badge">
@@ -306,37 +362,51 @@ onBeforeUnmount(() => {
     justify-content: center;
     overflow: hidden;
 
-    .preview-image {
-      width: 90%;
-      height: 85%;
-      max-width: 90%;
-      max-height: 85%;
-      object-fit: contain;
-      transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1);
-      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    .image-stage {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border-radius: 6px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+      transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease;
+      overflow: hidden;
 
-      &.preview-thumb {
-        position: absolute;
-        filter: blur(8px);
-        transform-origin: center center;
-        opacity: 1;
-        transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.35s ease;
-
-        &.is-fading-out {
-          opacity: 0;
-          pointer-events: none;
-        }
+      &.is-invisible {
+        opacity: 0;
+        pointer-events: none;
       }
 
-      &.main-image {
-        position: relative;
-        opacity: 1;
-        transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease;
+      .preview-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
 
-        &.is-loading {
-          opacity: 0;
-          pointer-events: none;
+        &.preview-thumb {
+          position: absolute;
+          inset: 0;
+          filter: blur(8px);
+          transform: scale(1.05);
+          transform-origin: center center;
+          opacity: 1;
+          transition: opacity 0.35s ease;
+          box-shadow: none;
+
+          &.is-fading-out {
+            opacity: 0;
+            pointer-events: none;
+          }
+        }
+
+        &.main-image {
+          position: relative;
+          opacity: 1;
+          transition: opacity 0.3s ease;
+
+          &.is-loading {
+            opacity: 0;
+            pointer-events: none;
+          }
         }
       }
     }
@@ -511,7 +581,7 @@ onBeforeUnmount(() => {
     background: radial-gradient(circle at 50% 50%, rgba(248, 250, 252, 0.8) 0%, rgba(226, 232, 240, 0.9) 100%);
 
     .image-viewport {
-      .preview-image {
+      .image-stage {
         box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
       }
 
