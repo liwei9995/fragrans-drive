@@ -18,7 +18,7 @@ import type { FilePreviewItem } from './types'
 import AudioViewer from './viewers/AudioViewer.vue'
 import CodeTextViewer from './viewers/CodeTextViewer.vue'
 import CsvViewer from './viewers/CsvViewer.vue'
-import ImageViewer from './viewers/ImageViewer.vue'
+import ImageViewer, { aspectCache } from './viewers/ImageViewer.vue'
 import MarkdownViewer from './viewers/MarkdownViewer.vue'
 import PdfViewer from './viewers/PdfViewer.vue'
 import UnsupportedViewer from './viewers/UnsupportedViewer.vue'
@@ -148,9 +148,41 @@ const preloadImageFile = (item?: FilePreviewItem) => {
     ? item.url
     : `${item.url}${item.url.includes('?') ? '&' : '?'}preview=1`
 
+  // Preload thumbnail eagerly to calculate and cache aspect ratio ahead of time
+  const thumbUrl = item.thumbnail
+    ? toProxyStorageUrl(item.thumbnail)
+    : item.thumb &&
+        !item.thumb.includes('assets/icons/') &&
+        !item.thumb.includes('file_unknown') &&
+        !item.thumb.includes('file_image') &&
+        !item.thumb.includes('img.alicdn.com')
+      ? item.thumb
+      : ''
+
+  if (thumbUrl && !aspectCache.has(thumbUrl)) {
+    const thumbImg = new Image()
+    thumbImg.onload = () => {
+      if (thumbImg.naturalWidth && thumbImg.naturalHeight) {
+        const ar = thumbImg.naturalWidth / thumbImg.naturalHeight
+        aspectCache.set(thumbUrl, ar)
+        aspectCache.set(targetUrl, ar)
+        if (item.url) aspectCache.set(item.url, ar)
+      }
+    }
+    thumbImg.src = thumbUrl
+  }
+
   if (!preloadedUrls.has(targetUrl)) {
     preloadedUrls.add(targetUrl)
     const img = new Image()
+    img.onload = () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        const ar = img.naturalWidth / img.naturalHeight
+        aspectCache.set(targetUrl, ar)
+        if (item.url) aspectCache.set(item.url, ar)
+        if (thumbUrl) aspectCache.set(thumbUrl, ar)
+      }
+    }
     img.src = targetUrl
   }
 }

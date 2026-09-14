@@ -1,3 +1,8 @@
+<script lang="ts">
+// Module-level persistent cache so aspect ratios persist across all switches and modal re-opens
+export const aspectCache = new Map<string, number>()
+</script>
+
 <script setup lang="ts">
 import {
   FullScreen,
@@ -40,8 +45,7 @@ const imageSrc = ref(props.src)
 const isShowingOriginal = ref(false)
 const loadingOriginal = ref(false)
 
-const thumbWidth = ref(0)
-const thumbHeight = ref(0)
+const aspectRatio = ref<number | null>(null)
 
 const hasRealThumb = computed(() => {
   if (!props.thumb) return false
@@ -60,20 +64,14 @@ const hasRealThumb = computed(() => {
 const handleThumbLoaded = (e: Event) => {
   const img = e.target as HTMLImageElement
   if (img.naturalWidth && img.naturalHeight) {
-    thumbWidth.value = img.naturalWidth
-    thumbHeight.value = img.naturalHeight
+    const ar = img.naturalWidth / img.naturalHeight
+    if (props.thumb) aspectCache.set(props.thumb, ar)
+    if (props.src) aspectCache.set(props.src, ar)
+    if (!aspectRatio.value) {
+      aspectRatio.value = ar
+    }
   }
 }
-
-const currentAspect = computed(() => {
-  if (naturalWidth.value && naturalHeight.value) {
-    return naturalWidth.value / naturalHeight.value
-  }
-  if (thumbWidth.value && thumbHeight.value) {
-    return thumbWidth.value / thumbHeight.value
-  }
-  return null
-})
 
 const stageStyle = computed(() => {
   const sx = flipH.value ? -1 : 1
@@ -83,20 +81,16 @@ const stageStyle = computed(() => {
     cursor:
       scale.value > 1 ? (isDragging.value ? 'grabbing' : 'grab') : 'default',
   }
-  if (currentAspect.value) {
-    style.aspectRatio = `${currentAspect.value}`
-    if (naturalWidth.value && naturalHeight.value) {
-      style.width = `min(${naturalWidth.value}px, min(90vw, calc(85vh * ${currentAspect.value})))`
-      style.height = `min(${naturalHeight.value}px, min(85vh, calc(90vw / ${currentAspect.value})))`
-    } else {
-      style.width = `min(90vw, calc(85vh * ${currentAspect.value}))`
-      style.height = `min(85vh, calc(90vw / ${currentAspect.value}))`
-    }
+  const ar = aspectRatio.value
+  if (ar) {
+    style.aspectRatio = `${ar}`
+    style.width = `min(90vw, calc(85vh * ${ar}))`
+    style.height = `min(85vh, calc(90vw / ${ar}))`
   } else {
-    style.width = 'auto'
-    style.height = 'auto'
-    style.maxWidth = '90%'
-    style.maxHeight = '85%'
+    // When aspect ratio is pending on initial open, keep hidden so it never flashes an oversized box
+    style.opacity = '0'
+    style.pointerEvents = 'none'
+    style.visibility = 'hidden'
   }
   return style
 })
@@ -120,16 +114,29 @@ watch(
     loadError.value = false
     naturalWidth.value = 0
     naturalHeight.value = 0
-    thumbWidth.value = 0
-    thumbHeight.value = 0
     resetTransform()
 
+    // 1. Check persistent aspect ratio cache immediately (synchronous!)
+    const cachedAspect =
+      (newThumb && aspectCache.get(newThumb)) ||
+      (newSrc && aspectCache.get(newSrc)) ||
+      null
+
+    if (cachedAspect) {
+      aspectRatio.value = cachedAspect
+    }
+
+    // 2. Preload thumbnail eagerly to resolve aspect ratio if not in cache
     if (newThumb && hasRealThumb.value) {
       const img = new Image()
       img.onload = () => {
         if (img.naturalWidth && img.naturalHeight) {
-          thumbWidth.value = img.naturalWidth
-          thumbHeight.value = img.naturalHeight
+          const ar = img.naturalWidth / img.naturalHeight
+          aspectCache.set(newThumb, ar)
+          if (newSrc) aspectCache.set(newSrc, ar)
+          if (!naturalWidth.value) {
+            aspectRatio.value = ar
+          }
         }
       }
       img.src = newThumb
@@ -202,6 +209,13 @@ const handleImageLoaded = (e: Event) => {
   const img = e.target as HTMLImageElement
   naturalWidth.value = img.naturalWidth
   naturalHeight.value = img.naturalHeight
+  if (img.naturalWidth && img.naturalHeight) {
+    const ar = img.naturalWidth / img.naturalHeight
+    if (props.src) aspectCache.set(props.src, ar)
+    if (props.thumb) aspectCache.set(props.thumb, ar)
+    if (props.originalSrc) aspectCache.set(props.originalSrc, ar)
+    aspectRatio.value = ar
+  }
   emit('loaded')
 }
 
@@ -369,7 +383,11 @@ onBeforeUnmount(() => {
       justify-content: center;
       border-radius: 6px;
       box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
-      transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease;
+      transition:
+        width 0.25s cubic-bezier(0.2, 0, 0, 1),
+        height 0.25s cubic-bezier(0.2, 0, 0, 1),
+        transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+        opacity 0.25s ease;
       overflow: hidden;
 
       &.is-invisible {

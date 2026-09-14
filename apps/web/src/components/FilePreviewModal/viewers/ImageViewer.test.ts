@@ -193,4 +193,44 @@ describe('ImageViewer', () => {
     expect(viewOriginalBtn.text()).toContain('已是原图')
     expect(viewOriginalBtn.classes()).toContain('active')
   })
+
+  it('preserves and caches aspect ratio across switching to eliminate stage flash', async () => {
+    const wrapper = mount(ImageViewer, {
+      props: {
+        src: '/api/v1/storage/photo_1.jpg',
+        name: 'photo_1.jpg',
+        thumb: '/api/v1/storage/photo_1_thumb.jpg',
+      },
+      global: {
+        stubs: commonStubs,
+      },
+    })
+
+    const thumbImg = wrapper.find('.preview-thumb')
+    Object.defineProperty(thumbImg.element, 'naturalWidth', {
+      value: 800,
+      configurable: true,
+    })
+    Object.defineProperty(thumbImg.element, 'naturalHeight', {
+      value: 600,
+      configurable: true,
+    })
+    await thumbImg.trigger('load')
+
+    const stage = wrapper.find('.image-stage')
+    const initialStyle = stage.attributes('style')
+    expect(initialStyle).toContain('aspect-ratio: 1.3333')
+
+    // Switch to photo_2 with known cached thumb
+    await wrapper.setProps({
+      src: '/api/v1/storage/photo_2.jpg',
+      name: 'photo_2.jpg',
+      thumb: '/api/v1/storage/photo_2_thumb.jpg',
+    })
+
+    // Notice that style never collapses to 0 or resets to auto/max-width: 90%
+    const switchedStyle = wrapper.find('.image-stage').attributes('style')
+    expect(switchedStyle).not.toContain('width: auto')
+    expect(switchedStyle).not.toContain('max-width: 90%')
+  })
 })
