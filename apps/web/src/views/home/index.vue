@@ -332,14 +332,17 @@ const handleTrashRestored = () => {
   })
 }
 
-const download = async (id: string, filename?: string) => {
+const download = async (id: string, _filename?: string) => {
   try {
     const url = await getDownloadUrl(id)
     const href = toDownloadHref(url)
 
+    // Rely on Content-Disposition: attachment from ?download=1.
+    // Avoid the download attribute — with CSP sandbox responses Chrome can
+    // abort the transfer and show "Site wasn't available".
     const a = document.createElement('a')
     a.href = href
-    a.download = filename || id
+    a.rel = 'noopener'
     a.style.display = 'none'
     document.body.appendChild(a)
     a.click()

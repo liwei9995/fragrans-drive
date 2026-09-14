@@ -14,3 +14,20 @@ export function toProxyStorageUrl(url: string | undefined): string {
 export function toDownloadHref(url: unknown): string {
   return toProxyStorageUrl(String(url ?? '').replace(/^"|"$/g, ''))
 }
+
+/** Ensure a download-forcing query flag is present. */
+export function withDownloadParam(url: string): string {
+  if (!url || /[?&]download=/.test(url)) return url
+  return url.includes('?') ? `${url}&download=1` : `${url}?download=1`
+}
+
+/** Absolute URL suitable for clipboard paste outside the SPA. */
+export function toClipboardUrl(url: unknown): string {
+  const href = toDownloadHref(url)
+  if (!href) return ''
+  if (href.startsWith('http://') || href.startsWith('https://')) return href
+  if (href.startsWith('/') && typeof window !== 'undefined') {
+    return `${window.location.origin}${href}`
+  }
+  return href
+}

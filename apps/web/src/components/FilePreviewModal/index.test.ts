@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import FilePreviewModal from './index.vue'
 import type { FilePreviewItem } from './types'
 
@@ -144,5 +145,60 @@ describe('FilePreviewModal', () => {
 
     expect(wrapper.find('.type-badge').text()).toBe('CSV')
     expect(wrapper.findComponent({ name: 'CsvViewer' }).exists()).toBe(true)
+  })
+
+  it('emits close when browser back (popstate) fires while preview is open', async () => {
+    const pushStateSpy = vi.spyOn(window.history, 'pushState')
+
+    const wrapper = mount(FilePreviewModal, {
+      props: {
+        visible: false,
+        file: mockFile,
+      },
+      global: {
+        stubs: commonStubs,
+      },
+    })
+
+    await wrapper.setProps({ visible: true })
+    await nextTick()
+
+    expect(pushStateSpy).toHaveBeenCalled()
+    expect(
+      (pushStateSpy.mock.calls.at(-1)?.[0] as { filePreview?: boolean })
+        ?.filePreview,
+    ).toBe(true)
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await nextTick()
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+
+    pushStateSpy.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('pops history when preview is closed via UI after being opened', async () => {
+    const backSpy = vi.spyOn(window.history, 'back')
+
+    const wrapper = mount(FilePreviewModal, {
+      props: {
+        visible: false,
+        file: mockFile,
+      },
+      global: {
+        stubs: commonStubs,
+      },
+    })
+
+    await wrapper.setProps({ visible: true })
+    await nextTick()
+    await wrapper.setProps({ visible: false })
+    await nextTick()
+
+    expect(backSpy).toHaveBeenCalled()
+
+    backSpy.mockRestore()
+    wrapper.unmount()
   })
 })

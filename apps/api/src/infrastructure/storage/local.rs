@@ -623,8 +623,8 @@ impl LocalStorage {
     }
 }
 pub mod legacy {
-    use super::{LocalStorage, StorageIoError};
-    use ctr::cipher::{KeyIvInit, StreamCipher};
+    use super::{LocalStorage, StorageIoError, StorageStream};
+    use ctr::cipher::{KeyIvInit, StreamCipher, StreamCipherSeek};
 
     pub struct LegacyReader<'a> {
         storage: &'a LocalStorage,
@@ -685,6 +685,97 @@ pub mod legacy {
             }
 
             Ok(Some(data))
+        }
+
+        pub async fn stream(
+            &self,
+            md5_hash: &str,
+            iv: Option<&str>,
+            range_start: u64,
+            range_end: Option<u64>,
+        ) -> Result<Option<(u64, u64, StorageStream)>, StorageIoError> {
+            let path = self.get_legacy_path(md5_hash)?;
+            if !path.exists() {
+                return Ok(None);
+            }
+
+            let mut in_file = tokio::fs::File::open(path).await?;
+            let total_len = in_file.metadata().await?.len();
+            if total_len == 0 {
+                let stream: StorageStream =
+                    Box::pin(futures::stream::empty());
+                return Ok(Some((0, 0, stream)));
+            }
+
+            let actual_end = std::cmp::min(
+                range_end.unwrap_or(total_len.saturating_sub(1)),
+                total_len.saturating_sub(1),
+            );
+            let range_start = std::cmp::min(range_start, total_len);
+            let range_len = if range_start <= actual_end {
+                actual_end - range_start + 1
+            } else {
+                0
+            };
+
+            use std::io::SeekFrom;
+            use tokio::io::AsyncSeekExt;
+            in_file.seek(SeekFrom::Start(range_start)).await?;
+
+            let cipher = if let Some(iv_str) = iv {
+                let mut iv_bytes = [0u8; 16];
+                if hex::decode_to_slice(iv_str, &mut iv_bytes).is_err() {
+                    return Err(StorageIoError::Format("Invalid IV hex".into()));
+                }
+
+                let key = aes::cipher::generic_array::GenericArray::from_slice(md5_hash.as_bytes());
+                let mut c = ctr::Ctr128BE::<aes::Aes256>::new(key, &iv_bytes.into());
+                c.seek(range_start);
+                Some(c)
+            } else {
+                None
+            };
+
+            struct LegacyStreamState {
+                in_file: tokio::fs::File,
+                cipher: Option<ctr::Ctr128BE<aes::Aes256>>,
+                remaining: u64,
+            }
+
+            let state = LegacyStreamState {
+                in_file,
+                cipher,
+                remaining: range_len,
+            };
+
+            use tokio::io::AsyncReadExt;
+            let stream: StorageStream = Box::pin(futures::stream::unfold(state, |mut s| async move {
+                if s.remaining == 0 {
+                    return None;
+                }
+
+                let to_read = std::cmp::min(s.remaining, 64 * 1024) as usize;
+                let mut buf = vec![0u8; to_read];
+                match s.in_file.read_exact(&mut buf).await {
+                    Ok(_) => {
+                        if let Some(c) = s.cipher.as_mut() {
+                            c.apply_keystream(&mut buf);
+                        }
+                        s.remaining -= to_read as u64;
+                        Some((Ok(axum::body::Bytes::from(buf)), s))
+                    }
+                    Err(e) => Some((
+                        Err(StorageIoError::Io(e)),
+                        LegacyStreamState {
+                            in_file: s.in_file,
+                            cipher: None,
+                            remaining: 0,
+                        },
+                    )),
+                }
+            }));
+
+            Ok(Some((total_len, range_len, stream)))
         }
     }
 }

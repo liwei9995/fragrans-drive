@@ -680,45 +680,11 @@ impl StorageService {
                     .map_err(|e| AppError::InternalError(e.to_string()))?;
                 return Ok((filename, mime, total_len, range_len, stream));
             } else if let Some(md5_hash) = item.md5_hash {
-                // Deprecated compatibility path. Legacy files are bounded in memory and should
-                // be migrated to v1 as soon as possible.
-                let data = LegacyReader::new(&self.local_storage)
-                    .fetch(&md5_hash, item.iv.as_deref(), Some(100 * 1024 * 1024))
+                let (total_len, range_len, stream) = LegacyReader::new(&self.local_storage)
+                    .stream(&md5_hash, item.iv.as_deref(), range_start, range_end)
                     .await
                     .map_err(|error| AppError::InternalError(error.to_string()))?
                     .ok_or_else(|| AppError::NotFound("File not found".into()))?;
-
-                use md5::Digest;
-                let mut hasher = md5::Md5::new();
-                hasher.update(&data);
-                if hex::encode(hasher.finalize()) != md5_hash {
-                    return Err(AppError::InternalError(
-                        "Legacy object failed integrity verification".into(),
-                    ));
-                }
-
-                let total_len = data.len() as u64;
-                let actual_end = std::cmp::min(
-                    range_end.unwrap_or(total_len.saturating_sub(1)),
-                    total_len.saturating_sub(1),
-                );
-                let range_start = std::cmp::min(range_start, total_len);
-                let range_len = if range_start <= actual_end {
-                    actual_end - range_start + 1
-                } else {
-                    0
-                };
-
-                let stream: StorageStream = Box::pin(futures::stream::once(async move {
-                    if range_start < total_len {
-                        Ok(axum::body::Bytes::from(
-                            data[(range_start as usize)..((range_start + range_len) as usize)]
-                                .to_vec(),
-                        ))
-                    } else {
-                        Ok(axum::body::Bytes::new())
-                    }
-                }));
                 return Ok((filename, mime, total_len, range_len, stream));
             }
         }

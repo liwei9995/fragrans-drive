@@ -8,10 +8,17 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, ref } from 'vue'
+import { getDownloadUrl } from '@/api/modules/storage'
+import {
+  toClipboardUrl,
+  toDownloadHref,
+  withDownloadParam,
+} from '@/utils/storageUrl'
 import { formatDate, formatFileSize } from '../previewHelper'
 
 interface Props {
   name: string
+  fileId?: string
   size?: number
   extName?: string
   mimeType?: string
@@ -24,6 +31,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   name: '',
+  fileId: '',
   size: 0,
   extName: '',
   mimeType: '',
@@ -37,6 +45,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<(e: 'download') => void>()
 
 const copied = ref(false)
+const copying = ref(false)
 
 const OFFICE_EXTS = new Set(['docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt'])
 const isOfficeDoc = computed(() => {
@@ -58,10 +67,26 @@ const handleOpenOfficeOnline = () => {
 const formattedSize = computed(() => formatFileSize(props.size))
 const formattedDate = computed(() => formatDate(props.updatedAt))
 
+const resolveCopyUrl = async () => {
+  if (props.publicUrl) {
+    return withDownloadParam(props.publicUrl)
+  }
+  if (props.fileId) {
+    return toDownloadHref(await getDownloadUrl(props.fileId))
+  }
+  if (props.downloadUrl) {
+    return withDownloadParam(props.downloadUrl)
+  }
+  return ''
+}
+
 const handleCopyLink = async () => {
-  const targetUrl = props.publicUrl || props.downloadUrl
-  if (!targetUrl) return
+  if (copying.value) return
+  copying.value = true
   try {
+    const raw = await resolveCopyUrl()
+    const targetUrl = toClipboardUrl(raw)
+    if (!targetUrl) return
     await navigator.clipboard.writeText(targetUrl)
     copied.value = true
     ElMessage.success('已复制下载链接')
@@ -70,6 +95,8 @@ const handleCopyLink = async () => {
     }, 2000)
   } catch {
     ElMessage.error('复制链接失败')
+  } finally {
+    copying.value = false
   }
 }
 </script>
@@ -131,9 +158,10 @@ const handleCopyLink = async () => {
           立即下载文件
         </el-button>
         <el-button
-          v-if="downloadUrl || publicUrl"
+          v-if="fileId || downloadUrl || publicUrl"
           size="large"
           class="link-btn"
+          :loading="copying"
           @click="handleCopyLink"
         >
           <el-icon>
@@ -174,11 +202,15 @@ const handleCopyLink = async () => {
     .icon-section {
       position: relative;
       margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
 
       .thumb-img {
         width: 80px;
         height: 80px;
         object-fit: contain;
+        display: block;
       }
 
       .fallback-icon {
@@ -272,6 +304,14 @@ const handleCopyLink = async () => {
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
         padding: 8px 12px;
+      }
+
+      .office-btn,
+      .dl-btn,
+      .link-btn {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
       }
 
       .dl-btn {

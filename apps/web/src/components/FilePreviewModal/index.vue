@@ -120,6 +120,51 @@ const handleOpenInNewTab = () => {
   }
 }
 
+// Sync fullscreen preview with browser history so Back closes the overlay
+// instead of navigating the underlying folder route while the modal stays open.
+const PREVIEW_HISTORY_KEY = 'filePreview'
+let previewHistoryPushed = false
+let closingFromPopstate = false
+
+const handlePopState = () => {
+  if (!props.visible) return
+  closingFromPopstate = true
+  previewHistoryPushed = false
+  handleClose()
+}
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      if (!previewHistoryPushed) {
+        history.pushState(
+          {
+            ...(history.state && typeof history.state === 'object'
+              ? history.state
+              : {}),
+            [PREVIEW_HISTORY_KEY]: true,
+          },
+          '',
+        )
+        previewHistoryPushed = true
+      }
+      return
+    }
+
+    if (closingFromPopstate) {
+      closingFromPopstate = false
+      return
+    }
+
+    if (previewHistoryPushed) {
+      previewHistoryPushed = false
+      history.back()
+    }
+  },
+  { immediate: true },
+)
+
 const handleGlobalKeydown = (e: KeyboardEvent) => {
   if (!props.visible) return
 
@@ -138,10 +183,12 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('popstate', handlePopState)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('popstate', handlePopState)
 })
 </script>
 
@@ -204,7 +251,7 @@ onBeforeUnmount(() => {
           <!-- Right: Actions & Close -->
           <div class="header-actions">
             <el-tooltip v-if="activeFile.url" content="在浏览器独立标签页打开" placement="bottom">
-              <button class="action-btn" @click="handleOpenInNewTab">
+              <button class="action-btn icon-only" @click="handleOpenInNewTab">
                 <el-icon :size="16"><TopRight /></el-icon>
               </button>
             </el-tooltip>
@@ -219,7 +266,7 @@ onBeforeUnmount(() => {
             <div class="divider"></div>
 
             <el-tooltip content="关闭预览 (Esc)" placement="bottom">
-              <button class="action-btn close-btn" @click="handleClose">
+              <button class="action-btn icon-only close-btn" @click="handleClose">
                 <el-icon :size="18"><Close /></el-icon>
               </button>
             </el-tooltip>
@@ -288,6 +335,7 @@ onBeforeUnmount(() => {
           <UnsupportedViewer
             v-else
             :name="activeFile.name"
+            :file-id="activeFile.id"
             :size="activeFile.size"
             :ext-name="activeFile.extName"
             :mime-type="activeFile.mimeType"
@@ -379,6 +427,7 @@ onBeforeUnmount(() => {
           height: 24px;
           object-fit: contain;
           flex-shrink: 0;
+          display: block;
         }
 
         .header-fallback-icon {
@@ -500,8 +549,14 @@ onBeforeUnmount(() => {
             padding: 0 6px;
             font-size: 12px;
 
+            &.icon-only {
+              width: 28px;
+              padding: 0;
+            }
+
             &.download-btn {
-              padding: 0 8px;
+              width: 28px;
+              padding: 0;
 
               span {
                 display: none;
@@ -515,8 +570,9 @@ onBeforeUnmount(() => {
         }
 
         .action-btn {
-          display: flex;
+          display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
           height: 32px;
           padding: 0 10px;
@@ -529,6 +585,19 @@ onBeforeUnmount(() => {
           transition: all 0.2s ease;
           white-space: nowrap;
           flex-shrink: 0;
+          line-height: 1;
+
+          :deep(.el-icon) {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+          }
+
+          &.icon-only {
+            width: 32px;
+            padding: 0;
+          }
 
           &:hover {
             background: rgba(255, 255, 255, 0.12);
@@ -548,7 +617,6 @@ onBeforeUnmount(() => {
           }
 
           &.close-btn {
-            padding: 0 8px;
             background: transparent;
             border-color: transparent;
 

@@ -178,6 +178,127 @@ async fn legacy_file_remains_downloadable_before_migration() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(response_bytes(response).await.as_ref(), content);
 
+    // Also verify range request on legacy encrypted file
+    let range_response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/v1/storage/{file_id_hex}?token={download_token}"))
+                .header(axum::http::header::RANGE, "bytes=2-6")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(range_response.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(response_bytes(range_response).await.as_ref(), &content[2..=6]);
+
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn legacy_zip_over_old_fetch_cap_downloads_via_stream() {
+    use futures::StreamExt;
+    use fragrans::infrastructure::storage::local::{LocalStorage, legacy::LegacyReader};
+
+    let storage_dir = tempfile::TempDir::new().unwrap();
+    // Historical fetch() refused anything over 100 MiB. Prove stream() still serves
+    // content that the old capped fetch would reject (use a tiny cap for speed).
+    let content = vec![0x5Au8; 256 * 1024];
+    let iv = "00000000000000000000000000000000";
+    let md5_hash = write_legacy_file(storage_dir.path(), &content, iv);
+
+    let storage = LocalStorage::new(storage_dir.path().to_path_buf(), [0u8; 32]).unwrap();
+    let reader = LegacyReader::new(&storage);
+
+    let capped = reader.fetch(&md5_hash, Some(iv), Some(100 * 1024)).await;
+    assert!(capped.is_err(), "fetch must still enforce its size cap");
+
+    let (total_len, range_len, mut stream) = reader
+        .stream(&md5_hash, Some(iv), 0, None)
+        .await
+        .unwrap()
+        .expect("legacy object should exist");
+    assert_eq!(total_len, content.len() as u64);
+    assert_eq!(range_len, content.len() as u64);
+
+    let mut got = Vec::with_capacity(content.len());
+    while let Some(chunk) = stream.next().await {
+        got.extend_from_slice(&chunk.unwrap());
+    }
+    assert_eq!(got, content);
+
+    // Also cover the HTTP path used by the ZIP preview "download" button.
+    let ctx = setup().await;
+    let file_id = mongodb::bson::oid::ObjectId::new();
+    let http_hash = write_legacy_file(ctx.storage_dir.path(), &content, iv);
+    ctx.db
+        .collection::<mongodb::bson::Document>("storage")
+        .insert_one(mongodb::bson::doc! {
+            "_id": file_id,
+            "userId": &ctx.user_id,
+            "name": "Compass China.zip",
+            "parentId": "root",
+            "type": "file",
+            "mimeType": "application/zip",
+            "size": content.len() as i64,
+            "MD5Hash": http_hash,
+            "iv": iv,
+            "trashed": false,
+            "createdAt": mongodb::bson::DateTime::now(),
+            "updatedAt": mongodb::bson::DateTime::now(),
+        })
+        .await
+        .unwrap();
+
+    let file_id_hex = file_id.to_hex();
+    let download_token = fragrans::api::middleware::create_token(
+        "test-secret-key-that-is-long-enough",
+        &ctx.user_id,
+        fragrans::api::middleware::TokenPurpose::Download,
+        Some(file_id_hex.clone()),
+        (chrono::Utc::now().timestamp() + 3600) as usize,
+        Some(0),
+        None,
+    )
+    .unwrap();
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/v1/storage/{file_id_hex}?download=1&token={download_token}"
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let disposition = response
+        .headers()
+        .get(header::CONTENT_DISPOSITION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(disposition.starts_with("attachment;"), "{disposition}");
+    assert!(
+        response
+            .headers()
+            .get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("allow-downloads"),
+        "download responses must allow browser downloads under CSP sandbox"
+    );
+    assert_eq!(response_bytes(response).await.as_ref(), content.as_slice());
+
     ctx.teardown().await;
 }
 

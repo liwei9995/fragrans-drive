@@ -767,7 +767,7 @@ pub async fn get_file(
     res_headers.insert(CACHE_CONTROL, "private, no-store".parse().unwrap());
     res_headers.insert(
         axum::http::HeaderName::from_static("content-security-policy"),
-        "default-src 'none'; sandbox".parse().unwrap(),
+        "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
     );
     res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
@@ -873,7 +873,7 @@ pub async fn get_download_url(
         Some(existing.share_version),
         None,
     )?;
-    Ok(format!("{}/v1/storage/{}?token={}", domain, file_id, token).into_response())
+    Ok(format!("{}/v1/storage/{}?download=1&token={}", domain, file_id, token).into_response())
 }
 
 #[utoipa::path(
@@ -1145,7 +1145,7 @@ async fn get_public_file_impl(
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
     res_headers.insert(
         axum::http::HeaderName::from_static("content-security-policy"),
-        "default-src 'none'; sandbox".parse().unwrap(),
+        "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
     );
     res_headers.insert(
         REFERRER_POLICY,

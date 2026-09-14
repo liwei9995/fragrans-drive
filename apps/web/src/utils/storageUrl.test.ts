@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { toDownloadHref, toProxyStorageUrl } from './storageUrl'
+import {
+  toClipboardUrl,
+  toDownloadHref,
+  toProxyStorageUrl,
+  withDownloadParam,
+} from './storageUrl'
 
 describe('toProxyStorageUrl', () => {
   const originalEnv = import.meta.env
@@ -68,5 +73,43 @@ describe('toDownloadHref', () => {
     expect(
       toDownloadHref('"https://drive.example.com/v1/storage/abc?token=tok"'),
     ).toBe('/api/v1/storage/abc?token=tok')
+  })
+})
+
+describe('withDownloadParam', () => {
+  it('appends download=1 when missing', () => {
+    expect(withDownloadParam('/api/v1/storage/abc?token=tok')).toBe(
+      '/api/v1/storage/abc?token=tok&download=1',
+    )
+  })
+
+  it('keeps existing download param', () => {
+    expect(withDownloadParam('/api/v1/storage/abc?download=1&token=tok')).toBe(
+      '/api/v1/storage/abc?download=1&token=tok',
+    )
+  })
+})
+
+describe('toClipboardUrl', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('prefixes origin for relative /api download links', () => {
+    vi.stubGlobal('location', { origin: 'https://drive.oyiyio.com' })
+    import.meta.env.VITE_API_URL = '/api'
+    expect(
+      toClipboardUrl(
+        'http://localhost:3821/v1/storage/abc?download=1&token=tok',
+      ),
+    ).toBe('https://drive.oyiyio.com/api/v1/storage/abc?download=1&token=tok')
+  })
+
+  it('rewrites absolute API URLs to the current origin /api proxy', () => {
+    vi.stubGlobal('location', { origin: 'https://drive.oyiyio.com' })
+    import.meta.env.VITE_API_URL = '/api'
+    expect(toClipboardUrl('https://cdn.example.com/v1/p/slug?download=1')).toBe(
+      'https://drive.oyiyio.com/api/v1/p/slug?download=1',
+    )
   })
 })
