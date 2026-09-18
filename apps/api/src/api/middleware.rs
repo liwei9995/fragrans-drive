@@ -78,6 +78,7 @@ pub fn create_token(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_token_with_jti(
     secret: &str,
     user_id: &str,
@@ -133,6 +134,16 @@ pub async fn auth_guard(
 
     if claims.purpose != TokenPurpose::Access {
         return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    if let Some(token_version) = claims.token_version {
+        let repo = crate::infrastructure::db::user_repo::UserRepository::new(&state.db);
+        let id = mongodb::bson::oid::ObjectId::parse_str(&claims.user_id)
+            .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        match repo.find_by_id(id).await {
+            Ok(Some(u)) if u.token_version == token_version => {}
+            _ => return Err(StatusCode::UNAUTHORIZED),
+        }
     }
 
     req.extensions_mut().insert(UserContext {

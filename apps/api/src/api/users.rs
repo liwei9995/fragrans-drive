@@ -67,6 +67,8 @@ fn issue_auth_tokens(
     })
 }
 
+use crate::api::auth_security::is_valid_email;
+
 #[derive(Deserialize, ToSchema)]
 pub struct CreateUserDto {
     pub email: String,
@@ -77,6 +79,47 @@ pub struct CreateUserDto {
     #[serde(rename = "lastName")]
     #[schema(example = "Doe")]
     pub last_name: String,
+    #[serde(rename = "captchaId")]
+    pub captcha_id: Option<String>,
+    #[serde(rename = "captchaCode")]
+    pub captcha_code: Option<String>,
+    #[serde(rename = "emailCode")]
+    pub email_code: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AuthConfigResponse {
+    #[serde(rename = "allowRegistration")]
+    pub allow_registration: bool,
+    #[serde(rename = "emailVerificationRequired")]
+    pub email_verification_required: bool,
+    #[serde(rename = "captchaRequired")]
+    pub captcha_required: bool,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CaptchaResponse {
+    pub id: String,
+    pub svg: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct SendEmailCodeDto {
+    pub email: String,
+    pub purpose: String,
+    #[serde(rename = "captchaId")]
+    pub captcha_id: String,
+    #[serde(rename = "captchaCode")]
+    pub captcha_code: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ResetPasswordDto {
+    pub email: String,
+    pub code: String,
+    pub password: String,
+    #[serde(rename = "changePassword")]
+    pub change_password: String,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -136,8 +179,15 @@ pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginDto>,
 ) -> Result<impl IntoResponse, AppError> {
+    let email = payload.email.trim().to_lowercase();
+    if email.is_empty() || payload.password.is_empty() || payload.password.len() > 72 {
+        return Err(AppError::Unauthorized(
+            "Invalid email or password".to_string(),
+        ));
+    }
+
     let repo = UserRepository::new(&state.db);
-    let user = match repo.find_by_email(&payload.email).await? {
+    let user = match repo.find_by_email(&email).await? {
         Some(u) => u,
         None => {
             return Err(AppError::Unauthorized(
@@ -233,12 +283,181 @@ pub async fn refresh(
 }
 
 #[utoipa::path(
+    get,
+    path = "/v1/auth/config",
+    responses(
+        (status = 200, description = "Authentication configuration", body = AuthConfigResponse)
+    ),
+    tag = "auth"
+)]
+pub async fn get_auth_config(State(state): State<AppState>) -> impl IntoResponse {
+    Json(AuthConfigResponse {
+        allow_registration: state.config.allow_registration,
+        email_verification_required: state.config.email_verification_required,
+        captcha_required: state.config.captcha_required,
+    })
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/auth/captcha",
+    responses(
+        (status = 200, description = "Generated captcha", body = CaptchaResponse)
+    ),
+    tag = "auth"
+)]
+pub async fn get_captcha(State(state): State<AppState>) -> impl IntoResponse {
+    let (id, svg) = state.auth_security.generate_captcha();
+    Json(CaptchaResponse { id, svg })
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/send-code",
+    request_body = SendEmailCodeDto,
+    responses(
+        (status = 200, description = "Verification code sent"),
+        (status = 400, description = "Invalid captcha or email"),
+        (status = 403, description = "Registration disabled"),
+        (status = 404, description = "User not found")
+    ),
+    tag = "auth"
+)]
+pub async fn send_email_code(
+    State(state): State<AppState>,
+    Json(payload): Json<SendEmailCodeDto>,
+) -> Result<impl IntoResponse, AppError> {
+    if !state
+        .auth_security
+        .verify_and_consume_captcha(&payload.captcha_id, &payload.captcha_code)
+    {
+        return Err(AppError::BadRequest(
+            "Invalid or expired captcha".to_string(),
+        ));
+    }
+
+    let email = payload.email.trim().to_lowercase();
+    if !is_valid_email(&email) {
+        return Err(AppError::BadRequest("Invalid email format".to_string()));
+    }
+
+    let repo = UserRepository::new(&state.db);
+    match payload.purpose.as_str() {
+        "register" => {
+            if !state.config.allow_registration {
+                return Err(AppError::Forbidden(
+                    "User registration is closed".to_string(),
+                ));
+            }
+            if repo.find_by_email(&email).await?.is_some() {
+                return Err(AppError::BadRequest("User already exists".to_string()));
+            }
+        }
+        "reset_password" => {
+            let user_exists = repo.find_by_email(&email).await?.is_some();
+            if !user_exists {
+                // Prevent user enumeration: return 200 without sending email if user does not exist
+                return Ok((
+                    StatusCode::OK,
+                    Json(serde_json::json!({
+                        "message": "If this email is registered, a verification code has been sent"
+                    })),
+                ));
+            }
+        }
+        _ => return Err(AppError::BadRequest("Invalid purpose".to_string())),
+    }
+
+    state
+        .auth_security
+        .check_and_record_email_rate_limit(&email)
+        .map_err(AppError::TooManyRequests)?;
+
+    let code = state
+        .auth_security
+        .generate_email_code(&payload.purpose, &email);
+    state
+        .auth_security
+        .send_email_code(&state.config, &email, &payload.purpose, &code)
+        .await
+        .map_err(|e| AppError::InternalError(format!("Failed to send email: {}", e)))?;
+
+    let message = if state.config.smtp_host.is_some() {
+        "Verification code sent to your email"
+    } else {
+        "Verification code sent (Mock mode: check backend server console)"
+    };
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({ "message": message })),
+    ))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/reset-password",
+    request_body = ResetPasswordDto,
+    responses(
+        (status = 200, description = "Password reset successfully"),
+        (status = 400, description = "Invalid verification code or passwords do not match"),
+        (status = 404, description = "User not found")
+    ),
+    tag = "auth"
+)]
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(payload): Json<ResetPasswordDto>,
+) -> Result<impl IntoResponse, AppError> {
+    if payload.password.len() < 6 || payload.password.len() > 72 {
+        return Err(AppError::BadRequest(
+            "Password must be between 6 and 72 characters".to_string(),
+        ));
+    }
+    if payload.password != payload.change_password {
+        return Err(AppError::BadRequest("Passwords do not match".to_string()));
+    }
+    let email = payload.email.trim().to_lowercase();
+    if !state
+        .auth_security
+        .verify_and_consume_email_code("reset_password", &email, &payload.code)
+    {
+        return Err(AppError::BadRequest(
+            "Invalid or expired verification code".to_string(),
+        ));
+    }
+
+    let repo = UserRepository::new(&state.db);
+    let user = repo
+        .find_by_email(&email)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    let user_id = user
+        .id
+        .ok_or_else(|| AppError::BadRequest("User ID missing".to_string()))?;
+
+    let hashed = hash_password(&payload.password);
+    repo.update_password(user_id, &hashed).await?;
+
+    // Invalidate and delete all refresh sessions for this user
+    RefreshSessionRepository::new(&state.db)
+        .delete_all_for_user(&user_id.to_hex())
+        .await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({ "message": "Password reset successfully" })),
+    ))
+}
+
+#[utoipa::path(
     post,
     path = "/v1/users",
     request_body = CreateUserDto,
     responses(
         (status = 201, description = "User created successfully", body = CreateUserResponse),
-        (status = 400, description = "User already exists, or invalid body (required: email, password, firstName, lastName)")
+        (status = 400, description = "User already exists, or invalid body"),
+        (status = 403, description = "Registration is disabled")
     ),
     tag = "users"
 )]
@@ -246,19 +465,90 @@ pub async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<CreateUserDto>,
 ) -> Result<impl IntoResponse, AppError> {
+    // 1. Check if registration is allowed
+    if !state.config.allow_registration {
+        return Err(AppError::Forbidden(
+            "User registration is closed".to_string(),
+        ));
+    }
+
+    // 2. Validate email format
+    let email = payload.email.trim().to_lowercase();
+    if !is_valid_email(&email) {
+        return Err(AppError::BadRequest("Invalid email format".to_string()));
+    }
+
+    // 3. Validate names
+    let first_name = payload.first_name.trim();
+    let last_name = payload.last_name.trim();
+    if first_name.is_empty() || first_name.len() > 100 {
+        return Err(AppError::BadRequest(
+            "First name must be between 1 and 100 characters".to_string(),
+        ));
+    }
+    if last_name.is_empty() || last_name.len() > 100 {
+        return Err(AppError::BadRequest(
+            "Last name must be between 1 and 100 characters".to_string(),
+        ));
+    }
+
+    // 4. Validate password length
+    if payload.password.len() < 6 || payload.password.len() > 72 {
+        return Err(AppError::BadRequest(
+            "Password must be between 6 and 72 characters".to_string(),
+        ));
+    }
+
+    // 5. Verification logic:
+    // - If email verification is enabled, verify the email code (its issuance was guarded by captcha in /v1/auth/send-code).
+    // - If email verification is disabled, verify graphic captcha directly to prevent automated registrations.
+    if state.config.email_verification_required {
+        let code = match &payload.email_code {
+            Some(c) if !c.trim().is_empty() => c.trim(),
+            _ => {
+                return Err(AppError::BadRequest(
+                    "Email verification code is required".to_string(),
+                ));
+            }
+        };
+        if !state
+            .auth_security
+            .verify_and_consume_email_code("register", &email, code)
+        {
+            return Err(AppError::BadRequest(
+                "Invalid or expired email verification code".to_string(),
+            ));
+        }
+    } else if state.config.captcha_required
+        || payload.captcha_id.is_some()
+        || payload.captcha_code.is_some()
+    {
+        let (cid, ccode) = match (&payload.captcha_id, &payload.captcha_code) {
+            (Some(id), Some(code)) if !id.trim().is_empty() && !code.trim().is_empty() => {
+                (id, code)
+            }
+            _ => return Err(AppError::BadRequest("Captcha is required".to_string())),
+        };
+        if !state.auth_security.verify_and_consume_captcha(cid, ccode) {
+            return Err(AppError::BadRequest(
+                "Invalid or expired captcha".to_string(),
+            ));
+        }
+    }
+
     let repo = UserRepository::new(&state.db);
 
     // Check if user exists
-    if repo.find_by_email(&payload.email).await?.is_some() {
+    if repo.find_by_email(&email).await?.is_some() {
         return Err(AppError::BadRequest("User already exists".to_string()));
     }
 
     let user = User {
         id: None,
-        email: payload.email,
+        email,
         password: hash_password(&payload.password),
-        first_name: payload.first_name,
-        last_name: payload.last_name,
+        first_name: first_name.to_string(),
+        last_name: last_name.to_string(),
         gender: None,
         age: None,
         avatar: None,
@@ -378,9 +668,9 @@ pub async fn update_password(
             "Current password is required".to_string(),
         ));
     }
-    if payload.password.len() < 6 {
+    if payload.password.len() < 6 || payload.password.len() > 72 {
         return Err(AppError::BadRequest(
-            "Password must be at least 6 characters".to_string(),
+            "Password must be between 6 and 72 characters".to_string(),
         ));
     }
     if payload.password != payload.change_password {
@@ -404,6 +694,12 @@ pub async fn update_password(
 
     let hashed = hash_password(&payload.password);
     repo.update_password(id, &hashed).await?;
+
+    // Invalidate and delete all refresh sessions for this user
+    RefreshSessionRepository::new(&state.db)
+        .delete_all_for_user(&user_ctx.user_id)
+        .await?;
+
     Ok((StatusCode::OK, "Password updated"))
 }
 

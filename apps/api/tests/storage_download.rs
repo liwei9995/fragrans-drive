@@ -193,7 +193,10 @@ async fn legacy_file_remains_downloadable_before_migration() {
         .await
         .unwrap();
     assert_eq!(range_response.status(), StatusCode::PARTIAL_CONTENT);
-    assert_eq!(response_bytes(range_response).await.as_ref(), &content[2..=6]);
+    assert_eq!(
+        response_bytes(range_response).await.as_ref(),
+        &content[2..=6]
+    );
 
     ctx.teardown().await;
 }
@@ -201,8 +204,8 @@ async fn legacy_file_remains_downloadable_before_migration() {
 #[tokio::test]
 #[serial]
 async fn legacy_zip_over_old_fetch_cap_downloads_via_stream() {
-    use futures::StreamExt;
     use fragrans::infrastructure::storage::local::{LocalStorage, legacy::LegacyReader};
+    use futures::StreamExt;
 
     let storage_dir = tempfile::TempDir::new().unwrap();
     // Historical fetch() refused anything over 100 MiB. Prove stream() still serves
@@ -854,4 +857,3 @@ async fn download_with_preview_returns_resized_image_and_caches() {
 
     ctx.teardown().await;
 }
-

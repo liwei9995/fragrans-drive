@@ -15,13 +15,21 @@ services:
     volumes:
       - storage-files:/app/bucket
     ports:
-      - 8085:3821
+      - 127.0.0.1:8085:3821
     environment:
       MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/fragrans?authSource=admin
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       STORAGE_MASTER_KEY_HEX: ${STORAGE_MASTER_KEY_HEX}
       STORAGE_DESTINATION: /app/bucket/storage
       DRIVE_DOMAIN: ${DRIVE_DOMAIN}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      CAPTCHA_REQUIRED: ${CAPTCHA_REQUIRED:-true}
+      EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     depends_on:
       mongo:
         condition: service_healthy
@@ -30,7 +38,7 @@ services:
     image: mongo:8.0
     restart: always
     ports:
-      - 25018:27017
+      - 127.0.0.1:25018:27017
     volumes:
       - storage-db-v8:/data/db
     environment:
@@ -46,7 +54,7 @@ services:
     image: mongo-express
     restart: always
     ports:
-      - 8084:8081
+      - 127.0.0.1:8084:8081
     environment:
       ME_CONFIG_OPTIONS_EDITORTHEME: material
       ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}

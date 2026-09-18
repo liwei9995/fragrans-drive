@@ -370,11 +370,7 @@ pub async fn upload_file(
                 for uploaded_id in &uploaded_ids {
                     if let Ok(oid) = mongodb::bson::oid::ObjectId::parse_str(uploaded_id) {
                         let _ = repo
-                            .update_one(
-                                oid,
-                                &user_ctx.user_id,
-                                doc! { "parentId": &parent_id },
-                            )
+                            .update_one(oid, &user_ctx.user_id, doc! { "parentId": &parent_id })
                             .await;
                     }
                 }
@@ -398,10 +394,10 @@ pub async fn upload_file(
                 .bytes()
                 .await
                 .map_err(|e| AppError::BadRequest(e.to_string()))?;
-            if let Ok(value) = String::from_utf8(bytes.to_vec()) {
-                if let Ok(size) = value.trim().parse::<i64>() {
-                    expected_size = Some(size);
-                }
+            if let Ok(value) = String::from_utf8(bytes.to_vec())
+                && let Ok(size) = value.trim().parse::<i64>()
+            {
+                expected_size = Some(size);
             }
             continue;
         }
@@ -429,9 +425,7 @@ pub async fn upload_file(
                 )));
             }
             use futures::StreamExt;
-            let stream = field.map(|res| {
-                res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-            });
+            let stream = field.map(|res| res.map_err(|e| std::io::Error::other(e.to_string())));
             let reader = tokio_util::io::StreamReader::new(stream);
 
             let id = service
@@ -723,18 +717,17 @@ pub async fn get_file(
 
     let mut range_start = 0;
     let mut range_end = None;
-    if let Some(range_header) = headers.get(axum::http::header::RANGE) {
-        if let Ok(range_str) = range_header.to_str() {
-            if let Some(stripped) = range_str.strip_prefix("bytes=") {
-                let parts: Vec<&str> = stripped.split('-').collect();
-                if parts.len() == 2 {
-                    if let Ok(start) = parts[0].parse::<u64>() {
-                        range_start = start;
-                    }
-                    if let Ok(end) = parts[1].parse::<u64>() {
-                        range_end = Some(end);
-                    }
-                }
+    if let Some(range_header) = headers.get(axum::http::header::RANGE)
+        && let Ok(range_str) = range_header.to_str()
+        && let Some(stripped) = range_str.strip_prefix("bytes=")
+    {
+        let parts: Vec<&str> = stripped.split('-').collect();
+        if parts.len() == 2 {
+            if let Ok(start) = parts[0].parse::<u64>() {
+                range_start = start;
+            }
+            if let Ok(end) = parts[1].parse::<u64>() {
+                range_end = Some(end);
             }
         }
     }
@@ -746,40 +739,44 @@ pub async fn get_file(
         .map(|p| p == "1" || p.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
-    if is_preview {
-        if let Ok((preview_data, preview_mime)) =
+    if is_preview
+        && let Ok((preview_data, preview_mime)) =
             service.get_or_generate_preview(&id, &owner_user_id).await
-        {
-            use axum::http::header::{
-                ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
-                REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
-            };
-            let mut res_headers = axum::http::HeaderMap::new();
-            res_headers.insert(CONTENT_TYPE, preview_mime.parse().unwrap());
-            res_headers.insert(CONTENT_LENGTH, preview_data.len().to_string().parse().unwrap());
-            let disposition = build_content_disposition("inline", &existing.name);
-            res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
-            let now = chrono::Utc::now().timestamp() as usize;
-            let max_age = token_exp.saturating_sub(now).clamp(60, 86400);
-            res_headers.insert(
-                CACHE_CONTROL,
-                format!("private, max-age={}", max_age).parse().unwrap(),
-            );
-            res_headers.insert(
-                axum::http::HeaderName::from_static("content-security-policy"),
-                "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
-            );
-            res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
-            res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
-            res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
+    {
+        use axum::http::header::{
+            ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
+            REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
+        };
+        let mut res_headers = axum::http::HeaderMap::new();
+        res_headers.insert(CONTENT_TYPE, preview_mime.parse().unwrap());
+        res_headers.insert(
+            CONTENT_LENGTH,
+            preview_data.len().to_string().parse().unwrap(),
+        );
+        let disposition = build_content_disposition("inline", &existing.name);
+        res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
+        let now = chrono::Utc::now().timestamp() as usize;
+        let max_age = token_exp.saturating_sub(now).clamp(60, 86400);
+        res_headers.insert(
+            CACHE_CONTROL,
+            format!("private, max-age={}", max_age).parse().unwrap(),
+        );
+        res_headers.insert(
+            axum::http::HeaderName::from_static("content-security-policy"),
+            "default-src 'none'; sandbox allow-downloads"
+                .parse()
+                .unwrap(),
+        );
+        res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
+        res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+        res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
 
-            return Ok((
-                axum::http::StatusCode::OK,
-                res_headers,
-                axum::body::Body::from(preview_data),
-            )
-                .into_response());
-        }
+        return Ok((
+            axum::http::StatusCode::OK,
+            res_headers,
+            axum::body::Body::from(preview_data),
+        )
+            .into_response());
     }
 
     let (filename, mime_type, total_size, range_len, stream) = service
@@ -813,7 +810,9 @@ pub async fn get_file(
     );
     res_headers.insert(
         axum::http::HeaderName::from_static("content-security-policy"),
-        "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
+        "default-src 'none'; sandbox allow-downloads"
+            .parse()
+            .unwrap(),
     );
     res_headers.insert(REFERRER_POLICY, "no-referrer".parse().unwrap());
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
@@ -919,7 +918,11 @@ pub async fn get_download_url(
         Some(existing.share_version),
         None,
     )?;
-    Ok(format!("{}/v1/storage/{}?download=1&token={}", domain, file_id, token).into_response())
+    Ok(format!(
+        "{}/v1/storage/{}?download=1&token={}",
+        domain, file_id, token
+    )
+    .into_response())
 }
 
 #[utoipa::path(
@@ -1117,10 +1120,10 @@ async fn get_public_file_impl(
         return Err(AppError::NotFound("File not found".into()));
     }
 
-    if let Some(expires_at) = existing.public_expires_at {
-        if expires_at < Utc::now() {
-            return Err(AppError::NotFound("Public direct link has expired".into()));
-        }
+    if let Some(expires_at) = existing.public_expires_at
+        && expires_at < Utc::now()
+    {
+        return Err(AppError::NotFound("Public direct link has expired".into()));
     }
 
     let etag = existing
@@ -1130,21 +1133,21 @@ async fn get_public_file_impl(
         .unwrap_or_else(|| existing.id.map(|id| id.to_hex()).unwrap_or_default());
     let etag_header_val = format!("\"{}\"", etag);
 
-    if let Some(if_none_match) = headers.get(axum::http::header::IF_NONE_MATCH) {
-        if let Ok(inm) = if_none_match.to_str() {
-            let inm_trimmed = inm.trim();
-            if inm_trimmed == etag_header_val || inm_trimmed == "*" || inm_trimmed.contains(&etag) {
-                let mut res = axum::http::StatusCode::NOT_MODIFIED.into_response();
-                res.headers_mut()
-                    .insert(axum::http::header::ETAG, etag_header_val.parse().unwrap());
-                res.headers_mut().insert(
-                    axum::http::header::CACHE_CONTROL,
-                    "public, max-age=86400, stale-while-revalidate=3600"
-                        .parse()
-                        .unwrap(),
-                );
-                return Ok(res);
-            }
+    if let Some(if_none_match) = headers.get(axum::http::header::IF_NONE_MATCH)
+        && let Ok(inm) = if_none_match.to_str()
+    {
+        let inm_trimmed = inm.trim();
+        if inm_trimmed == etag_header_val || inm_trimmed == "*" || inm_trimmed.contains(&etag) {
+            let mut res = axum::http::StatusCode::NOT_MODIFIED.into_response();
+            res.headers_mut()
+                .insert(axum::http::header::ETAG, etag_header_val.parse().unwrap());
+            res.headers_mut().insert(
+                axum::http::header::CACHE_CONTROL,
+                "public, max-age=86400, stale-while-revalidate=3600"
+                    .parse()
+                    .unwrap(),
+            );
+            return Ok(res);
         }
     }
 
@@ -1174,45 +1177,49 @@ async fn get_public_file_impl(
 
     if is_preview {
         let service = StorageService::new(repo.clone(), state.local_storage.clone());
-        if let Some(file_id) = existing.id {
-            if let Ok((preview_data, preview_mime)) = service
+        if let Some(file_id) = existing.id
+            && let Ok((preview_data, preview_mime)) = service
                 .get_or_generate_preview(&file_id.to_hex(), &existing.user_id)
                 .await
-            {
-                use axum::http::header::{
-                    ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH,
-                    CONTENT_TYPE, ETAG, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
-                };
-                let mut res_headers = axum::http::HeaderMap::new();
-                res_headers.insert(CONTENT_TYPE, preview_mime.parse().unwrap());
-                res_headers.insert(CONTENT_LENGTH, preview_data.len().to_string().parse().unwrap());
-                let disposition = build_content_disposition("inline", &filename);
-                res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
-                res_headers.insert(
-                    CACHE_CONTROL,
-                    "public, max-age=86400, stale-while-revalidate=3600"
-                        .parse()
-                        .unwrap(),
-                );
-                res_headers.insert(ETAG, etag_header_val.parse().unwrap());
-                res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
-                res_headers.insert(
-                    axum::http::HeaderName::from_static("content-security-policy"),
-                    "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
-                );
-                res_headers.insert(
-                    REFERRER_POLICY,
-                    "strict-origin-when-cross-origin".parse().unwrap(),
-                );
-                res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
+        {
+            use axum::http::header::{
+                ACCEPT_RANGES, CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE,
+                ETAG, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
+            };
+            let mut res_headers = axum::http::HeaderMap::new();
+            res_headers.insert(CONTENT_TYPE, preview_mime.parse().unwrap());
+            res_headers.insert(
+                CONTENT_LENGTH,
+                preview_data.len().to_string().parse().unwrap(),
+            );
+            let disposition = build_content_disposition("inline", &filename);
+            res_headers.insert(CONTENT_DISPOSITION, disposition.parse().unwrap());
+            res_headers.insert(
+                CACHE_CONTROL,
+                "public, max-age=86400, stale-while-revalidate=3600"
+                    .parse()
+                    .unwrap(),
+            );
+            res_headers.insert(ETAG, etag_header_val.parse().unwrap());
+            res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+            res_headers.insert(
+                axum::http::HeaderName::from_static("content-security-policy"),
+                "default-src 'none'; sandbox allow-downloads"
+                    .parse()
+                    .unwrap(),
+            );
+            res_headers.insert(
+                REFERRER_POLICY,
+                "strict-origin-when-cross-origin".parse().unwrap(),
+            );
+            res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
 
-                return Ok((
-                    axum::http::StatusCode::OK,
-                    res_headers,
-                    axum::body::Body::from(preview_data),
-                )
-                    .into_response());
-            }
+            return Ok((
+                axum::http::StatusCode::OK,
+                res_headers,
+                axum::body::Body::from(preview_data),
+            )
+                .into_response());
         }
     }
 
@@ -1240,7 +1247,9 @@ async fn get_public_file_impl(
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
     res_headers.insert(
         axum::http::HeaderName::from_static("content-security-policy"),
-        "default-src 'none'; sandbox allow-downloads".parse().unwrap(),
+        "default-src 'none'; sandbox allow-downloads"
+            .parse()
+            .unwrap(),
     );
     res_headers.insert(
         REFERRER_POLICY,
@@ -1261,18 +1270,17 @@ async fn get_public_file_impl(
 
     let mut range_start = 0;
     let mut range_end = None;
-    if let Some(range_header) = headers.get(axum::http::header::RANGE) {
-        if let Ok(range_str) = range_header.to_str() {
-            if let Some(stripped) = range_str.strip_prefix("bytes=") {
-                let parts: Vec<&str> = stripped.split('-').collect();
-                if parts.len() == 2 {
-                    if let Ok(start) = parts[0].parse::<u64>() {
-                        range_start = start;
-                    }
-                    if let Ok(end) = parts[1].parse::<u64>() {
-                        range_end = Some(end);
-                    }
-                }
+    if let Some(range_header) = headers.get(axum::http::header::RANGE)
+        && let Ok(range_str) = range_header.to_str()
+        && let Some(stripped) = range_str.strip_prefix("bytes=")
+    {
+        let parts: Vec<&str> = stripped.split('-').collect();
+        if parts.len() == 2 {
+            if let Ok(start) = parts[0].parse::<u64>() {
+                range_start = start;
+            }
+            if let Ok(end) = parts[1].parse::<u64>() {
+                range_end = Some(end);
             }
         }
     }

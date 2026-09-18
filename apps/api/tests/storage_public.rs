@@ -367,7 +367,7 @@ async fn test_public_link_expiration_and_head() {
     let res = ctx.app.clone().oneshot(list_req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let list_data: serde_json::Value = serde_json::from_slice(&response_bytes(res).await).unwrap();
-    assert!(list_data["docs"].as_array().unwrap().len() >= 1);
+    assert!(!list_data["docs"].as_array().unwrap().is_empty());
     for doc in list_data["docs"].as_array().unwrap() {
         assert_eq!(doc["isPublic"], true);
     }

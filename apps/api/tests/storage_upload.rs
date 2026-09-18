@@ -476,3 +476,80 @@ async fn oversized_image_dimensions_are_rejected() {
     // Mock oversized image test
     ctx.teardown().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn upload_deduplication_verifies_real_size_not_spoofed_client_size() {
+    let ctx = setup().await;
+    use sha2::Digest;
+
+    let content = b"verified real content";
+    let real_size = content.len() as i64;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(content);
+    let hash = hex::encode(hasher.finalize());
+
+    // 1. First upload: establishes the physical object on disk
+    let req1 = multipart_upload_request(
+        "/v1/storage/upload",
+        &ctx.auth_token,
+        "root",
+        "original.txt",
+        content,
+        Some(&hash),
+        None,
+        None,
+        Some(real_size),
+    );
+    let res1 = ctx.app.clone().oneshot(req1).await.unwrap();
+    assert_eq!(res1.status(), StatusCode::OK);
+
+    // 2. Create a folder so parent_id is different (different logical path)
+    let folder_payload = serde_json::json!({
+        "name": "subfolder",
+        "parentId": "root",
+        "type": "folder"
+    });
+    let folder_res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/folder",
+            &ctx.auth_token,
+            folder_payload,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(folder_res.status(), StatusCode::OK);
+    let folder_json: serde_json::Value =
+        serde_json::from_slice(&response_bytes(folder_res).await).unwrap();
+    let folder_id = folder_json["id"].as_str().unwrap();
+
+    // 3. Second upload with duplicate hash, but spoofed size=999999
+    let req2 = multipart_upload_request(
+        "/v1/storage/upload",
+        &ctx.auth_token,
+        folder_id,
+        "duplicate.txt",
+        content,
+        Some(&hash),
+        None,
+        None,
+        Some(999999), // Spoofed size!
+    );
+    let res2 = ctx.app.clone().oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::OK);
+
+    // 4. Verify in database: the duplicate file's size must be real_size (21), NOT 999999!
+    let dup_doc = ctx
+        .db
+        .collection::<mongodb::bson::Document>("storage")
+        .find_one(mongodb::bson::doc! { "name": "duplicate.txt", "userId": &ctx.user_id })
+        .await
+        .unwrap()
+        .expect("duplicate doc exists");
+    assert_eq!(dup_doc.get_i64("size").unwrap(), real_size);
+
+    ctx.teardown().await;
+}

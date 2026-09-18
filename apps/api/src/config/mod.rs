@@ -32,6 +32,14 @@ pub struct Config {
     pub storage_destination: PathBuf,
     pub storage_master_key: [u8; 32],
     pub max_upload_bytes: usize,
+    pub allow_registration: bool,
+    pub email_verification_required: bool,
+    pub captcha_required: bool,
+    pub smtp_host: Option<String>,
+    pub smtp_port: Option<u16>,
+    pub smtp_user: Option<String>,
+    pub smtp_pass: Option<String>,
+    pub smtp_from: Option<String>,
 }
 
 impl Config {
@@ -83,6 +91,27 @@ impl Config {
             return Err(ConfigError::InvalidFormat("MAX_UPLOAD_BYTES"));
         }
 
+        let allow_registration = env::var("ALLOW_REGISTRATION")
+            .map(|v| v != "false" && v != "0")
+            .unwrap_or(true);
+
+        let email_verification_required = env::var("EMAIL_VERIFICATION_REQUIRED")
+            .map(|v| v != "false" && v != "0")
+            .unwrap_or(true);
+
+        let captcha_required = env::var("CAPTCHA_REQUIRED")
+            .map(|v| v != "false" && v != "0")
+            .unwrap_or(true);
+
+        let smtp_host = env::var("SMTP_HOST").ok().filter(|s| !s.trim().is_empty());
+        let smtp_port = env::var("SMTP_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .or(Some(587));
+        let smtp_user = env::var("SMTP_USER").ok().filter(|s| !s.trim().is_empty());
+        let smtp_pass = env::var("SMTP_PASS").ok().filter(|s| !s.trim().is_empty());
+        let smtp_from = env::var("SMTP_FROM").ok().filter(|s| !s.trim().is_empty());
+
         Ok(Self {
             mongo_uri,
             jwt_secret,
@@ -91,6 +120,14 @@ impl Config {
             storage_destination,
             storage_master_key,
             max_upload_bytes,
+            allow_registration,
+            email_verification_required,
+            captcha_required,
+            smtp_host,
+            smtp_port,
+            smtp_user,
+            smtp_pass,
+            smtp_from,
         })
     }
 }
@@ -110,6 +147,14 @@ mod tests {
             env::remove_var("DRIVE_DOMAIN");
             env::remove_var("STORAGE_DESTINATION");
             env::remove_var("MAX_UPLOAD_BYTES");
+            env::remove_var("ALLOW_REGISTRATION");
+            env::remove_var("EMAIL_VERIFICATION_REQUIRED");
+            env::remove_var("CAPTCHA_REQUIRED");
+            env::remove_var("SMTP_HOST");
+            env::remove_var("SMTP_PORT");
+            env::remove_var("SMTP_USER");
+            env::remove_var("SMTP_PASS");
+            env::remove_var("SMTP_FROM");
         }
     }
 

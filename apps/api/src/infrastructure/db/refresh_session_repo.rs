@@ -55,4 +55,13 @@ impl RefreshSessionRepository {
             .await?;
         Ok(result.deleted_count == 1)
     }
+
+    /// Deletes all refresh sessions for the specified user (e.g. on password change/reset).
+    pub async fn delete_all_for_user(&self, user_id: &str) -> Result<u64, mongodb::error::Error> {
+        let result = self
+            .collection
+            .delete_many(doc! { "userId": user_id })
+            .await?;
+        Ok(result.deleted_count)
+    }
 }

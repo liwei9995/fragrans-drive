@@ -34,6 +34,12 @@ pub enum AppError {
 
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
+
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
+    #[error("Too Many Requests: {0}")]
+    TooManyRequests(String),
 }
 
 impl IntoResponse for AppError {
@@ -81,6 +87,8 @@ impl IntoResponse for AppError {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::PayloadTooLarge(msg) => (StatusCode::PAYLOAD_TOO_LARGE, msg),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
+            AppError::TooManyRequests(msg) => (StatusCode::TOO_MANY_REQUESTS, msg),
         };
 
         let body = Json(json!({

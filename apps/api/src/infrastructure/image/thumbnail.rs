@@ -35,7 +35,10 @@ pub fn generate_thumbnail(data: &[u8]) -> Result<Vec<u8>, AppError> {
     Ok(buffer)
 }
 
-pub fn generate_preview(data: &[u8], max_dimension: u32) -> Result<(Vec<u8>, &'static str), AppError> {
+pub fn generate_preview(
+    data: &[u8],
+    max_dimension: u32,
+) -> Result<(Vec<u8>, &'static str), AppError> {
     let reader = ImageReader::new(Cursor::new(data))
         .with_guessed_format()
         .map_err(|e| AppError::BadRequest(format!("Invalid image format: {}", e)))?;

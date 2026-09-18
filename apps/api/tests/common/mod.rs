@@ -32,6 +32,10 @@ impl TestContext {
 }
 
 pub async fn setup() -> TestContext {
+    unsafe {
+        env::set_var("FRAGRANS_TEST_MODE", "1");
+    }
+
     let mongo_uri = env::var("TEST_MONGO_URI")
         .or_else(|_| env::var("MONGO_URI"))
         .unwrap_or_else(|_| "mongodb://test:nest@127.0.0.1:25018/?authSource=admin".to_string());
@@ -63,6 +67,14 @@ pub async fn setup() -> TestContext {
         storage_destination: storage_dir.path().to_path_buf(),
         storage_master_key: [0u8; 32],
         max_upload_bytes: 10 * 1024 * 1024,
+        allow_registration: true,
+        email_verification_required: false,
+        captcha_required: false,
+        smtp_host: None,
+        smtp_port: None,
+        smtp_user: None,
+        smtp_pass: None,
+        smtp_from: None,
     };
     let app = api::router(db.clone(), config);
 

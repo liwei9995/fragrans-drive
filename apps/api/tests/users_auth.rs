@@ -279,5 +279,49 @@ async fn password_change_invalidates_refresh_token() {
         .expect("refresh after password change");
     assert_eq!(refresh_res.status(), StatusCode::UNAUTHORIZED);
 
+    // Old access token must also be immediately rejected because token_version was incremented
+    let old_access_res = ctx
+        .app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/profile", &access))
+        .await
+        .expect("access profile with old access token");
+    assert_eq!(old_access_res.status(), StatusCode::UNAUTHORIZED);
+
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn login_rate_limit_blocks_after_burst() {
+    let ctx = setup().await;
+
+    let payload = serde_json::json!({
+        "email": format!("test-{}@example.com", uuid::Uuid::new_v4()),
+        "password": "wrongpassword"
+    });
+
+    let mut hit_rate_limit = false;
+    // Login limiter capacity is 10
+    for _ in 0..12 {
+        let res = ctx
+            .app
+            .clone()
+            .oneshot(json_auth_request(
+                "POST",
+                "/v1/auth/login",
+                "",
+                payload.clone(),
+            ))
+            .await
+            .expect("login attempt");
+        if res.status() == StatusCode::TOO_MANY_REQUESTS {
+            assert!(res.headers().contains_key(axum::http::header::RETRY_AFTER));
+            hit_rate_limit = true;
+            break;
+        }
+    }
+    assert!(hit_rate_limit, "Expected to hit 429 Too Many Requests");
+
     ctx.teardown().await;
 }

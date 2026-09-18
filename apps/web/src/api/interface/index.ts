@@ -182,3 +182,41 @@ export namespace User {
     changePassword: string
   }
 }
+
+// * 认证与安全模块
+export namespace Auth {
+  export interface AuthConfig {
+    allowRegistration: boolean
+    emailVerificationRequired: boolean
+    captchaRequired: boolean
+  }
+
+  export interface CaptchaData {
+    id: string
+    svg: string
+  }
+
+  export interface ReqSendEmailCode {
+    email: string
+    purpose: 'register' | 'reset_password'
+    captchaId: string
+    captchaCode: string
+  }
+
+  export interface ReqRegister {
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    captchaId?: string
+    captchaCode?: string
+    emailCode?: string
+  }
+
+  export interface ReqResetPassword {
+    email: string
+    code: string
+    password: string
+    changePassword: string
+  }
+}

@@ -298,6 +298,22 @@ describe('api index', () => {
     expect(checkStatus).toHaveBeenCalledWith(500)
   })
 
+  it('response interceptor prioritizes backend error message', async () => {
+    const error = {
+      message: 'bad request',
+      response: {
+        status: 400,
+        data: { error: 'Invalid or expired verification code' },
+      },
+    }
+
+    await expect(responseInterceptor().rejected(error)).rejects.toEqual(error)
+    expect(ElMessage.error).toHaveBeenCalledWith(
+      'Invalid or expired verification code',
+    )
+    expect(checkStatus).not.toHaveBeenCalled()
+  })
+
   it('response interceptor handles reject offline', async () => {
     Object.defineProperty(window.navigator, 'onLine', {
       value: false,

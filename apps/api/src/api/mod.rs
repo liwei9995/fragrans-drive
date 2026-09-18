@@ -1,5 +1,7 @@
+pub mod auth_security;
 pub mod error;
 pub mod middleware;
+pub mod rate_limit;
 pub mod storage;
 pub mod users;
 
@@ -16,11 +18,16 @@ pub struct AppState {
     pub db: Database,
     pub config: Arc<Config>,
     pub local_storage: crate::infrastructure::storage::local::LocalStorage,
+    pub auth_security: Arc<auth_security::AuthSecurityManager>,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        users::get_auth_config,
+        users::get_captcha,
+        users::send_email_code,
+        users::reset_password,
         users::login,
         users::refresh,
         users::create_user,
@@ -47,6 +54,7 @@ pub struct AppState {
     ),
     components(
         schemas(
+            users::AuthConfigResponse, users::CaptchaResponse, users::SendEmailCodeDto, users::ResetPasswordDto,
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::RefreshTokenDto, users::CreateUserResponse,
             storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse, storage::StorageUsageResponse,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
@@ -87,20 +95,57 @@ pub fn router(db: Database, config: Config) -> Router {
     )
     .expect("Failed to initialize local storage");
 
+    let auth_security = Arc::new(auth_security::AuthSecurityManager::new());
+
     let state = AppState {
         db,
         config: Arc::new(config),
         local_storage,
+        auth_security,
     };
 
+    let login_limiter = rate_limit::RateLimiter::new(10, std::time::Duration::from_secs(60));
+    let register_limiter = rate_limit::RateLimiter::new(5, std::time::Duration::from_secs(60));
+    let public_limiter = rate_limit::RateLimiter::new(120, std::time::Duration::from_secs(60));
+
     let auth_routes = Router::new()
-        .route("/login", axum::routing::post(users::login))
+        .route("/config", axum::routing::get(users::get_auth_config))
+        .route("/captcha", axum::routing::get(users::get_captcha))
+        .route(
+            "/send-code",
+            axum::routing::post(users::send_email_code).layer(
+                axum::middleware::from_fn_with_state(
+                    register_limiter.clone(),
+                    rate_limit::rate_limit_middleware,
+                ),
+            ),
+        )
+        .route(
+            "/reset-password",
+            axum::routing::post(users::reset_password).layer(axum::middleware::from_fn_with_state(
+                login_limiter.clone(),
+                rate_limit::rate_limit_middleware,
+            )),
+        )
+        .route(
+            "/login",
+            axum::routing::post(users::login).layer(axum::middleware::from_fn_with_state(
+                login_limiter,
+                rate_limit::rate_limit_middleware,
+            )),
+        )
         .route("/refresh", axum::routing::post(users::refresh))
         .with_state(state.clone());
 
     // User registration does not require auth; other user routes require JWT.
     let user_routes_public = Router::new()
-        .route("/", axum::routing::post(users::create_user))
+        .route(
+            "/",
+            axum::routing::post(users::create_user).layer(axum::middleware::from_fn_with_state(
+                register_limiter,
+                rate_limit::rate_limit_middleware,
+            )),
+        )
         .with_state(state.clone());
 
     let user_routes_protected = Router::new()
@@ -161,7 +206,11 @@ pub fn router(db: Database, config: Config) -> Router {
         .route(
             "/{slug}/{filename}",
             axum::routing::get(storage::get_public_file_with_name),
-        );
+        )
+        .layer(axum::middleware::from_fn_with_state(
+            public_limiter,
+            rate_limit::rate_limit_middleware,
+        ));
 
     let v1 = Router::new()
         .nest("/auth", auth_routes)

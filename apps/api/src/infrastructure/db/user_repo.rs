@@ -20,10 +20,20 @@ impl UserRepository {
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<Option<User>, mongodb::error::Error> {
-        self.collection.find_one(doc! { "email": email }).await
+        let email_trimmed = email.trim();
+        let email_norm = email_trimmed.to_lowercase();
+        self.collection
+            .find_one(doc! {
+                "$or": [
+                    { "email": &email_norm },
+                    { "email": { "$regex": format!("^{}$", regex::escape(email_trimmed)), "$options": "i" } }
+                ]
+            })
+            .await
     }
 
-    pub async fn create(&self, user: User) -> Result<ObjectId, mongodb::error::Error> {
+    pub async fn create(&self, mut user: User) -> Result<ObjectId, mongodb::error::Error> {
+        user.email = user.email.trim().to_lowercase();
         let result = self.collection.insert_one(user).await?;
         Ok(result.inserted_id.as_object_id().unwrap())
     }

@@ -296,6 +296,16 @@ impl StorageService {
             .await
             .map_err(|error| AppError::InternalError(error.to_string()))?;
 
+        let actual_size = if !need_store {
+            self.local_storage
+                .get_plaintext_size(user_id, hash)
+                .await
+                .map(|s| s as i64)
+                .unwrap_or(size)
+        } else {
+            size
+        };
+
         let mut storage_item = Storage {
             id: None,
             name: name.clone(),
@@ -316,7 +326,7 @@ impl StorageService {
             ),
             mime_type: Some(content_type.to_string()),
             encoding: None,
-            size: Some(size),
+            size: Some(actual_size),
             md5_hash: None,
             iv: None,
             content_hash: Some(hash.to_string()),
@@ -345,10 +355,11 @@ impl StorageService {
             let mut file = tokio::fs::File::open(temp_file_path).await?;
             let mut buffer = [0; 512];
             use tokio::io::AsyncReadExt;
-            if let Ok(n) = file.read(&mut buffer).await {
-                if n > 0 && infer::is_image(&buffer[..n]) {
-                    is_valid_image = true;
-                }
+            if let Ok(n) = file.read(&mut buffer).await
+                && n > 0
+                && infer::is_image(&buffer[..n])
+            {
+                is_valid_image = true;
             }
         }
 
@@ -439,6 +450,7 @@ impl StorageService {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn upload_stream<R: tokio::io::AsyncRead + Unpin + Send + Sync>(
         &self,
         user_id: &str,
@@ -455,12 +467,21 @@ impl StorageService {
             .await
             .map_err(|error| AppError::InternalError(error.to_string()))?;
 
-        if need_store {
+        let actual_size = if need_store {
             self.local_storage
                 .store_from_async_read(user_id, hash, reader, size as u64)
                 .await
                 .map_err(|error| AppError::InternalError(error.to_string()))?;
-        }
+            size
+        } else {
+            let mut reader = reader;
+            let _ = tokio::io::copy(&mut reader, &mut tokio::io::sink()).await;
+            self.local_storage
+                .get_plaintext_size(user_id, hash)
+                .await
+                .map(|s| s as i64)
+                .unwrap_or(size)
+        };
 
         let mut storage_item = Storage {
             id: None,
@@ -482,7 +503,7 @@ impl StorageService {
             ),
             mime_type: Some(content_type.to_string()),
             encoding: None,
-            size: Some(size),
+            size: Some(actual_size),
             md5_hash: None,
             iv: None,
             content_hash: Some(hash.to_string()),
@@ -734,11 +755,10 @@ impl StorageService {
                 .await
                 .map_err(|e| AppError::InternalError(e.to_string()))?;
 
-            let (preview_bytes, preview_mime) = tokio::task::spawn_blocking(move || {
-                generate_preview(&orig_bytes, 1600)
-            })
-            .await
-            .map_err(|e| AppError::InternalError(e.to_string()))??;
+            let (preview_bytes, preview_mime) =
+                tokio::task::spawn_blocking(move || generate_preview(&orig_bytes, 1600))
+                    .await
+                    .map_err(|e| AppError::InternalError(e.to_string()))??;
 
             if let Err(e) = tokio::fs::write(&preview_path, &preview_bytes).await {
                 tracing::warn!(error = %e, "Failed to cache preview to disk");
@@ -764,11 +784,10 @@ impl StorageService {
                 .map_err(|e| AppError::InternalError(e.to_string()))?
                 .ok_or_else(|| AppError::NotFound("File not found".into()))?;
 
-            let (preview_bytes, preview_mime) = tokio::task::spawn_blocking(move || {
-                generate_preview(&orig_bytes, 1600)
-            })
-            .await
-            .map_err(|e| AppError::InternalError(e.to_string()))??;
+            let (preview_bytes, preview_mime) =
+                tokio::task::spawn_blocking(move || generate_preview(&orig_bytes, 1600))
+                    .await
+                    .map_err(|e| AppError::InternalError(e.to_string()))??;
 
             if let Err(e) = tokio::fs::write(&preview_path, &preview_bytes).await {
                 tracing::warn!(error = %e, "Failed to cache legacy preview to disk");

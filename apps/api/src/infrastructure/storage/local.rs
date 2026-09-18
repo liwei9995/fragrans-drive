@@ -88,7 +88,11 @@ impl LocalStorage {
         Ok(path)
     }
 
-    pub fn get_preview_path(&self, user_id: &str, sha256_hash: &str) -> Result<PathBuf, StorageIoError> {
+    pub fn get_preview_path(
+        &self,
+        user_id: &str,
+        sha256_hash: &str,
+    ) -> Result<PathBuf, StorageIoError> {
         let mut path = self.get_path(user_id, sha256_hash)?;
         let file_name = path
             .file_name()
@@ -204,6 +208,13 @@ impl LocalStorage {
                     expected: content_hash.to_string(),
                     actual: hash_result,
                 });
+            }
+
+            if total_read != plaintext_size {
+                return Err(StorageIoError::Format(format!(
+                    "Uploaded stream size {} does not match expected size {}",
+                    total_read, plaintext_size
+                )));
             }
 
             out_file.sync_all().await?;
@@ -369,16 +380,52 @@ impl LocalStorage {
         if path.exists() {
             fs::remove_file(&path).await?;
         }
-        if let Ok(preview_path) = self.get_preview_path(user_id, content_hash) {
-            if preview_path.exists() {
-                let _ = fs::remove_file(preview_path).await;
-            }
+        if let Ok(preview_path) = self.get_preview_path(user_id, content_hash)
+            && preview_path.exists()
+        {
+            let _ = fs::remove_file(preview_path).await;
         }
         Ok(())
     }
 
     pub async fn exists(&self, user_id: &str, content_hash: &str) -> Result<bool, StorageIoError> {
         Ok(self.get_path(user_id, content_hash)?.exists())
+    }
+
+    pub async fn get_plaintext_size(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+    ) -> Result<u64, StorageIoError> {
+        let path = self.get_path(user_id, content_hash)?;
+        if !path.exists() {
+            return Err(StorageIoError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "File not found",
+            )));
+        }
+        let mut in_file = fs::File::open(path).await?;
+        let mut magic = [0u8; 8];
+        in_file.read_exact(&mut magic).await?;
+        if &magic != MAGIC {
+            return Err(StorageIoError::Format("Bad magic".into()));
+        }
+        let version = in_file.read_u8().await?;
+        if version != VERSION {
+            return Err(StorageIoError::Format(format!(
+                "Unsupported version: {}",
+                version
+            )));
+        }
+        let chunk_size = in_file.read_u32().await?;
+        if chunk_size != CHUNK_SIZE {
+            return Err(StorageIoError::Format(format!(
+                "Invalid chunk size: {}",
+                chunk_size
+            )));
+        }
+        let plaintext_size = in_file.read_u64().await?;
+        Ok(plaintext_size)
     }
 
     pub async fn stream_content(
@@ -669,7 +716,10 @@ pub mod legacy {
             Ok(p)
         }
 
-        pub fn get_legacy_preview_path(&self, md5_hash: &str) -> Result<std::path::PathBuf, StorageIoError> {
+        pub fn get_legacy_preview_path(
+            &self,
+            md5_hash: &str,
+        ) -> Result<std::path::PathBuf, StorageIoError> {
             let mut path = self.get_legacy_path(md5_hash)?;
             let file_name = path
                 .file_name()
@@ -729,8 +779,7 @@ pub mod legacy {
             let mut in_file = tokio::fs::File::open(path).await?;
             let total_len = in_file.metadata().await?.len();
             if total_len == 0 {
-                let stream: StorageStream =
-                    Box::pin(futures::stream::empty());
+                let stream: StorageStream = Box::pin(futures::stream::empty());
                 return Ok(Some((0, 0, stream)));
             }
 
@@ -776,31 +825,32 @@ pub mod legacy {
             };
 
             use tokio::io::AsyncReadExt;
-            let stream: StorageStream = Box::pin(futures::stream::unfold(state, |mut s| async move {
-                if s.remaining == 0 {
-                    return None;
-                }
-
-                let to_read = std::cmp::min(s.remaining, 64 * 1024) as usize;
-                let mut buf = vec![0u8; to_read];
-                match s.in_file.read_exact(&mut buf).await {
-                    Ok(_) => {
-                        if let Some(c) = s.cipher.as_mut() {
-                            c.apply_keystream(&mut buf);
-                        }
-                        s.remaining -= to_read as u64;
-                        Some((Ok(axum::body::Bytes::from(buf)), s))
+            let stream: StorageStream =
+                Box::pin(futures::stream::unfold(state, |mut s| async move {
+                    if s.remaining == 0 {
+                        return None;
                     }
-                    Err(e) => Some((
-                        Err(StorageIoError::Io(e)),
-                        LegacyStreamState {
-                            in_file: s.in_file,
-                            cipher: None,
-                            remaining: 0,
-                        },
-                    )),
-                }
-            }));
+
+                    let to_read = std::cmp::min(s.remaining, 64 * 1024) as usize;
+                    let mut buf = vec![0u8; to_read];
+                    match s.in_file.read_exact(&mut buf).await {
+                        Ok(_) => {
+                            if let Some(c) = s.cipher.as_mut() {
+                                c.apply_keystream(&mut buf);
+                            }
+                            s.remaining -= to_read as u64;
+                            Some((Ok(axum::body::Bytes::from(buf)), s))
+                        }
+                        Err(e) => Some((
+                            Err(StorageIoError::Io(e)),
+                            LegacyStreamState {
+                                in_file: s.in_file,
+                                cipher: None,
+                                remaining: 0,
+                            },
+                        )),
+                    }
+                }));
 
             Ok(Some((total_len, range_len, stream)))
         }

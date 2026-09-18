@@ -18,6 +18,7 @@ declare module 'vue' {
     AvatarCropper: typeof import('./components/AvatarCropper/index.vue')['default']
     CodeTextViewer: typeof import('./components/FilePreviewModal/viewers/CodeTextViewer.vue')['default']
     CsvViewer: typeof import('./components/FilePreviewModal/viewers/CsvViewer.vue')['default']
+    ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']
     ElBreadcrumbItem: typeof import('element-plus/es')['ElBreadcrumbItem']

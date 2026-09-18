@@ -78,6 +78,14 @@ jobs:
             DRIVE_DOMAIN=$DRIVE_DOMAIN
             ALIYUN_REGISTRY_URL=$ALIYUN_REGISTRY_URL
             IMAGE_TAG=$UNIQUE_TAG
+            ALLOW_REGISTRATION=$ALLOW_REGISTRATION
+            CAPTCHA_REQUIRED=$CAPTCHA_REQUIRED
+            EMAIL_VERIFICATION_REQUIRED=$EMAIL_VERIFICATION_REQUIRED
+            SMTP_HOST=$SMTP_HOST
+            SMTP_PORT=$SMTP_PORT
+            SMTP_USER=$SMTP_USER
+            SMTP_PASS=$SMTP_PASS
+            SMTP_FROM=$SMTP_FROM
             EOF
 
             echo "Deploying config files to Aliyun..."
