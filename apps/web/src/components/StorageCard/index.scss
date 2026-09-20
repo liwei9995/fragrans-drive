@@ -24,6 +24,11 @@
           .selection-checkbox {
             opacity: 1;
           }
+
+          .video-play-badge {
+            transform: scale(1.1);
+            background-color: rgba(0, 0, 0, 0.8);
+          }
         }
 
         .action-btn-more {
@@ -151,7 +156,32 @@
 
                 &.thumb .icon {
                   border: 1px solid rgb(132 133 141 / 16%);
-                  border-radius: 5px;
+                  border-radius: 6px;
+
+                  &:deep(.el-image__inner),
+                  &:deep(img) {
+                    object-fit: cover;
+                  }
+                }
+
+                .video-play-badge {
+                  position: absolute;
+                  right: 4px;
+                  bottom: 4px;
+                  z-index: 2;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  width: 22px;
+                  height: 22px;
+                  color: #fff;
+                  background-color: rgba(0, 0, 0, 0.6);
+                  backdrop-filter: blur(4px);
+                  -webkit-backdrop-filter: blur(4px);
+                  border-radius: 50%;
+                  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+                  pointer-events: none;
+                  transition: transform 0.2s ease, background-color 0.2s ease;
                 }
 
                 .icon-placeholder {

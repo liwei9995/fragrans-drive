@@ -1,5 +1,5 @@
 <script setup lang="ts" name="storage-card">
-import { More, SuccessFilled } from '@element-plus/icons-vue'
+import { CaretRight, More, SuccessFilled } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
@@ -173,7 +173,7 @@ const handleLoad = () => (showPlaceholder.value = false)
                 <div
                   class="file-icon"
                   :class="{
-                    thumb: !showPlaceholder && (previewSrcList.length > 0 || (mimeType && mimeType.startsWith('image/'))),
+                    thumb: !showPlaceholder && (previewSrcList.length > 0 || (mimeType && (mimeType.startsWith('image/') || mimeType.startsWith('video/')))),
                   }"
                 >
                   <el-image
@@ -194,6 +194,12 @@ const handleLoad = () => (showPlaceholder.value = false)
                     class="icon-placeholder"
                     :style="{ backgroundImage: 'url(' + thumbPlaceholder + ')' }"
                   />
+                  <div
+                    v-if="!showPlaceholder && mimeType && mimeType.startsWith('video/')"
+                    class="video-play-badge"
+                  >
+                    <el-icon :size="13"><CaretRight /></el-icon>
+                  </div>
                 </div>
               </div>
             </div>

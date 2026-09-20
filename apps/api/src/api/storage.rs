@@ -557,9 +557,23 @@ pub async fn get_files(
     let limit = payload.limit.clamp(1, 1000);
     let sort = build_sort(&payload);
 
-    let (files, total) = service
+    let (mut files, total) = service
         .get_files(&user_ctx.user_id, query, page, limit, sort)
         .await?;
+
+    for file in &mut files {
+        if file.thumbnail.is_none()
+            && file
+                .mime_type
+                .as_deref()
+                .unwrap_or("")
+                .starts_with("video/")
+        {
+            if let Ok(Some(thumb_id)) = service.ensure_video_thumbnail(file).await {
+                file.thumbnail = Some(thumb_id.to_hex());
+            }
+        }
+    }
 
     let thumb_ids: Vec<mongodb::bson::oid::ObjectId> = files
         .iter()

@@ -19,7 +19,13 @@ async fn main() {
         .await
         .expect("Failed to initialize database");
 
-    let app = api::router(db, config.clone());
+    let app = api::router(db.clone(), config.clone());
+
+    let db_bg = db.clone();
+    let config_bg = config.clone();
+    tokio::spawn(async move {
+        fragrans::service::storage::backfill_video_thumbnails(&db_bg, &config_bg).await;
+    });
 
     let port = config.port;
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

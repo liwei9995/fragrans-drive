@@ -261,6 +261,133 @@ impl StorageService {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub async fn create_and_store_thumbnail(
+        &self,
+        user_id: &str,
+        parent_id: &str,
+        name: &str,
+        thumb_data: &[u8],
+    ) -> Result<ObjectId, AppError> {
+        use sha2::Digest;
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(thumb_data);
+        let thumb_hash = hex::encode(hasher.finalize());
+
+        let thumb_need_store = !self
+            .local_storage
+            .exists(user_id, &thumb_hash)
+            .await
+            .map_err(|error| AppError::InternalError(error.to_string()))?;
+
+        let thumb_item = Storage {
+            id: None,
+            name: format!("{}_thumbnail", name),
+            base_name: None,
+            ext_name: None,
+            mime_type: Some("image/jpeg".to_string()),
+            encoding: None,
+            size: Some(thumb_data.len() as i64),
+            md5_hash: None,
+            iv: None,
+            content_hash: Some(thumb_hash.clone()),
+            hash_algorithm: Some("sha256".to_string()),
+            encryption_format: Some(1),
+            share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
+            parent_id: parent_id.to_string(),
+            r#type: StorageType::Thumbnail,
+            user_id: user_id.to_string(),
+            thumbnail: None,
+            trashed: false,
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
+        };
+
+        if thumb_need_store {
+            let thumb_temp = tempfile::NamedTempFile::new()
+                .map_err(|error| AppError::InternalError(error.to_string()))?;
+            tokio::fs::write(thumb_temp.path(), thumb_data)
+                .await
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+            self.local_storage
+                .store_from_file(user_id, &thumb_hash, thumb_temp.path())
+                .await
+                .map_err(|error| AppError::InternalError(error.to_string()))?;
+        }
+
+        let thumb_id = self.repo.create(thumb_item).await?;
+        Ok(thumb_id)
+    }
+
+    pub async fn ensure_video_thumbnail(
+        &self,
+        video_item: &Storage,
+    ) -> Result<Option<ObjectId>, AppError> {
+        if video_item.thumbnail.is_some() {
+            return Ok(None);
+        }
+        let mime = video_item.mime_type.as_deref().unwrap_or("");
+        if !mime.starts_with("video/") {
+            return Ok(None);
+        }
+
+        let thumb_data = if let Some(ref hash) = video_item.content_hash {
+            crate::infrastructure::video::thumbnail::extract_video_thumbnail_from_storage(
+                &self.local_storage,
+                &video_item.user_id,
+                hash,
+            )
+            .await
+        } else if let Some(ref md5_hash) = video_item.md5_hash {
+            crate::infrastructure::video::thumbnail::extract_video_thumbnail_from_legacy(
+                &self.local_storage,
+                md5_hash,
+                video_item.iv.as_deref(),
+            )
+            .await
+        } else {
+            return Ok(None);
+        };
+
+        let thumb_data = match thumb_data {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::warn!(
+                    video_id = ?video_item.id,
+                    error = %e,
+                    "Failed to extract video thumbnail for existing video"
+                );
+                return Ok(None);
+            }
+        };
+
+        let thumb_id = self
+            .create_and_store_thumbnail(
+                &video_item.user_id,
+                &video_item.parent_id,
+                &video_item.name,
+                &thumb_data,
+            )
+            .await?;
+
+        if let Some(video_id) = video_item.id {
+            let _ = self
+                .repo
+                .update_one(
+                    video_id,
+                    &video_item.user_id,
+                    doc! { "thumbnail": thumb_id.to_hex() },
+                )
+                .await;
+        }
+
+        Ok(Some(thumb_id))
+    }
+
     pub async fn upload_file_chunk(
         &self,
         user_id: &str,
@@ -348,7 +475,8 @@ impl StorageService {
         };
 
         let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
-        let mut thumbnail_item = None;
+        let is_video = content_type.starts_with("video/");
+        let mut thumbnail_id = None;
 
         let mut is_valid_image = false;
         if is_raster_image {
@@ -369,55 +497,26 @@ impl StorageService {
                 .await
                 .map_err(|_| AppError::BadRequest("Thumbnail task failed".into()))??;
 
-            use sha2::Digest;
-            let mut hasher = sha2::Sha256::new();
-            hasher.update(&thumb_data);
-            let thumb_hash = hex::encode(hasher.finalize());
-
-            let thumb_need_store = !self
-                .local_storage
-                .exists(user_id, &thumb_hash)
+            if let Ok(t_id) = self
+                .create_and_store_thumbnail(user_id, parent_id, &name, &thumb_data)
                 .await
-                .map_err(|error| AppError::InternalError(error.to_string()))?;
-
-            let thumb_item = Storage {
-                id: None,
-                name: format!("{}_thumbnail", name),
-                base_name: None,
-                ext_name: None,
-                mime_type: Some("image/jpeg".to_string()),
-                encoding: None,
-                size: Some(thumb_data.len() as i64),
-                md5_hash: None,
-                iv: None,
-                content_hash: Some(thumb_hash.clone()),
-                hash_algorithm: Some("sha256".to_string()),
-                encryption_format: Some(1),
-                share_version: 0,
-                is_public: false,
-                public_slug: None,
-                public_expires_at: None,
-                public_access_count: Some(0),
-                last_public_accessed_at: None,
-                parent_id: parent_id.to_string(),
-                r#type: StorageType::Thumbnail,
-                user_id: user_id.to_string(),
-                thumbnail: None,
-                trashed: false,
-                created_at: Some(Utc::now()),
-                updated_at: Some(Utc::now()),
-            };
-
-            if thumb_need_store {
-                let thumb_temp = tempfile::NamedTempFile::new()
-                    .map_err(|error| AppError::InternalError(error.to_string()))?;
-                tokio::fs::write(thumb_temp.path(), &thumb_data).await?;
-                self.local_storage
-                    .store_from_file(user_id, &thumb_hash, thumb_temp.path())
-                    .await
-                    .map_err(|error| AppError::InternalError(error.to_string()))?;
+            {
+                thumbnail_id = Some(t_id);
             }
-            thumbnail_item = Some(thumb_item);
+        } else if is_video {
+            if let Ok(thumb_data) =
+                crate::infrastructure::video::thumbnail::extract_video_thumbnail_from_file(
+                    temp_file_path,
+                )
+                .await
+            {
+                if let Ok(t_id) = self
+                    .create_and_store_thumbnail(user_id, parent_id, &name, &thumb_data)
+                    .await
+                {
+                    thumbnail_id = Some(t_id);
+                }
+            }
         }
 
         if need_store {
@@ -443,10 +542,6 @@ impl StorageService {
             });
         }
 
-        let thumbnail_id = match thumbnail_item {
-            Some(item) => Some(self.repo.create(item).await?),
-            None => None,
-        };
         storage_item.thumbnail = thumbnail_id.map(|id| id.to_hex());
 
         match self.repo.create(storage_item).await {
@@ -557,7 +652,8 @@ impl StorageService {
         };
 
         let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
-        let mut thumbnail_item = None;
+        let is_video = content_type.starts_with("video/");
+        let mut thumbnail_id = None;
 
         if is_raster_image {
             let stream_res = self
@@ -589,66 +685,33 @@ impl StorageService {
                         tokio::task::spawn_blocking(move || generate_thumbnail(&data)).await;
 
                     if let Ok(Ok(thumb_data)) = thumb_data_res {
-                        use sha2::Digest;
-                        let mut hasher = sha2::Sha256::new();
-                        hasher.update(&thumb_data);
-                        let thumb_hash = hex::encode(hasher.finalize());
-
-                        let thumb_need_store = !self
-                            .local_storage
-                            .exists(user_id, &thumb_hash)
+                        if let Ok(t_id) = self
+                            .create_and_store_thumbnail(user_id, parent_id, name, &thumb_data)
                             .await
-                            .map_err(|error| AppError::InternalError(error.to_string()))?;
-
-                        let thumb_item = Storage {
-                            id: None,
-                            name: format!("{}_thumbnail", name),
-                            base_name: None,
-                            ext_name: None,
-                            mime_type: Some("image/jpeg".to_string()),
-                            encoding: None,
-                            size: Some(thumb_data.len() as i64),
-                            md5_hash: None,
-                            iv: None,
-                            content_hash: Some(thumb_hash.clone()),
-                            hash_algorithm: Some("sha256".to_string()),
-                            encryption_format: Some(1),
-                            share_version: 0,
-                            is_public: false,
-                            public_slug: None,
-                            public_expires_at: None,
-                            public_access_count: Some(0),
-                            last_public_accessed_at: None,
-                            parent_id: parent_id.to_string(),
-                            r#type: StorageType::Thumbnail,
-                            user_id: user_id.to_string(),
-                            thumbnail: None,
-                            trashed: false,
-                            created_at: Some(Utc::now()),
-                            updated_at: Some(Utc::now()),
-                        };
-
-                        if thumb_need_store {
-                            let thumb_temp = tempfile::NamedTempFile::new()
-                                .map_err(|error| AppError::InternalError(error.to_string()))?;
-                            tokio::fs::write(thumb_temp.path(), &thumb_data)
-                                .await
-                                .map_err(|e| AppError::InternalError(e.to_string()))?;
-                            self.local_storage
-                                .store_from_file(user_id, &thumb_hash, thumb_temp.path())
-                                .await
-                                .map_err(|error| AppError::InternalError(error.to_string()))?;
+                        {
+                            thumbnail_id = Some(t_id);
                         }
-                        thumbnail_item = Some(thumb_item);
                     }
+                }
+            }
+        } else if is_video {
+            if let Ok(thumb_data) =
+                crate::infrastructure::video::thumbnail::extract_video_thumbnail_from_storage(
+                    &self.local_storage,
+                    user_id,
+                    hash,
+                )
+                .await
+            {
+                if let Ok(t_id) = self
+                    .create_and_store_thumbnail(user_id, parent_id, name, &thumb_data)
+                    .await
+                {
+                    thumbnail_id = Some(t_id);
                 }
             }
         }
 
-        let thumbnail_id = match thumbnail_item {
-            Some(item) => Some(self.repo.create(item).await?),
-            None => None,
-        };
         storage_item.thumbnail = thumbnail_id.map(|id| id.to_hex());
 
         match self.repo.create(storage_item).await {
@@ -1237,5 +1300,69 @@ impl StorageService {
     pub async fn get_storage_usage(&self, user_id: &str) -> Result<(i64, u64), AppError> {
         let (size, count) = self.repo.get_storage_usage(user_id).await?;
         Ok((size, count))
+    }
+}
+
+pub async fn backfill_video_thumbnails(
+    db: &mongodb::Database,
+    config: &crate::config::Config,
+) {
+    let repo = StorageRepository::new(db);
+    let local_storage = match LocalStorage::new(
+        config.storage_destination.clone(),
+        config.storage_master_key,
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                "Failed to initialize LocalStorage for video thumbnail backfill"
+            );
+            return;
+        }
+    };
+    let service = StorageService::new(repo.clone(), local_storage);
+
+    let query = doc! {
+        "type": "file",
+        "mimeType": { "$regex": "^video/" },
+        "$or": [
+            { "thumbnail": null },
+            { "thumbnail": { "$exists": false } }
+        ],
+        "trashed": false
+    };
+
+    match repo.find_many(query).await {
+        Ok(videos) => {
+            if !videos.is_empty() {
+                tracing::info!(count = videos.len(), "Starting background backfill of video thumbnails");
+                for video in videos {
+                    match service.ensure_video_thumbnail(&video).await {
+                        Ok(Some(thumb_id)) => {
+                            tracing::info!(
+                                video_id = ?video.id,
+                                name = %video.name,
+                                thumb_id = %thumb_id,
+                                "Successfully backfilled thumbnail for video"
+                            );
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            tracing::warn!(
+                                video_id = ?video.id,
+                                name = %video.name,
+                                error = %e,
+                                "Failed to backfill thumbnail for video"
+                            );
+                        }
+                    }
+                }
+                tracing::info!("Completed background backfill of video thumbnails");
+            }
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to query videos for thumbnail backfill");
+        }
     }
 }

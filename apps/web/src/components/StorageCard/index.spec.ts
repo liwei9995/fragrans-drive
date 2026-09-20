@@ -137,4 +137,27 @@ describe('StorageCard', () => {
       expect.any(String),
     )
   })
+
+  it('renders video play badge when video thumbnail is loaded', async () => {
+    const wrapper = mount(StorageCard, {
+      props: {
+        id: '1',
+        title: 'video.mp4',
+        mimeType: 'video/mp4',
+        thumbUrl: 'http://test.jpg',
+      },
+      global: {
+        stubs: {
+          More: true,
+          SuccessFilled: true,
+          CaretRight: true,
+        },
+      },
+    })
+    expect(wrapper.find('.video-play-badge').exists()).toBe(false)
+
+    await wrapper.findComponent({ name: 'ElImage' }).vm.$emit('load')
+    expect(wrapper.find('.video-play-badge').exists()).toBe(true)
+    expect(wrapper.find('.file-icon').classes()).toContain('thumb')
+  })
 })
