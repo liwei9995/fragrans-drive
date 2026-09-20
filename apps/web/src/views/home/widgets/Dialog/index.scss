@@ -1,4 +1,7 @@
 .dialog-wrapper {
+  max-width: calc(100vw - 24px) !important;
+  margin: 16px auto !important;
+
   .thumb-wrapper {
     display: flex;
     align-items: center;

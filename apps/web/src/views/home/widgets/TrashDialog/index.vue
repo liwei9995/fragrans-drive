@@ -361,12 +361,19 @@ const handleEmptyTrash = () => {
   </el-dialog>
 </template>
 
-<style scoped lang="scss">
-:deep(.trash-dialog) {
+<style lang="scss">
+.trash-dialog {
   border-radius: 16px;
   overflow: hidden;
   max-width: calc(100vw - 20px);
   margin: 16px auto !important;
+
+  @media (max-width: 768px) {
+    --el-dialog-width: calc(100vw - 20px) !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    margin: 12px auto !important;
+  }
 
   .el-dialog__header {
     margin-right: 0;
@@ -384,10 +391,12 @@ const handleEmptyTrash = () => {
   }
 
   .el-dialog__body {
-    padding: 0;
+    padding: 0 !important;
   }
 }
+</style>
 
+<style scoped lang="scss">
 .trash-container {
   display: flex;
   flex-direction: column;
@@ -403,7 +412,7 @@ const handleEmptyTrash = () => {
 
   @media (max-width: 640px) {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 10px;
     padding: 10px 14px;
   }
@@ -412,6 +421,11 @@ const handleEmptyTrash = () => {
     display: flex;
     align-items: center;
     gap: 10px;
+
+    @media (max-width: 640px) {
+      width: 100%;
+      justify-content: space-between;
+    }
 
     .trash-count-badge {
       font-size: 13px;
@@ -430,6 +444,7 @@ const handleEmptyTrash = () => {
       width: 100%;
       justify-content: flex-end;
       flex-wrap: wrap;
+      gap: 6px;
     }
   }
 }
@@ -442,6 +457,11 @@ const handleEmptyTrash = () => {
   padding: 60px 20px;
   gap: 10px;
   color: #888;
+  text-align: center;
+
+  @media (max-width: 640px) {
+    padding: 40px 16px;
+  }
 
   .empty-icon-box {
     width: 80px;
@@ -457,7 +477,7 @@ const handleEmptyTrash = () => {
   .empty-title {
     font-size: 16px;
     font-weight: 600;
-    color: #444;
+    color: var(--text-color, #444);
   }
 
   .empty-subtitle {
@@ -480,6 +500,10 @@ const handleEmptyTrash = () => {
   color: #888;
   background-color: rgba(0, 0, 0, 0.015);
   border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+
+  @media (max-width: 640px) {
+    padding: 8px 10px;
+  }
 }
 
 .trash-table-body {
@@ -494,6 +518,10 @@ const handleEmptyTrash = () => {
   border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.04));
   cursor: pointer;
   transition: background-color 0.15s ease;
+
+  @media (max-width: 640px) {
+    padding: 8px 10px;
+  }
 
   &:hover {
     background-color: rgba(0, 143, 253, 0.04);
@@ -529,7 +557,7 @@ const handleEmptyTrash = () => {
   .row-name {
     font-size: 13px;
     font-weight: 500;
-    color: #333;
+    color: var(--text-color, #333);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -565,5 +593,9 @@ const handleEmptyTrash = () => {
   width: 70px;
   text-align: right;
   flex-shrink: 0;
+
+  @media (max-width: 640px) {
+    width: 50px;
+  }
 }
 </style>

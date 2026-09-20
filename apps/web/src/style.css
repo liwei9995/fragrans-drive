@@ -447,3 +447,61 @@ button:focus-visible {
 .el-progress-bar__inner {
   background-color: var(--c-primary) !important;
 }
+
+/* ==========================================================================
+   Responsive & Modern Dialog Styling (Element Plus)
+   ========================================================================== */
+.el-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 20px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.el-dialog__header {
+  margin-right: 0 !important;
+  padding: 18px 24px !important;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+}
+
+.el-dialog__title {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  color: var(--text-color, #0f172a);
+}
+
+.el-dialog__headerbtn {
+  top: 16px !important;
+  right: 16px !important;
+}
+
+@media (max-width: 768px) {
+  .el-overlay-dialog {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .el-dialog {
+    --el-dialog-width: calc(100vw - 24px) !important;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    border-radius: 16px !important;
+  }
+
+  .el-dialog__header {
+    padding: 14px 16px !important;
+  }
+
+  .el-dialog__title {
+    font-size: 16px !important;
+  }
+
+  .el-dialog__headerbtn {
+    top: 12px !important;
+    right: 12px !important;
+  }
+}

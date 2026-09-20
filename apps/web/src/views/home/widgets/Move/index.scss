@@ -49,6 +49,8 @@
 
 @media (width <= 576px) {
   .move-dialog-wrapper {
-    width: 340px;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
   }
 }

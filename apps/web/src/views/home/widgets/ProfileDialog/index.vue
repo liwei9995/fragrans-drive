@@ -437,13 +437,20 @@ const handleChangePassword = async () => {
   </el-dialog>
 </template>
 
-<style scoped lang="scss">
-:deep(.profile-dialog) {
+<style lang="scss">
+.profile-dialog {
   border-radius: 16px;
   overflow: hidden;
   max-width: calc(100vw - 20px);
   margin: 16px auto !important;
   text-align: left;
+
+  @media (max-width: 768px) {
+    --el-dialog-width: calc(100vw - 20px) !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    margin: 12px auto !important;
+  }
 
   .el-dialog__header {
     margin-right: 0;
@@ -462,13 +469,18 @@ const handleChangePassword = async () => {
 
   .el-dialog__body {
     padding: 20px 24px 28px;
+    max-height: calc(88vh - 60px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 
     @media (max-width: 540px) {
       padding: 14px 16px 20px;
     }
   }
 }
+</style>
 
+<style scoped lang="scss">
 .user-overview {
   display: flex;
   align-items: center;
@@ -528,14 +540,14 @@ const handleChangePassword = async () => {
   .user-overview-info {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    text-align: left;
     gap: 4px;
+    text-align: left;
 
     .user-name {
       font-size: 18px;
-      font-weight: 600;
-      color: #222;
+      font-weight: 700;
+      color: var(--text-color, #111);
+      font-family: 'Outfit', sans-serif;
       text-align: left;
     }
 
@@ -552,6 +564,11 @@ const handleChangePassword = async () => {
   align-items: center;
   gap: 6px;
   font-size: 14px;
+
+  @media (max-width: 480px) {
+    font-size: 13px;
+    gap: 4px;
+  }
 }
 
 .storage-section {
@@ -577,7 +594,7 @@ const handleChangePassword = async () => {
       .quota-title {
         font-size: 14px;
         font-weight: 600;
-        color: #333;
+        color: var(--text-color, #333);
       }
 
       .quota-ratio {
@@ -603,8 +620,25 @@ const handleChangePassword = async () => {
     gap: 12px;
 
     @media (max-width: 540px) {
-      grid-template-columns: 1fr;
       gap: 8px;
+    }
+
+    @media (max-width: 480px) {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+
+      .stat-box {
+        padding: 10px 6px;
+        text-align: center;
+
+        .stat-label {
+          font-size: 11px;
+        }
+
+        .stat-value {
+          font-size: 13px;
+        }
+      }
     }
 
     .stat-box {
@@ -624,7 +658,7 @@ const handleChangePassword = async () => {
       .stat-value {
         font-size: 16px;
         font-weight: 600;
-        color: #333;
+        color: var(--text-color, #333);
       }
     }
   }
@@ -709,6 +743,13 @@ const handleChangePassword = async () => {
         align-items: center;
         gap: 10px;
         flex-wrap: wrap;
+
+        @media (max-width: 480px) {
+          width: 100%;
+          .el-button {
+            flex: 1;
+          }
+        }
       }
 
       .avatar-url-row {

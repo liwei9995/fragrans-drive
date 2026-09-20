@@ -444,17 +444,63 @@ const handleClose = () => emit('close')
   </el-dialog>
 </template>
 
-<style scoped lang="scss">
+<style lang="scss">
 .public-link-dialog {
-  :deep(.el-dialog__body) {
-    padding: 16px 24px;
+  border-radius: 16px;
+  overflow: hidden;
+  max-width: calc(100vw - 20px);
+  margin: 16px auto !important;
+
+  @media (max-width: 768px) {
+    --el-dialog-width: calc(100vw - 20px) !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    margin: 12px auto !important;
   }
 
-  .dialog-body {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+  .el-dialog__header {
+    margin-right: 0;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+
+    @media (max-width: 640px) {
+      padding: 12px 16px;
+    }
+
+    .el-dialog__title {
+      font-size: 16px;
+      font-weight: 600;
+    }
   }
+
+  .el-dialog__body {
+    padding: 16px 20px;
+    max-height: calc(85vh - 120px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+
+    @media (max-width: 640px) {
+      padding: 12px 14px;
+    }
+  }
+
+  .el-dialog__footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+
+    @media (max-width: 640px) {
+      padding: 10px 14px;
+    }
+  }
+}
+</style>
+
+<style scoped lang="scss">
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
   .file-summary {
     display: flex;
@@ -700,5 +746,4 @@ const handleClose = () => emit('close')
       }
     }
   }
-}
 </style>
