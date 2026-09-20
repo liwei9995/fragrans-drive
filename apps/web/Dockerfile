@@ -27,4 +27,5 @@ COPY --from=build-stage /app/apps/web/dist /app
 COPY apps/web/deploy/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY apps/web/deploy/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 ENV API_UPSTREAM=http://host.docker.internal:3821 \
-    NGINX_ENVSUBST_FILTER=API_UPSTREAM
+    TRUSTED_INGRESS_CIDR=127.0.0.1/32 \
+    NGINX_ENVSUBST_FILTER=API_UPSTREAM|TRUSTED_INGRESS_CIDR

@@ -9,6 +9,7 @@ CONTAINER_PORT=8061
 CONTAINER_INNER_PORT=80
 COMMIT_SHA=$(git rev-parse --short HEAD)
 API_UPSTREAM=${API_UPSTREAM:-http://host.docker.internal:3821}
+TRUSTED_INGRESS_CIDR=${TRUSTED_INGRESS_CIDR:-127.0.0.1/32}
 
 # Build fragrans-drive image
 docker build --pull --no-cache -t "$REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA" .
@@ -39,6 +40,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
     -d \
     -p "$CONTAINER_PORT:$CONTAINER_INNER_PORT" \
     -e "API_UPSTREAM=$API_UPSTREAM" \
+    -e "TRUSTED_INGRESS_CIDR=$TRUSTED_INGRESS_CIDR" \
     --add-host host.docker.internal:host-gateway \
     --restart=always \
     "$REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA"
@@ -48,6 +50,7 @@ elif [ "$(uname -s)" = "Linux" ]; then
     -d \
     -p "$CONTAINER_PORT:$CONTAINER_INNER_PORT" \
     -e "API_UPSTREAM=$API_UPSTREAM" \
+    -e "TRUSTED_INGRESS_CIDR=$TRUSTED_INGRESS_CIDR" \
     --add-host host.docker.internal:host-gateway \
     --restart=always \
     -v /etc/localtime:/etc/localtime:ro \
