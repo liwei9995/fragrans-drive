@@ -1,5 +1,5 @@
 FROM rust:alpine AS builder
-RUN apk add --no-cache musl-dev gcc curl unzip
+RUN apk add --no-cache musl-dev gcc curl unzip pkgconfig openssl-dev
 
 WORKDIR /usr/src/fragrans
 
@@ -21,7 +21,7 @@ RUN touch src/lib.rs src/main.rs src/bin/migrate_storage_v1.rs \
     && cargo build --release --bin fragrans
 
 FROM alpine:latest
-RUN apk add --no-cache libgcc ffmpeg
+RUN apk add --no-cache libgcc ffmpeg openssl ca-certificates
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN mkdir -p /app/bucket && chown -R appuser:appgroup /app
