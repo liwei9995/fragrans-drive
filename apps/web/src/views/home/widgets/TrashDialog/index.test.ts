@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  deleteTrash,
   emptyTrash,
   getTrashList,
   restoreFile,
@@ -35,6 +36,9 @@ vi.mock('@/api/modules/storage', () => ({
     Promise.resolve({ requestedItems: 1, restoredDocs: 1 }),
   ),
   emptyTrash: vi.fn(() => Promise.resolve({ deletedDocs: 1, deletedFiles: 1 })),
+  deleteTrash: vi.fn(() =>
+    Promise.resolve({ deletedDocs: 1, deletedFiles: 1 }),
+  ),
 }))
 
 describe('TrashDialog.vue', () => {

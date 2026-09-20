@@ -5,7 +5,8 @@ import type {
   UploadProps,
   UploadRequestOptions,
 } from 'element-plus'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { GlobalStore } from '@/store'
 import { calculateFileHash } from '@/utils/fileHash'
@@ -49,8 +50,9 @@ const handleSuccess: UploadProps['onSuccess'] = (
   uploadFiles,
 ) => {
   props.onUploadSuccess?.(response, uploadFile, uploadFiles)
-  props.onUploadChange?.(uploadFile, uploadFiles)
-  clearFiles(['success'])
+  nextTick(() => {
+    clearFiles(['success'])
+  })
 }
 
 const handleError: UploadProps['onError'] = (
@@ -59,8 +61,17 @@ const handleError: UploadProps['onError'] = (
   uploadFiles,
 ) => {
   props.onUploadError?.(error, uploadFile, uploadFiles)
-  props.onUploadChange?.(uploadFile, uploadFiles)
-  clearFiles(['fail'])
+  const err = error as any
+  if (err?.response?.status === 413 || err?.status === 413) {
+    ElMessage.error(
+      '文件过大，超出服务器上传限制 (413 Request Entity Too Large)',
+    )
+  } else if (err?.response?.data?.message || err?.response?.data?.error) {
+    ElMessage.error(err.response.data.message || err.response.data.error)
+  }
+  nextTick(() => {
+    clearFiles(['fail'])
+  })
 }
 
 const customUploadRequest = async (options: UploadRequestOptions) => {

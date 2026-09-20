@@ -1,4 +1,5 @@
 <script setup lang="ts" name="home">
+import { Link } from '@element-plus/icons-vue'
 import type { UploadProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -9,6 +10,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { StorageNode } from '@/api/interface'
 import {
@@ -54,6 +56,7 @@ type BreadcrumbItem = {
   text: string
 }
 
+const { t } = useI18n()
 const globalStore = GlobalStore()
 const defaultFolderName = '新建文件夹'
 const folderDialogFormVisible = ref(false)
@@ -105,74 +108,80 @@ const {
     isDragging.value = false
     dragCounter = 0
   },
-  onComplete: () =>
+  onComplete: () => {
     fetchFiles(parentId.value, true, {
       isPublic: onlyPublic.value ? true : undefined,
-    }),
+    })
+    if (onlyPublic.value) {
+      ElMessage.info(t('file.publicUploadedNotice'))
+    }
+  },
   showStatus: () => uploadStatusRef.value?.show(),
 })
-const basicActionItems = [
+
+const basicActionItems = computed(() => [
   {
     id: 'rename',
-    name: '重命名',
+    name: t('file.rename'),
     divided: false,
   },
   {
     id: 'move',
-    name: '移动',
+    name: t('file.move'),
     divided: false,
   },
   {
     id: 'delete',
-    name: '删除',
+    name: t('file.delete'),
     divided: true,
   },
-]
-const fullActionItems = [
+])
+
+const fullActionItems = computed(() => [
   {
     id: 'preview',
-    name: '在线预览',
+    name: t('file.preview'),
     divided: false,
   },
   {
     id: 'download',
-    name: '下载',
+    name: t('file.download'),
     divided: false,
   },
   {
     id: 'publicLink',
-    name: '公开直链',
+    name: t('file.publicLink'),
     divided: false,
   },
-  ...basicActionItems,
-]
+  ...basicActionItems.value,
+])
 
-const actionItems = [
+const actionItems = computed(() => [
   {
     id: 'folder',
-    name: '新建文件夹',
+    name: t('home.newFolder'),
   },
   {
     id: 'file',
-    name: '上传文件',
+    name: t('home.uploadFile'),
     isUpload: true,
   },
-]
+])
 
-const avatarActionItems = [
+const avatarActionItems = computed(() => [
   {
     id: 'profile',
-    name: '个人中心',
+    name: t('home.profile'),
   },
   {
     id: 'trash',
-    name: '回收站',
+    name: t('home.trash'),
   },
   {
     id: 'logout',
-    name: '退出登录',
+    name: t('home.logout'),
   },
-]
+])
 
 const load = () => {
   if (isFetching.value || listData.value.page + 1 > listData.value.pages) return
@@ -274,7 +283,7 @@ const handleRenameFile = (name: string) => {
   }).then((res) => {
     const { exist, id, name, baseName, extName, createdAt, updatedAt } = res
     if (exist) {
-      ElMessage.error('已存在同名文件，请修改名称')
+      ElMessage.error(t('file.duplicateName'))
     } else {
       renameDialogFormVisible.value = false
 
@@ -313,7 +322,7 @@ const handleTapActionItem = (command: string | number | object) => {
   } else if (command === 'trash') {
     trashDialogVisible.value = true
   } else if (command === 'logout') {
-    globalStore.$reset()
+    globalStore.logout()
     router.push(LOGIN_URL)
   }
 }
@@ -348,7 +357,7 @@ const download = async (id: string, _filename?: string) => {
     a.click()
     document.body.removeChild(a)
   } catch (error) {
-    ElMessage.error('下载失败，请重试')
+    ElMessage.error(t('file.downloadFailed'))
     console.error('Download error:', error)
   }
 }
@@ -366,24 +375,20 @@ const handleTapCardActionItem = async (
   } else if (command === 'download') {
     download(id, name)
   } else if (command === 'delete') {
-    ElMessageBox.confirm(
-      '文件将移入回收站，可在回收站中随时还原。确定要删除吗？',
-      '移入回收站',
-      {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    )
+    ElMessageBox.confirm(t('file.deleteConfirm'), t('file.delete'), {
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
+      type: 'warning',
+    })
       .then(async () => {
         try {
           await deleteFile(id)
           listData.value.docs = listData.value.docs.filter(
             (doc) => doc.id !== id,
           )
-          ElMessage.success('已移入回收站')
+          ElMessage.success(t('file.deleteSuccess'))
         } catch {
-          ElMessage.error('移入回收站失败，请重试')
+          ElMessage.error(t('file.deleteFailed'))
         }
       })
       .catch(() => {})
@@ -543,11 +548,11 @@ const handleClearSelection = () => {
 const handleBatchDelete = () => {
   const count = selectedIds.value.size
   ElMessageBox.confirm(
-    `确定要将选中的 ${count} 项移入回收站吗？（可在回收站中随时还原）`,
-    '批量移入回收站',
+    t('home.batchDeleteConfirm', { count }),
+    t('home.batchDelete'),
     {
-      confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
       type: 'warning',
     },
   )
@@ -567,10 +572,10 @@ const handleBatchDelete = () => {
       await fetchFiles(parentId.value)
 
       if (failed === 0) {
-        ElMessage.success(`已将 ${count} 项移入回收站`)
+        ElMessage.success(t('home.batchDeleteSuccess', { count }))
       } else {
         ElMessage.warning(
-          `操作完成：成功移入回收站 ${count - failed} 项，失败 ${failed} 项`,
+          t('home.batchDeletePartial', { success: count - failed, failed }),
         )
       }
     })
@@ -584,13 +589,13 @@ const handlePreviewVideo = (videoUrl: string) => {
 
 const handleUploadExceed: UploadProps['onExceed'] = (files) => {
   ElMessage.warning(
-    `一次最多允许上传${uploadFileLimit}个文件，你这次选择了${files.length}个`,
+    t('home.uploadLimit', { limit: uploadFileLimit, count: files.length }),
   )
 }
 
 const handelBeforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
   if (rawFile.size / 1024 / 1024 > 512) {
-    ElMessage.error('上传文件的大小不能超过512MB')
+    ElMessage.error(t('home.uploadSizeLimit'))
     return false
   }
 }
@@ -680,13 +685,16 @@ onUnmounted(() => {
           </div>
           <transition name="el-fade-in-linear">
             <div v-if="onlyPublic" class="public-filter-banner">
-              <div class="banner-left">
-                <el-tag size="small" type="primary" effect="light">已开启筛选</el-tag>
-                <span class="banner-text">当前仅显示具有公开直链的文件</span>
+              <div class="banner-top">
+                <el-tag size="small" type="primary" effect="light" class="banner-tag">{{ t('home.filterBannerTag') }}</el-tag>
+                <span class="banner-text desktop-text">{{ t('home.filterBannerText') }}</span>
+                <el-button class="banner-action" type="primary" link size="small" @click="handleToggleOnlyPublic">
+                  {{ t('home.showAllFiles') }}
+                </el-button>
               </div>
-              <el-button type="primary" link size="small" @click="handleToggleOnlyPublic">
-                显示全部文件
-              </el-button>
+              <div class="banner-text mobile-text">
+                {{ t('home.filterBannerText') }}
+              </div>
             </div>
           </transition>
           <el-scrollbar class="items-wrapper" @end-reached="load">
@@ -720,25 +728,38 @@ onUnmounted(() => {
               <div v-for="item in 10" :key="'spacer-' + item" class="empty-card" />
             </div>
           </el-scrollbar>
+          <div
+            v-if="!isFetching && onlyPublic && listData?.docs.length === 0"
+            class="filter-empty-wrapper"
+          >
+            <div class="filter-empty-icon">
+              <el-icon :size="36"><Link /></el-icon>
+            </div>
+            <p class="filter-empty-title">{{ t('home.emptyPublicTitle') }}</p>
+            <p class="filter-empty-desc">{{ t('home.emptyPublicDesc') }}</p>
+            <el-button type="primary" round size="default" @click="handleToggleOnlyPublic">
+              {{ t('home.showAllFiles') }}
+            </el-button>
+          </div>
           <Empty
-              v-if="!isFetching && listData?.docs.length === 0"
-              :on-upload-change="handleUploadChange"
-              :on-upload-exceed="handleUploadExceed"
-              :on-upload-progress="handleUploadProgress"
-              :before-upload="handelBeforeUpload"
-              :tap-item="handleTapActionItem"
-            />
+            v-else-if="!isFetching && listData?.docs.length === 0"
+            :on-upload-change="handleUploadChange"
+            :on-upload-exceed="handleUploadExceed"
+            :on-upload-progress="handleUploadProgress"
+            :before-upload="handelBeforeUpload"
+            :tap-item="handleTapActionItem"
+          />
           <Footer />
           <Dialog
             v-if="folderDialogFormVisible"
-            title="新建文件夹"
+            :title="t('file.createFolderTitle')"
             :name="folderName"
             :on-close="handleCloseFolderDialog"
             :on-confirm="handleCreateFolder"
           />
           <Dialog
             v-if="renameDialogFormVisible"
-            title="重命名"
+            :title="t('file.renameTitle')"
             :thumb-url="needToRenameThumb"
             :name="needToRenameFileName"
             :on-close="handleCloseRenameDialog"
@@ -748,7 +769,7 @@ onUnmounted(() => {
             v-if="moveDialogFormVisible"
             :id="needToMoveId"
             :parent-id="parentId"
-            title="移动到"
+            :title="t('file.moveTitle')"
             :on-close="handleCloseMoveDialog"
             :on-moved="handleMoved"
             :on-folder-created="handleFolderCreated"

@@ -10,8 +10,12 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { setPublicStatus } from '@/api/modules/storage'
 import type { StorageViewItem } from '@/hooks/useFetchFiles'
+import { formatDateTime as formatDateTimeUtil, parseDate } from '@/utils/date'
+
+const { t } = useI18n()
 
 interface PublicLinkDialogProps {
   file: StorageViewItem | null
@@ -62,15 +66,12 @@ watch(
 
 const isExpired = computed(() => {
   if (!publicExpiresAt.value) return false
-  return new Date(publicExpiresAt.value).getTime() < Date.now()
+  const d = parseDate(publicExpiresAt.value)
+  return d ? d.getTime() < Date.now() : false
 })
 
 const formatDateTime = (dateStr?: string) => {
-  if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return '-'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return formatDateTimeUtil(dateStr, '-')
 }
 
 const publicUrl = computed(() => {
@@ -134,10 +135,14 @@ const handleTogglePublic = async (val: boolean | string | number) => {
       publicAccessCount: res.publicAccessCount,
       lastPublicAccessedAt: res.lastPublicAccessedAt,
     })
-    ElMessage.success(nextVal ? '已开启公开直链访问' : '已关闭公开直链访问')
+    ElMessage.success(
+      nextVal
+        ? t('publicLink.enabledSuccess')
+        : t('publicLink.disabledSuccess'),
+    )
   } catch (err) {
     isPublic.value = !nextVal
-    ElMessage.error('更新公开状态失败，请重试')
+    ElMessage.error(t('publicLink.updateStatusFailed'))
     console.error('Failed to set public status:', err)
   } finally {
     loading.value = false
@@ -168,9 +173,13 @@ const handleExpirationChange = async (val: any) => {
       publicAccessCount: res.publicAccessCount,
       lastPublicAccessedAt: res.lastPublicAccessedAt,
     })
-    ElMessage.success(Number(val) > 0 ? '直链有效期已更新' : '已设置为永久有效')
+    ElMessage.success(
+      Number(val) > 0
+        ? t('publicLink.expirationUpdated')
+        : t('publicLink.expirationSetPermanent'),
+    )
   } catch (err) {
-    ElMessage.error('更新有效期失败，请重试')
+    ElMessage.error(t('publicLink.updateExpirationFailed'))
     console.error('Failed to update expiration:', err)
   } finally {
     loading.value = false
@@ -181,11 +190,11 @@ const handleRefreshSlug = () => {
   const currentFile = props.file
   if (!currentFile) return
   ElMessageBox.confirm(
-    '重置后原公开直链将永久失效，并立即生成全新直链，是否继续？',
-    '重置直链警告',
+    t('publicLink.resetWarningConfirm'),
+    t('publicLink.resetWarningTitle'),
     {
-      confirmButtonText: '确定重置',
-      cancelButtonText: '取消',
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
       type: 'warning',
     },
   )
@@ -213,9 +222,9 @@ const handleRefreshSlug = () => {
           publicAccessCount: res.publicAccessCount,
           lastPublicAccessedAt: res.lastPublicAccessedAt,
         })
-        ElMessage.success('已生成全新直链，原直链已失效')
+        ElMessage.success(t('publicLink.resetSuccess'))
       } catch (err) {
-        ElMessage.error('重置直链失败，请重试')
+        ElMessage.error(t('publicLink.resetFailed'))
         console.error('Failed to refresh slug:', err)
       } finally {
         loading.value = false
@@ -248,9 +257,9 @@ const copyToClipboard = async (
         copiedField.value = null
       }
     }, 1800)
-    ElMessage.success(`${label}已复制到剪贴板`)
+    ElMessage.success(t('common.copySuccess', { label }))
   } catch {
-    ElMessage.error('复制失败，请手动选择复制')
+    ElMessage.error(t('common.copyFailed'))
   }
 }
 
@@ -262,7 +271,7 @@ const handleClose = () => emit('close')
     v-model="dialogVisible"
     class="public-link-dialog"
     width="540px"
-    title="公开直链管理"
+    :title="t('publicLink.title')"
     :close-on-click-modal="false"
     append-to-body
     @close="handleClose"
@@ -275,14 +284,14 @@ const handleClose = () => emit('close')
         <div class="file-meta">
           <div class="name" :title="file?.name">{{ file?.name }}</div>
           <div class="sub-info">
-            <span class="mime">{{ file?.mimeType || '未知类型' }}</span>
+            <span class="mime">{{ file?.mimeType || t('publicLink.fileTypeUnknown') }}</span>
             <el-tag
               :type="isPublic ? (isExpired ? 'danger' : 'success') : 'info'"
               size="small"
               effect="plain"
               class="status-tag"
             >
-              {{ isPublic ? (isExpired ? '● 直链已过期' : '● 公开访问已生效') : '○ 仅私有访问' }}
+              {{ isPublic ? (isExpired ? t('publicLink.statusExpired') : t('publicLink.statusActive')) : t('publicLink.statusPrivate') }}
             </el-tag>
           </div>
         </div>
@@ -292,10 +301,10 @@ const handleClose = () => emit('close')
         <div class="toggle-info">
           <div class="toggle-title">
             <el-icon class="icon-link"><Link /></el-icon>
-            <span>允许公开直链访问</span>
+            <span>{{ t('publicLink.allowAccess') }}</span>
           </div>
           <div class="toggle-desc">
-            无需账号登录凭据即可访问（类似于 OSS / S3 公开读），可直接嵌入网页、Markdown、图片展示或外部下载。
+            {{ t('publicLink.allowAccessDesc') }}
           </div>
         </div>
         <el-switch
@@ -313,7 +322,7 @@ const handleClose = () => emit('close')
             <div class="config-header">
               <div class="config-title">
                 <el-icon class="section-icon"><Clock /></el-icon>
-                <span>直链有效期</span>
+                <span>{{ t('publicLink.expirationTitle') }}</span>
               </div>
               <el-tag
                 v-if="publicExpiresAt"
@@ -321,9 +330,9 @@ const handleClose = () => emit('close')
                 size="small"
                 effect="light"
               >
-                {{ isExpired ? '已过期' : `截止: ${formatDateTime(publicExpiresAt)}` }}
+                {{ isExpired ? t('publicLink.expired') : t('publicLink.expiresAt', { date: formatDateTime(publicExpiresAt) }) }}
               </el-tag>
-              <el-tag v-else size="small" type="info" effect="light">永久有效</el-tag>
+              <el-tag v-else size="small" type="info" effect="light">{{ t('publicLink.permanent') }}</el-tag>
             </div>
             <div class="expiration-radios">
               <el-radio-group
@@ -332,11 +341,11 @@ const handleClose = () => emit('close')
                 :disabled="loading"
                 @change="handleExpirationChange"
               >
-                <el-radio-button :value="0">永久有效</el-radio-button>
-                <el-radio-button :value="3600">1 小时</el-radio-button>
-                <el-radio-button :value="86400">1 天</el-radio-button>
-                <el-radio-button :value="604800">7 天</el-radio-button>
-                <el-radio-button :value="2592000">30 天</el-radio-button>
+                <el-radio-button :value="0">{{ t('publicLink.permanent') }}</el-radio-button>
+                <el-radio-button :value="3600">{{ t('publicLink.oneHour') }}</el-radio-button>
+                <el-radio-button :value="86400">{{ t('publicLink.oneDay') }}</el-radio-button>
+                <el-radio-button :value="604800">{{ t('publicLink.sevenDays') }}</el-radio-button>
+                <el-radio-button :value="2592000">{{ t('publicLink.thirtyDays') }}</el-radio-button>
               </el-radio-group>
             </div>
           </div>
@@ -346,20 +355,20 @@ const handleClose = () => emit('close')
             <div class="analytics-item">
               <div class="item-title">
                 <el-icon class="analytics-icon"><DataLine /></el-icon>
-                <span>累计访问</span>
+                <span>{{ t('publicLink.totalAccess') }}</span>
               </div>
               <div class="item-value highlight">
-                {{ publicAccessCount }} <span class="unit">次</span>
+                {{ publicAccessCount }} <span class="unit">{{ t('publicLink.times') }}</span>
               </div>
             </div>
             <div class="analytics-divider" />
             <div class="analytics-item">
               <div class="item-title">
                 <el-icon class="analytics-icon"><Clock /></el-icon>
-                <span>最近访问</span>
+                <span>{{ t('publicLink.recentAccess') }}</span>
               </div>
               <div class="item-value">
-                {{ lastPublicAccessedAt ? formatDateTime(lastPublicAccessedAt) : '尚未被访问' }}
+                {{ lastPublicAccessedAt ? formatDateTime(lastPublicAccessedAt) : t('publicLink.neverAccessed') }}
               </div>
             </div>
           </div>
@@ -367,9 +376,9 @@ const handleClose = () => emit('close')
           <!-- 链接列表 -->
           <div v-if="publicUrl" class="link-item">
             <div class="link-header">
-              <span class="label">内联引用直链（推荐用于网页/图片嵌入）</span>
+              <span class="label">{{ t('publicLink.inlineLink') }}</span>
               <a :href="namedPublicUrl" target="_blank" rel="noreferrer" class="open-link">
-                新标签打开 <el-icon><TopRight /></el-icon>
+                {{ t('publicLink.openInNewTab') }} <el-icon><TopRight /></el-icon>
               </a>
             </div>
             <el-input :model-value="namedPublicUrl" readonly>
@@ -379,7 +388,7 @@ const handleClose = () => emit('close')
                   :icon="copiedField === 'inline' ? Check : CopyDocument"
                   @click="copyToClipboard(namedPublicUrl, 'inline', '内联直链')"
                 >
-                  {{ copiedField === 'inline' ? '已复制' : '复制' }}
+                  {{ copiedField === 'inline' ? t('common.copied') : t('common.copy') }}
                 </el-button>
               </template>
             </el-input>
@@ -387,7 +396,7 @@ const handleClose = () => emit('close')
 
           <div v-if="isImage && publicUrl" class="link-item">
             <div class="link-header">
-              <span class="label">Markdown 引用代码</span>
+              <span class="label">{{ t('publicLink.markdownCode') }}</span>
             </div>
             <el-input :model-value="`![${file?.name}](${namedPublicUrl})`" readonly>
               <template #append>
@@ -396,7 +405,7 @@ const handleClose = () => emit('close')
                   :icon="copiedField === 'markdown' ? Check : CopyDocument"
                   @click="copyToClipboard(`![${file?.name}](${namedPublicUrl})`, 'markdown', 'Markdown 代码')"
                 >
-                  {{ copiedField === 'markdown' ? '已复制' : '复制' }}
+                  {{ copiedField === 'markdown' ? t('common.copied') : t('common.copy') }}
                 </el-button>
               </template>
             </el-input>
@@ -404,7 +413,7 @@ const handleClose = () => emit('close')
 
           <div v-if="publicUrl" class="link-item">
             <div class="link-header">
-              <span class="label">强制下载直链（触发浏览器直接保存）</span>
+              <span class="label">{{ t('publicLink.downloadLink') }}</span>
             </div>
             <el-input :model-value="downloadUrl" readonly>
               <template #append>
@@ -413,7 +422,7 @@ const handleClose = () => emit('close')
                   :icon="copiedField === 'download' ? Check : CopyDocument"
                   @click="copyToClipboard(downloadUrl, 'download', '下载直链')"
                 >
-                  {{ copiedField === 'download' ? '已复制' : '复制' }}
+                  {{ copiedField === 'download' ? t('common.copied') : t('common.copy') }}
                 </el-button>
               </template>
             </el-input>
@@ -421,7 +430,7 @@ const handleClose = () => emit('close')
 
           <div class="security-tips">
             <div class="tip-text">
-              🛡️ 安全保障：对外使用高熵Slug隔离对象ID；支持自定义有效期与零IO快速HEAD探测；流式防重放防遍历。
+              {{ t('publicLink.securityTip') }}
             </div>
             <el-button
               type="danger"
@@ -430,7 +439,7 @@ const handleClose = () => emit('close')
               :icon="Refresh"
               @click="handleRefreshSlug"
             >
-              重置直链（使旧链接失效）
+              {{ t('publicLink.resetLink') }}
             </el-button>
           </div>
         </div>
@@ -438,7 +447,7 @@ const handleClose = () => emit('close')
     </div>
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">关闭</el-button>
+        <el-button @click="handleClose">{{ t('common.close') }}</el-button>
       </div>
     </template>
   </el-dialog>

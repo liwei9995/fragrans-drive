@@ -9,7 +9,7 @@ vi.mock('@/store', () => ({
 }))
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useRoute: () => ({ query: {} }),
 }))
 
@@ -53,7 +53,7 @@ describe('LoginForm.vue', () => {
       },
     })
     expect(wrapper.exists()).toBe(true)
-    expect(wrapper.text()).toContain('Log in')
+    expect(wrapper.text()).toContain('登录')
   })
 
   it('can switch to register mode and forgot password mode', async () => {
@@ -75,18 +75,18 @@ describe('LoginForm.vue', () => {
     vm.switchMode('register')
     await wrapper.vm.$nextTick()
     expect(vm.mode).toBe('register')
-    expect(wrapper.text()).toContain('Sign up')
+    expect(wrapper.text()).toContain('注册')
 
     // Switch to forgot
     vm.switchMode('forgot')
     await wrapper.vm.$nextTick()
     expect(vm.mode).toBe('forgot')
-    expect(wrapper.text()).toContain('Reset password')
+    expect(wrapper.text()).toContain('找回密码')
 
     // Switch back to login
     vm.switchMode('login')
     await wrapper.vm.$nextTick()
     expect(vm.mode).toBe('login')
-    expect(wrapper.text()).toContain('Log in')
+    expect(wrapper.text()).toContain('登录')
   })
 })

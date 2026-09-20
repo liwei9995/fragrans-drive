@@ -134,6 +134,10 @@ export namespace Storage {
     deletedFiles: number
   }
 
+  export interface TrashDeleteParams {
+    fileIds: string[]
+  }
+
   export interface StorageUsage {
     usedBytes: number
     fileCount: number

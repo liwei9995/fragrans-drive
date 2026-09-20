@@ -1,15 +1,16 @@
 import { ref } from 'vue'
 import type { StorageListResponse, StorageNode } from '@/api/interface'
 import { getFiles } from '@/api/modules/storage'
+import { parseDate } from '@/utils/date'
 import { toProxyStorageUrl } from '@/utils/storageUrl'
 import { getThumb } from '@/utils/thumb/index'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 
 const getDesc = (dateTime: string) => {
-  const dt = new Date(dateTime)
+  const dt = parseDate(dateTime)
   const now = new Date()
-  if (Number.isNaN(dt.getTime())) return ''
+  if (!dt) return ''
 
   const sameYear = dt.getFullYear() === now.getFullYear()
   const sameDay =
@@ -57,7 +58,7 @@ export const convertItem = (item: StorageNode): StorageViewItem => ({
     : '',
 })
 
-const dateToNumber = (date: string) => +new Date(date)
+const dateToNumber = (date: string) => parseDate(date)?.getTime() || 0
 
 export const sortDocs = (docs: StorageViewItem[]) => {
   const folderItems: StorageViewItem[] = []

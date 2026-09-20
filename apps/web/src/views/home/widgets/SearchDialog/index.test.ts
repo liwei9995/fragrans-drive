@@ -68,4 +68,29 @@ describe('SearchDialog.vue', () => {
     await wrapper.find('.search-backdrop').trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
   })
+
+  it('renders results and footer when typing query', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(SearchDialog, {
+      props: { visible: true },
+      global: {
+        stubs: ['el-icon'],
+      },
+    })
+
+    const input = wrapper.find('.search-input')
+    await input.setValue('pho')
+    vi.advanceTimersByTime(300)
+    await vi.runAllTimersAsync()
+
+    expect(getFiles).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: 'pho' }),
+    )
+    expect(wrapper.find('.results-count').text()).toContain('找到 2 个相关项目')
+    expect(wrapper.findAll('.result-item').length).toBe(2)
+    expect(wrapper.find('.search-footer').exists()).toBe(true)
+    expect(wrapper.find('.footer-shortcuts').exists()).toBe(true)
+
+    vi.useRealTimers()
+  })
 })

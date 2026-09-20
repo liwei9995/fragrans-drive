@@ -1,12 +1,15 @@
 <script setup lang="ts" name="move">
 import { ElMessage } from 'element-plus'
 import { computed, onBeforeMount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getPath, moveFile } from '@/api/modules/storage'
 import type { Item } from '@/hooks/useCreateFolder'
 import { useFetchFiles } from '@/hooks/useFetchFiles'
 import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
 import Breadcrumb from '../Breadcrumb/index.vue'
 import FolderCreation from '../FolderCreation/index.vue'
+
+const { t } = useI18n()
 
 interface MoveProps {
   id?: string
@@ -105,7 +108,7 @@ const handleCancel = () => (dialogFormVisible.value = false)
 
 const handleMove = () => {
   ElMessage.info({
-    message: '正在移动文件...',
+    message: t('file.moving'),
     duration: 0,
   })
 
@@ -116,12 +119,12 @@ const handleMove = () => {
     .then(() => {
       dialogFormVisible.value = false
       ElMessage.closeAll()
-      ElMessage.success('移动成功')
+      ElMessage.success(t('file.moveSuccess'))
       props.onMoved?.(props.id, id.value)
     })
     .catch(() => {
       ElMessage.closeAll()
-      ElMessage.error('移动失败，请重试')
+      ElMessage.error(t('file.moveFailed'))
     })
 }
 
@@ -167,14 +170,14 @@ defineExpose({
           class="icon"
           src="https://img.alicdn.com/imgextra/i2/O1CN018yXBXY1caApf7qUew_!!6000000003616-2-tps-224-224.png"
         />
-        <div>文件夹为空</div>
+        <div>{{ t('file.folderEmpty') }}</div>
       </div>
     </el-scrollbar>
     <div class="action">
-      <div class="create" @click="handleCreateFolder">新建文件夹</div>
+      <div class="create" @click="handleCreateFolder">{{ t('file.createFolderTitle') }}</div>
       <div class="buttons">
-        <el-button @click="handleCancel">取消</el-button>
-        <el-button type="primary" @click="handleMove"> 移动到此处 </el-button>
+        <el-button @click="handleCancel">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleMove"> {{ t('file.moveToHere') }} </el-button>
       </div>
     </div>
   </el-dialog>

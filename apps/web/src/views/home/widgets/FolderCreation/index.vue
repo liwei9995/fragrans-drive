@@ -2,6 +2,7 @@
 import { CircleCloseFilled, SuccessFilled } from '@element-plus/icons-vue'
 import type { InputInstance } from 'element-plus'
 import { nextTick, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Item } from '@/hooks/useCreateFolder'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 
@@ -18,7 +19,8 @@ const props = withDefaults(defineProps<FolderCreationProps>(), {
     'https://img.alicdn.com/imgextra/i1/O1CN01rGJZac1Zn37NL70IT_!!6000000003238-2-tps-230-180.png',
 })
 
-const folderName = ref('新建文件夹')
+const { t } = useI18n()
+const folderName = ref(t('file.createFolderTitle'))
 const inputRef = ref<InputInstance>()
 
 onMounted(() => {

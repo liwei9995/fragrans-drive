@@ -1182,6 +1182,80 @@ impl StorageService {
         })
     }
 
+    pub async fn delete_trashed_files(
+        &self,
+        user_id: &str,
+        file_ids: Vec<String>,
+    ) -> Result<TrashCleanupResponse, AppError> {
+        if file_ids.is_empty() {
+            return Err(AppError::BadRequest("fileIds cannot be empty".into()));
+        }
+        let mut ids = Vec::new();
+        let mut seen = HashSet::new();
+        for id in &file_ids {
+            let oid = ObjectId::parse_str(id)
+                .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+            if seen.insert(oid) {
+                ids.push(oid);
+            }
+        }
+
+        let roots = self
+            .repo
+            .find_many_by_ids(ids.clone(), user_id)
+            .await?
+            .into_iter()
+            .filter(|item| item.trashed)
+            .collect::<Vec<_>>();
+
+        if roots.len() != ids.len() {
+            return Err(AppError::NotFound(
+                "Some items were not found in trash".into(),
+            ));
+        }
+
+        let mut all_ids_to_delete = HashSet::new();
+        for root in &roots {
+            all_ids_to_delete.extend(self.collect_related_item_ids(user_id, root).await?);
+        }
+
+        let all_ids_vec: Vec<ObjectId> = all_ids_to_delete.into_iter().collect();
+
+        let docs_to_delete = self
+            .repo
+            .find_many_by_ids(all_ids_vec.clone(), user_id)
+            .await?;
+
+        let hashes: HashSet<String> = docs_to_delete
+            .iter()
+            .filter_map(|item| item.content_hash.clone())
+            .collect();
+
+        let deleted_docs = self.repo.delete_many_by_ids(all_ids_vec, user_id).await?;
+        let mut deleted_files = 0;
+
+        let hash_list: Vec<String> = hashes.into_iter().collect();
+        let referenced_hashes = self
+            .repo
+            .find_referenced_content_hashes(user_id, &hash_list)
+            .await?;
+
+        for hash in hash_list {
+            if !referenced_hashes.contains(&hash) {
+                self.local_storage
+                    .remove(user_id, &hash)
+                    .await
+                    .map_err(|error| AppError::InternalError(error.to_string()))?;
+                deleted_files += 1;
+            }
+        }
+
+        Ok(TrashCleanupResponse {
+            deleted_docs,
+            deleted_files,
+        })
+    }
+
     pub async fn empty_trash(&self, user_id: &str) -> Result<TrashCleanupResponse, AppError> {
         let trashed_items = self
             .repo

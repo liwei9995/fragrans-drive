@@ -17,6 +17,7 @@ import {
 } from '@simplewebauthn/browser'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Storage, User as UserType } from '@/api/interface'
 import { getStorageUsage } from '@/api/modules/storage'
 import {
@@ -30,6 +31,7 @@ import {
 } from '@/api/modules/user'
 import AvatarCropper from '@/components/AvatarCropper/index.vue'
 import { GlobalStore } from '@/store'
+import { formatLocaleDate } from '@/utils/date'
 
 interface ProfileDialogProps {
   visible: boolean
@@ -41,6 +43,7 @@ const emit = defineEmits<{
   (e: 'updated', profile: UserType.UserProfile): void
 }>()
 
+const { t } = useI18n()
 const globalStore = GlobalStore()
 const activeTab = ref('storage')
 const loading = ref(false)
@@ -93,7 +96,7 @@ const userName = computed(() => {
   const first = profile.value?.firstName?.trim() || ''
   const last = profile.value?.lastName?.trim() || ''
   const full = [first, last].filter(Boolean).join(' ')
-  return full || profile.value?.email || 'No name set'
+  return full || profile.value?.email || t('profile.noName')
 })
 
 const loadData = async () => {
@@ -145,11 +148,11 @@ const handleSaveProfile = async () => {
     profile.value = updated
     profileForm.avatar = updated.avatar || ''
     globalStore.setUserInfo(updated)
-    ElMessage.success('Profile saved successfully')
+    ElMessage.success(t('profile.profileSaved'))
     emit('updated', updated)
   } catch (error) {
     console.error('Update profile error:', error)
-    ElMessage.error('Failed to save profile. Please try again later.')
+    ElMessage.error(t('profile.saveFailed'))
   } finally {
     savingProfile.value = false
   }
@@ -167,19 +170,19 @@ const handleClearAvatar = async () => {
 
 const handleChangePassword = async () => {
   if (!passwordForm.oldPassword) {
-    ElMessage.warning('Please enter your current password')
+    ElMessage.warning(t('profile.oldPasswordPlaceholder'))
     return
   }
   if (!passwordForm.password) {
-    ElMessage.warning('Please enter a new password')
+    ElMessage.warning(t('profile.newPasswordPlaceholder'))
     return
   }
   if (passwordForm.password.length < 6) {
-    ElMessage.warning('Password must be at least 6 characters')
+    ElMessage.warning(t('login.passwordLength'))
     return
   }
   if (passwordForm.password !== passwordForm.confirmPassword) {
-    ElMessage.warning('Passwords do not match')
+    ElMessage.warning(t('login.passwordMismatch'))
     return
   }
 
@@ -190,12 +193,12 @@ const handleChangePassword = async () => {
       password: passwordForm.password,
       changePassword: passwordForm.confirmPassword,
     })
-    ElMessage.success('Password changed successfully')
+    ElMessage.success(t('profile.passwordUpdated'))
     passwordForm.oldPassword = ''
     passwordForm.password = ''
     passwordForm.confirmPassword = ''
   } catch (error: any) {
-    const msg = error?.response?.data?.message || 'Failed to change password'
+    const msg = error?.response?.data?.message || t('common.error')
     ElMessage.error(msg)
   } finally {
     savingPassword.value = false
@@ -251,9 +254,7 @@ const handleRegisterPasskey = async () => {
       credential,
       name: defaultName,
     })
-    ElMessage.success(
-      'Touch ID passkey registered successfully! You can now sign in using Touch ID.',
-    )
+    ElMessage.success(t('profile.registerTouchIdSuccess'))
     await loadPasskeys()
   } catch (error: any) {
     if (error?.name === 'NotAllowedError') {
@@ -261,9 +262,7 @@ const handleRegisterPasskey = async () => {
     }
     console.error('Passkey registration failed:', error)
     const msg =
-      error?.response?.data?.message ||
-      error?.message ||
-      'Registration failed. Please try again later.'
+      error?.response?.data?.message || error?.message || t('common.error')
     ElMessage.error(msg)
   } finally {
     registeringPasskey.value = false
@@ -273,35 +272,23 @@ const handleRegisterPasskey = async () => {
 const handleDeletePasskey = async (id: string) => {
   try {
     await deletePasskey(id)
-    ElMessage.success('Passkey removed successfully')
+    ElMessage.success(t('profile.deletePasskeySuccess'))
     await loadPasskeys()
   } catch (error: any) {
     console.error('Delete passkey error:', error)
-    ElMessage.error('Failed to remove passkey. Please try again later.')
+    ElMessage.error(t('common.error'))
   }
 }
 
 const formatDate = (dateStr?: string) => {
-  if (!dateStr) return 'Unknown'
-  try {
-    const d = new Date(dateStr)
-    return d.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return dateStr
-  }
+  return formatLocaleDate(dateStr, 'Unknown')
 }
 </script>
 
 <template>
   <el-dialog
     :model-value="visible"
-    title="Profile & Settings"
+    :title="t('profile.title')"
     width="640px"
     destroy-on-close
     class="profile-dialog"
@@ -312,7 +299,7 @@ const formatDate = (dateStr?: string) => {
       <div class="user-overview">
         <div
           class="user-avatar-wrapper"
-          title="Click to change avatar"
+          :title="t('profile.changeAvatar')"
           @click="cropperVisible = true"
         >
           <el-avatar
@@ -324,7 +311,7 @@ const formatDate = (dateStr?: string) => {
           </el-avatar>
           <div class="avatar-hover-overlay">
             <el-icon :size="18"><Camera /></el-icon>
-            <span>Change</span>
+            <span>{{ t('profile.changeAvatar') }}</span>
           </div>
         </div>
         <div class="user-overview-info">
@@ -341,14 +328,14 @@ const formatDate = (dateStr?: string) => {
           <template #label>
             <span class="tab-label">
               <el-icon><PieChart /></el-icon>
-              <span>Storage</span>
+              <span>{{ t('profile.tabStorage') }}</span>
             </span>
           </template>
 
           <div class="storage-section">
             <div class="quota-card">
               <div class="quota-header">
-                <span class="quota-title">Storage Usage</span>
+                <span class="quota-title">{{ t('profile.storageUsage') }}</span>
                 <span class="quota-ratio">
                   <strong>{{ formatBytes(usage.usedBytes) }}</strong> / {{ formatBytes(usage.quotaBytes) }}
                 </span>
@@ -361,21 +348,21 @@ const formatDate = (dateStr?: string) => {
                 striped-flow
               />
               <div class="quota-footer-tip">
-                {{ usedPercentage }}% of total storage used
+                {{ t('profile.storageUsedTip', { pct: usedPercentage }) }}
               </div>
             </div>
 
             <div class="stats-grid">
               <div class="stat-box">
-                <span class="stat-label">Used Storage</span>
+                <span class="stat-label">{{ t('profile.usedStorage') }}</span>
                 <span class="stat-value">{{ formatBytes(usage.usedBytes) }}</span>
               </div>
               <div class="stat-box">
-                <span class="stat-label">Total Files</span>
-                <span class="stat-value">{{ usage.fileCount }} files</span>
+                <span class="stat-label">{{ t('profile.totalFiles') }}</span>
+                <span class="stat-value">{{ usage.fileCount }} {{ t('profile.filesUnit') }}</span>
               </div>
               <div class="stat-box">
-                <span class="stat-label">Quota Limit</span>
+                <span class="stat-label">{{ t('profile.quotaLimit') }}</span>
                 <span class="stat-value">{{ formatBytes(usage.quotaBytes) }}</span>
               </div>
             </div>
@@ -387,25 +374,25 @@ const formatDate = (dateStr?: string) => {
           <template #label>
             <span class="tab-label">
               <el-icon><User /></el-icon>
-              <span>Profile</span>
+              <span>{{ t('profile.tabProfile') }}</span>
             </span>
           </template>
 
           <el-form :model="profileForm" label-position="top" class="profile-form">
             <div class="form-row">
-              <el-form-item label="Last Name">
-                <el-input v-model="profileForm.lastName" placeholder="Enter last name" />
+              <el-form-item :label="t('profile.lastName')">
+                <el-input v-model="profileForm.lastName" :placeholder="t('profile.lastNamePlaceholder')" />
               </el-form-item>
-              <el-form-item label="First Name">
-                <el-input v-model="profileForm.firstName" placeholder="Enter first name" />
+              <el-form-item :label="t('profile.firstName')">
+                <el-input v-model="profileForm.firstName" :placeholder="t('profile.firstNamePlaceholder')" />
               </el-form-item>
             </div>
 
-            <el-form-item label="Avatar">
+            <el-form-item :label="t('profile.avatar')">
               <div class="avatar-setting-row">
                 <div
                   class="avatar-thumbnail-wrapper"
-                  title="Click to change avatar"
+                  :title="t('profile.changeAvatar')"
                   @click="cropperVisible = true"
                 >
                   <el-avatar
@@ -428,7 +415,7 @@ const formatDate = (dateStr?: string) => {
                       :icon="Upload"
                       @click="cropperVisible = true"
                     >
-                      Upload & Crop
+                      {{ t('profile.uploadAndCrop') }}
                     </el-button>
                     <el-button
                       v-if="profileForm.avatar"
@@ -437,13 +424,13 @@ const formatDate = (dateStr?: string) => {
                       :icon="Delete"
                       @click="handleClearAvatar"
                     >
-                      Remove
+                      {{ t('profile.removeAvatar') }}
                     </el-button>
                   </div>
                   <div class="avatar-url-row">
                     <el-input
                       v-model="profileForm.avatar"
-                      placeholder="Or enter image URL (https://...)"
+                      :placeholder="t('profile.avatarUrlPlaceholder')"
                       clearable
                       size="small"
                     />
@@ -453,20 +440,33 @@ const formatDate = (dateStr?: string) => {
             </el-form-item>
 
             <div class="form-row">
-              <el-form-item label="Gender">
+              <el-form-item :label="t('profile.gender')">
                 <el-select v-model="profileForm.gender" style="width: 100%">
-                  <el-option :value="0" label="Private" />
-                  <el-option :value="1" label="Male" />
-                  <el-option :value="2" label="Female" />
+                  <el-option :value="0" :label="t('profile.genderSecret')" />
+                  <el-option :value="1" :label="t('profile.genderMale')" />
+                  <el-option :value="2" :label="t('profile.genderFemale')" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="Age">
+              <el-form-item :label="t('profile.age')">
                 <el-input-number
                   v-model="profileForm.age"
                   :min="0"
                   :max="120"
                   style="width: 100%"
                 />
+              </el-form-item>
+            </div>
+
+            <div class="form-row">
+              <el-form-item :label="t('profile.languageSetting')">
+                <el-select
+                  :model-value="globalStore.language"
+                  style="width: 100%"
+                  @change="(val: 'zh' | 'en') => globalStore.setLanguage(val)"
+                >
+                  <el-option value="zh" :label="t('common.zh')" />
+                  <el-option value="en" :label="t('common.en')" />
+                </el-select>
               </el-form-item>
             </div>
 
@@ -477,7 +477,7 @@ const formatDate = (dateStr?: string) => {
                 :loading="savingProfile"
                 @click="handleSaveProfile"
               >
-                Save Profile
+                {{ t('profile.saveProfile') }}
               </el-button>
             </div>
           </el-form>
@@ -488,41 +488,41 @@ const formatDate = (dateStr?: string) => {
           <template #label>
             <span class="tab-label">
               <el-icon><Key /></el-icon>
-              <span>Security</span>
+              <span>{{ t('profile.tabSecurity') }}</span>
             </span>
           </template>
 
           <div class="security-pane">
             <div class="security-sub-header">
-              <span class="sub-title">Change Password</span>
+              <span class="sub-title">{{ t('profile.changePassword') }}</span>
             </div>
 
             <el-form :model="passwordForm" label-position="top" class="security-form">
-              <el-form-item label="Current Password">
+              <el-form-item :label="t('profile.oldPassword')">
                 <el-input
                   v-model="passwordForm.oldPassword"
                   type="password"
                   show-password
-                  placeholder="Enter current password"
+                  :placeholder="t('profile.oldPasswordPlaceholder')"
                 />
               </el-form-item>
 
               <div class="form-row">
-                <el-form-item label="New Password">
+                <el-form-item :label="t('profile.newPassword')">
                   <el-input
                     v-model="passwordForm.password"
                     type="password"
                     show-password
-                    placeholder="Enter at least 6 characters"
+                    :placeholder="t('profile.newPasswordPlaceholder')"
                   />
                 </el-form-item>
 
-                <el-form-item label="Confirm New Password">
+                <el-form-item :label="t('profile.confirmNewPassword')">
                   <el-input
                     v-model="passwordForm.confirmPassword"
                     type="password"
                     show-password
-                    placeholder="Confirm new password"
+                    :placeholder="t('profile.confirmNewPasswordPlaceholder')"
                   />
                 </el-form-item>
               </div>
@@ -534,7 +534,7 @@ const formatDate = (dateStr?: string) => {
                   :loading="savingPassword"
                   @click="handleChangePassword"
                 >
-                  Update Password
+                  {{ t('profile.updatePasswordBtn') }}
                 </el-button>
               </div>
             </el-form>
@@ -545,9 +545,9 @@ const formatDate = (dateStr?: string) => {
             <div class="passkey-section">
               <div class="passkey-header">
                 <div class="passkey-header-text">
-                  <span class="sub-title">Touch ID / Passkeys</span>
+                  <span class="sub-title">{{ t('profile.touchIdTitle') }}</span>
                   <span class="sub-desc">
-                    Sign in quickly and securely using your device's Touch ID or biometric passkey.
+                    {{ t('profile.touchIdDesc') }}
                   </span>
                 </div>
                 <el-button
@@ -577,20 +577,20 @@ const formatDate = (dateStr?: string) => {
                     <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
                     <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
                   </svg>
-                  <span>Register this device</span>
+                  <span>{{ t('profile.registerTouchId') }}</span>
                 </el-button>
               </div>
 
               <div v-if="!supportsWebAuthn" class="passkey-unsupported">
-                WebAuthn / Touch ID is not supported in this browser or environment. Please use a modern browser (e.g. Safari, Chrome) over HTTPS or localhost.
+                {{ t('profile.touchIdNotSupported') }}
               </div>
 
               <div v-loading="loadingPasskeys" class="passkey-list">
                 <div v-if="passkeys.length === 0" class="passkey-empty">
-                  <span>No passkeys or Touch ID credentials registered yet</span>
+                  <span>{{ t('profile.noPasskeys') }}</span>
                 </div>
                 <div
-                  v-for="item in passkeys"
+                  v-for="(item, index) in passkeys"
                   :key="item.id"
                   class="passkey-item"
                 >
@@ -616,14 +616,14 @@ const formatDate = (dateStr?: string) => {
                       </svg>
                     </div>
                     <div class="passkey-info">
-                      <div class="passkey-name">{{ item.name || 'Touch ID Credential' }}</div>
-                      <div class="passkey-date">Added on: {{ formatDate(item.createdAt) }}</div>
+                      <div class="passkey-name">{{ item.name || t('profile.passkeyItem', { index: index + 1 }) }}</div>
+                      <div class="passkey-date">{{ t('profile.addedOn', { date: formatDate(item.createdAt) }) }}</div>
                     </div>
                   </div>
                   <el-popconfirm
-                    title="Are you sure you want to remove this Touch ID passkey? You will no longer be able to use it to sign in."
-                    confirm-button-text="Confirm"
-                    cancel-button-text="Cancel"
+                    :title="t('profile.deletePasskeyConfirm')"
+                    :confirm-button-text="t('common.confirm')"
+                    :cancel-button-text="t('common.cancel')"
                     @confirm="handleDeletePasskey(item.id)"
                   >
                     <template #reference>
@@ -633,7 +633,7 @@ const formatDate = (dateStr?: string) => {
                         :icon="Delete"
                         size="small"
                       >
-                        Remove
+                        {{ t('common.delete') }}
                       </el-button>
                     </template>
                   </el-popconfirm>

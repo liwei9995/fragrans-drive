@@ -79,6 +79,12 @@ pub struct RestoreTrashDto {
     pub restore_all: bool,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct DeleteTrashDto {
+    #[serde(rename = "fileIds", default)]
+    pub file_ids: Vec<String>,
+}
+
 fn default_page() -> u64 {
     1
 }
@@ -1459,6 +1465,33 @@ pub async fn restore_trashed_files(
     let service = StorageService::new(repo, state.local_storage.clone());
     let response = service
         .restore_trashed_files(&user_ctx.user_id, payload.file_ids, payload.restore_all)
+        .await?;
+    Ok(Json(response))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/trash/delete",
+    request_body = DeleteTrashDto,
+    responses(
+        (status = 200, description = "Selected trash items permanently deleted", body = TrashCleanupResponse),
+        (status = 400, description = "Invalid request or empty fileIds"),
+        (status = 404, description = "Some requested items were not found in trash")
+    ),
+    tag = "storage",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn delete_trashed_files(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Json(payload): Json<DeleteTrashDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let service = StorageService::new(repo, state.local_storage.clone());
+    let response = service
+        .delete_trashed_files(&user_ctx.user_id, payload.file_ids)
         .await?;
     Ok(Json(response))
 }

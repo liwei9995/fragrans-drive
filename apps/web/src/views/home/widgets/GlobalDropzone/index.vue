@@ -1,6 +1,7 @@
 <script setup lang="ts" name="global-dropzone">
 import { UploadFilled } from '@element-plus/icons-vue'
 import type { UploadProps } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import Upload from '../Upload/index.vue'
 
 interface GlobalDropzoneProps {
@@ -12,6 +13,7 @@ interface GlobalDropzoneProps {
 }
 
 defineProps<GlobalDropzoneProps>()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -30,8 +32,8 @@ defineProps<GlobalDropzoneProps>()
           <div class="drop-content">
             <el-icon class="drop-icon"><UploadFilled /></el-icon>
             <div class="drop-text">
-              <h3>松开鼠标即可上传</h3>
-              <p>快到碗里来</p>
+              <h3>{{ t('home.dropReleaseHint') }}</h3>
+              <p>{{ t('home.dropSubtitle') }}</p>
             </div>
           </div>
         </template>

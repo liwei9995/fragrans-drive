@@ -167,7 +167,8 @@
         }
 
         .search,
-        .trash-btn {
+        .trash-btn,
+        .lang-btn {
           display: flex;
           align-items: center;
           justify-content: center;
@@ -179,6 +180,13 @@
           background: rgba(0, 0, 0, 0.04);
           border: 1px solid rgba(0, 0, 0, 0.06);
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          font-size: 12px;
+          font-weight: 600;
+          user-select: none;
+
+          .lang-code {
+            line-height: 1;
+          }
 
           &:hover {
             background-color: rgba(0, 143, 253, 0.1);
@@ -193,7 +201,8 @@
           }
         }
 
-        .trash-btn {
+        .trash-btn,
+        .lang-btn {
           margin-left: 10px;
         }
 
@@ -352,7 +361,8 @@
   }
 
   .search,
-  .trash-btn {
+  .trash-btn,
+  .lang-btn {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.1);
     color: #94a3b8;

@@ -1163,3 +1163,157 @@ async fn storage_usage_reports_active_files_and_quota() {
 
     ctx.teardown().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn delete_trashed_files_permanently_deletes_selected_items() {
+    let ctx = setup().await;
+
+    let repo = StorageRepository::new(&ctx.db);
+    let now = Utc::now();
+
+    let orphan_hash =
+        "cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4".to_string();
+    let shared_hash =
+        "247610f4dedd4ab7247d07dbda19c81ca9817f85820742cad49d407ffae9e4ed".to_string();
+    let orphan_iv = get_iv();
+    let shared_iv = get_iv();
+
+    let trashed_one = repo
+        .create(Storage {
+            id: None,
+            name: "target.txt".to_string(),
+            base_name: Some("target".to_string()),
+            ext_name: Some("txt".to_string()),
+            mime_type: Some("text/plain".to_string()),
+            encoding: None,
+            size: Some(3),
+            md5_hash: Some(orphan_hash.clone()),
+            content_hash: Some(orphan_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
+            share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
+            iv: Some(orphan_iv.clone()),
+            parent_id: "root".to_string(),
+            r#type: StorageType::File,
+            user_id: ctx.user_id.clone(),
+            thumbnail: None,
+            trashed: true,
+            created_at: Some(now),
+            updated_at: Some(now),
+        })
+        .await
+        .expect("create trashed file 1");
+
+    let trashed_two = repo
+        .create(Storage {
+            id: None,
+            name: "keep_in_trash.txt".to_string(),
+            base_name: Some("keep_in_trash".to_string()),
+            ext_name: Some("txt".to_string()),
+            mime_type: Some("text/plain".to_string()),
+            encoding: None,
+            size: Some(4),
+            md5_hash: Some(shared_hash.clone()),
+            content_hash: Some(shared_hash.clone()),
+            hash_algorithm: None,
+            encryption_format: None,
+            share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
+            iv: Some(shared_iv.clone()),
+            parent_id: "root".to_string(),
+            r#type: StorageType::File,
+            user_id: ctx.user_id.clone(),
+            thumbnail: None,
+            trashed: true,
+            created_at: Some(now),
+            updated_at: Some(now),
+        })
+        .await
+        .expect("create trashed file 2");
+
+    let storage = LocalStorage::new(ctx.storage_dir.path().to_path_buf(), [0u8; 32]).unwrap();
+    {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"old").unwrap();
+        storage
+            .store_from_file(&ctx.user_id, &orphan_hash, temp.path())
+            .await
+            .unwrap();
+    }
+    {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"live").unwrap();
+        storage
+            .store_from_file(&ctx.user_id, &shared_hash, temp.path())
+            .await
+            .unwrap();
+    }
+
+    // Delete only trashed_one
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/trash/delete",
+            &ctx.auth_token,
+            serde_json::json!({
+                "fileIds": [trashed_one.to_hex()]
+            }),
+        ))
+        .await
+        .expect("delete selected trash");
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload: TrashCleanupResponse =
+        serde_json::from_slice(&response_bytes(response).await).expect("parse cleanup response");
+    assert_eq!(payload.deleted_docs, 1);
+    assert_eq!(payload.deleted_files, 1);
+
+    // trashed_one should be gone
+    assert!(repo.find_by_id(trashed_one).await.unwrap().is_none());
+    assert!(!storage.exists(&ctx.user_id, &orphan_hash).await.unwrap());
+
+    // trashed_two should STILL be in trash
+    assert!(repo.find_by_id(trashed_two).await.unwrap().is_some());
+    assert!(storage.exists(&ctx.user_id, &shared_hash).await.unwrap());
+
+    // Validation: empty fileIds -> 400
+    let res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/trash/delete",
+            &ctx.auth_token,
+            serde_json::json!({ "fileIds": [] }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // Validation: already deleted file -> 404
+    let res = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/storage/trash/delete",
+            &ctx.auth_token,
+            serde_json::json!({ "fileIds": [trashed_one.to_hex()] }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    ctx.teardown().await;
+}

@@ -1,6 +1,9 @@
 <script setup lang="ts" name="form-dialog">
 import type { InputInstance } from 'element-plus'
 import { nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface DialogProps {
   title: string
@@ -104,7 +107,9 @@ defineExpose({ dialogFormVisible, handleClick, handleClose, selectAll })
       </el-row>
       <el-row justify="end">
         <div class="dialog-footer">
-          <el-button native-type="submit" type="primary" :disabled="!inputValue.trim()"> 确定 </el-button>
+          <el-button native-type="submit" type="primary" :disabled="!inputValue.trim()">
+            {{ t('common.confirm') }}
+          </el-button>
         </div>
       </el-row>
     </form>

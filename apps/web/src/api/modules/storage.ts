@@ -91,6 +91,14 @@ export const emptyTrash = () => {
   return http.delete<Storage.TrashCleanupResponse>(`${PORT}/storage/trash`)
 }
 
+// Permanently delete specified files from trash
+export const deleteTrash = (params: Storage.TrashDeleteParams) => {
+  return http.post<Storage.TrashCleanupResponse>(
+    `${PORT}/storage/trash/delete`,
+    params,
+  )
+}
+
 // Get storage usage and file statistics
 export const getStorageUsage = () => {
   return http.get<Storage.StorageUsage>(`${PORT}/storage/usage`)

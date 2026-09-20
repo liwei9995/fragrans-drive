@@ -5,4 +5,5 @@ export interface GlobalState {
   accessToken: string
   refreshToken: string
   userInfo?: User.UserProfile | null
+  language: 'zh' | 'en'
 }

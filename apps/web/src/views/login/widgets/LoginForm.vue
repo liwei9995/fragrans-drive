@@ -5,9 +5,10 @@ import {
   platformAuthenticatorIsAvailable,
   startAuthentication,
 } from '@simplewebauthn/browser'
-import type { ElForm } from 'element-plus'
+import type { ElForm, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { Auth, Login } from '@/api/interface'
 import {
@@ -20,9 +21,10 @@ import {
   webauthnLoginFinish,
   webauthnLoginStart,
 } from '@/api/modules/user'
-import { HOME_URL } from '@/config/config'
+import { HOME_URL, LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 
+const { t } = useI18n()
 const globalStore = GlobalStore()
 const router = useRouter()
 const route = useRoute()
@@ -86,19 +88,19 @@ const loginForm = reactive<Login.ReqLoginForm>({
   email: '',
   password: '',
 })
-const loginRules = reactive({
+const loginRules = computed<FormRules>(() => ({
   email: [
-    { required: true, message: 'Please enter your email', trigger: 'blur' },
+    { required: true, message: t('login.emailRequired'), trigger: 'blur' },
     {
       type: 'email',
-      message: 'Please enter a valid email address',
+      message: t('login.emailInvalid'),
       trigger: 'blur',
     },
   ],
   password: [
-    { required: true, message: 'Please enter your password', trigger: 'blur' },
+    { required: true, message: t('login.passwordRequired'), trigger: 'blur' },
   ],
-})
+}))
 
 // Registration form
 const registerFormRef = ref<FormInstance>()
@@ -111,37 +113,41 @@ const registerForm = reactive({
   captchaCode: '',
   emailCode: '',
 })
-const registerRules = reactive({
+const registerRules = computed<FormRules>(() => ({
   lastName: [
-    { required: true, message: 'Please enter your last name', trigger: 'blur' },
+    {
+      required: true,
+      message: t('login.lastNamePlaceholder'),
+      trigger: 'blur',
+    },
   ],
   firstName: [
     {
       required: true,
-      message: 'Please enter your first name',
+      message: t('login.firstNamePlaceholder'),
       trigger: 'blur',
     },
   ],
   email: [
-    { required: true, message: 'Please enter your email', trigger: 'blur' },
+    { required: true, message: t('login.emailRequired'), trigger: 'blur' },
     {
       type: 'email',
-      message: 'Please enter a valid email address',
+      message: t('login.emailInvalid'),
       trigger: 'blur',
     },
   ],
   password: [
-    { required: true, message: 'Please enter your password', trigger: 'blur' },
+    { required: true, message: t('login.passwordRequired'), trigger: 'blur' },
     {
       min: 6,
-      message: 'Password must be at least 6 characters',
+      message: t('login.passwordLength'),
       trigger: 'blur',
     },
   ],
   confirmPassword: [
     {
       required: true,
-      message: 'Please confirm your password',
+      message: t('login.confirmPasswordPlaceholder'),
       trigger: 'blur',
     },
     {
@@ -151,7 +157,7 @@ const registerRules = reactive({
         callback: (error?: Error) => void,
       ) => {
         if (value !== registerForm.password) {
-          callback(new Error('Passwords do not match'))
+          callback(new Error(t('login.passwordMismatch')))
         } else {
           callback()
         }
@@ -162,18 +168,18 @@ const registerRules = reactive({
   captchaCode: [
     {
       required: true,
-      message: 'Please enter the captcha code',
+      message: t('login.captchaRequired'),
       trigger: 'blur',
     },
   ],
   emailCode: [
     {
       required: true,
-      message: 'Please enter the verification code',
+      message: t('login.emailCodeRequired'),
       trigger: 'blur',
     },
   ],
-})
+}))
 
 // Forgot password form
 const forgotFormRef = ref<FormInstance>()
@@ -184,45 +190,45 @@ const forgotForm = reactive({
   password: '',
   confirmPassword: '',
 })
-const forgotRules = reactive({
+const forgotRules = computed<FormRules>(() => ({
   email: [
-    { required: true, message: 'Please enter your email', trigger: 'blur' },
+    { required: true, message: t('login.emailRequired'), trigger: 'blur' },
     {
       type: 'email',
-      message: 'Please enter a valid email address',
+      message: t('login.emailInvalid'),
       trigger: 'blur',
     },
   ],
   captchaCode: [
     {
       required: true,
-      message: 'Please enter the captcha code',
+      message: t('login.captchaRequired'),
       trigger: 'blur',
     },
   ],
   emailCode: [
     {
       required: true,
-      message: 'Please enter the verification code',
+      message: t('login.emailCodeRequired'),
       trigger: 'blur',
     },
   ],
   password: [
     {
       required: true,
-      message: 'Please enter your new password',
+      message: t('login.newPasswordPlaceholder'),
       trigger: 'blur',
     },
     {
       min: 6,
-      message: 'Password must be at least 6 characters',
+      message: t('login.passwordLength'),
       trigger: 'blur',
     },
   ],
   confirmPassword: [
     {
       required: true,
-      message: 'Please confirm your new password',
+      message: t('login.confirmPasswordPlaceholder'),
       trigger: 'blur',
     },
     {
@@ -232,7 +238,7 @@ const forgotRules = reactive({
         callback: (error?: Error) => void,
       ) => {
         if (value !== forgotForm.password) {
-          callback(new Error('Passwords do not match'))
+          callback(new Error(t('login.passwordMismatch')))
         } else {
           callback()
         }
@@ -240,7 +246,7 @@ const forgotRules = reactive({
       trigger: 'blur',
     },
   ],
-})
+}))
 
 // Countdown timer
 const startCountdown = () => {
@@ -263,11 +269,11 @@ const handleSendCode = async (purpose: 'register' | 'reset_password') => {
     purpose === 'register' ? registerForm.captchaCode : forgotForm.captchaCode
 
   if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
-    ElMessage.warning('Please enter a valid email address')
+    ElMessage.warning(t('login.emailInvalid'))
     return
   }
   if (!targetCaptcha) {
-    ElMessage.warning('Please enter the captcha code first')
+    ElMessage.warning(t('login.sendCodeFirstCaptcha'))
     return
   }
 
@@ -279,9 +285,7 @@ const handleSendCode = async (purpose: 'register' | 'reset_password') => {
       captchaId: captchaId.value,
       captchaCode: targetCaptcha.trim(),
     })
-    ElMessage.success(
-      res?.message || 'Verification code has been sent to your email',
-    )
+    ElMessage.success(res?.message || t('login.codeSentSuccess'))
     startCountdown()
   } catch {
     fetchCaptcha()
@@ -296,6 +300,19 @@ const switchMode = (target: Mode) => {
   fetchCaptcha()
 }
 
+const getRedirectPath = () => {
+  const redirect = route.query.redirect as string | undefined
+  if (
+    redirect &&
+    redirect !== LOGIN_URL &&
+    !redirect.startsWith(`${LOGIN_URL}?`) &&
+    !redirect.startsWith(`${LOGIN_URL}#`)
+  ) {
+    return redirect
+  }
+  return HOME_URL
+}
+
 // Login
 const login = (formEl: FormInstance | undefined) => {
   if (!formEl) return
@@ -307,11 +324,15 @@ const login = (formEl: FormInstance | undefined) => {
         email: loginForm.email.trim(),
         password: loginForm.password,
       })
-      const { redirect } = route.query
-      const path = (redirect || HOME_URL) as string
 
       globalStore.setTokens(res.access_token, res.refresh_token)
-      router.push(path)
+      loginFormRef.value?.clearValidate()
+
+      const targetPath = getRedirectPath()
+      await router.replace(targetPath)
+      if (router.currentRoute.value.path !== targetPath) {
+        window.location.hash = `#${targetPath}`
+      }
     } finally {
       loading.value = false
     }
@@ -334,7 +355,7 @@ const register = (formEl: FormInstance | undefined) => {
         captchaCode: registerForm.captchaCode || undefined,
         emailCode: registerForm.emailCode || undefined,
       })
-      ElMessage.success('Registration successful! Please sign in.')
+      ElMessage.success(t('login.registerSuccess'))
       loginForm.email = registerForm.email.trim()
       loginForm.password = registerForm.password
       switchMode('login')
@@ -359,9 +380,7 @@ const reset = (formEl: FormInstance | undefined) => {
         password: forgotForm.password,
         changePassword: forgotForm.confirmPassword,
       })
-      ElMessage.success(
-        'Password reset successful! Please sign in with your new password.',
-      )
+      ElMessage.success(t('login.resetSuccess'))
       loginForm.email = forgotForm.email.trim()
       loginForm.password = ''
       switchMode('login')
@@ -385,12 +404,15 @@ const handleTouchIdLogin = async () => {
     const credential = await startAuthentication({ optionsJSON: options })
     const finishRes = await webauthnLoginFinish({ sessionId, credential })
 
-    const { redirect } = route.query
-    const path = (redirect || HOME_URL) as string
-
     globalStore.setTokens(finishRes.access_token, finishRes.refresh_token)
-    ElMessage.success('Touch ID login successful!')
-    router.push(path)
+    loginFormRef.value?.clearValidate()
+    ElMessage.success(t('login.touchIdSuccess'))
+
+    const targetPath = getRedirectPath()
+    await router.replace(targetPath)
+    if (router.currentRoute.value.path !== targetPath) {
+      window.location.hash = `#${targetPath}`
+    }
   } catch (error: any) {
     if (error?.name === 'NotAllowedError') {
       return
@@ -399,7 +421,7 @@ const handleTouchIdLogin = async () => {
     const msg =
       error?.response?.data?.message ||
       error?.message ||
-      'Touch ID login failed'
+      t('login.touchIdFailed')
     ElMessage.error(msg)
   } finally {
     touchIdLoading.value = false
@@ -442,10 +464,25 @@ defineExpose({
 
 <template>
   <div class="login-form-wrapper">
+    <!-- Language Switcher Bar -->
+    <div class="lang-switch-container">
+      <el-button
+        class="lang-switch-btn"
+        size="small"
+        text
+        round
+        :title="t('home.switchLangTip')"
+        @click="globalStore.setLanguage(globalStore.language === 'zh' ? 'en' : 'zh')"
+      >
+        <span class="lang-icon">🌐</span>
+        <span>{{ globalStore.language === 'zh' ? 'English' : '简体中文' }}</span>
+      </el-button>
+    </div>
+
     <!-- Log in view -->
     <div v-if="mode === 'login'" class="login-form">
-      <h1>Log in</h1>
-      <small>Sign in if you already have an account.</small>
+      <h1>{{ t('login.tabLogin') }}</h1>
+      <small>{{ t('login.signInHint') }}</small>
       <el-form
         ref="loginFormRef"
         :model="loginForm"
@@ -454,7 +491,7 @@ defineExpose({
         @submit.prevent="login(loginFormRef)"
       >
         <el-form-item prop="email">
-          <el-input v-model="loginForm.email" placeholder="Email">
+          <el-input v-model="loginForm.email" :placeholder="t('login.emailPlaceholder')">
             <template #prefix>
               <el-icon class="el-input__icon"><User /></el-icon>
             </template>
@@ -464,7 +501,7 @@ defineExpose({
           <el-input
             v-model="loginForm.password"
             type="password"
-            placeholder="Password"
+            :placeholder="t('login.passwordPlaceholder')"
             show-password
             autocomplete="current-password"
           >
@@ -486,21 +523,22 @@ defineExpose({
           :loading="loading"
           @click="login(loginFormRef)"
         >
-          Sign in
+          {{ t('login.submitLogin') }}
         </el-button>
       </div>
 
       <div v-if="supportsTouchId" class="touch-id-wrapper">
         <div class="touch-id-divider">
-          <span>or</span>
+          <span>{{ t('login.or') }}</span>
         </div>
         <el-button
           class="touch-id-btn"
           round
           size="large"
+          native-type="button"
           :disabled="loading || touchIdLoading"
           :loading="touchIdLoading"
-          @click="handleTouchIdLogin"
+          @click.stop.prevent="handleTouchIdLogin"
         >
           <svg
             class="touch-id-icon"
@@ -521,30 +559,30 @@ defineExpose({
             <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
             <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
           </svg>
-          <span>Sign in with Touch ID</span>
+          <span>{{ t('login.touchIdLogin') }}</span>
         </el-button>
       </div>
 
       <div class="form-links">
-        <a class="link" @click.prevent="switchMode('forgot')">Forgot password?</a>
+        <a class="link" @click.prevent="switchMode('forgot')">{{ t('login.forgotPassword') }}</a>
         <div v-if="authConfig.allowRegistration" class="signup-prompt">
-          <span class="prompt-text">Don't have an account?</span>
-          <a class="link link-primary" @click.prevent="switchMode('register')">Sign up</a>
+          <span class="prompt-text">{{ t('login.noAccount') }}</span>
+          <a class="link link-primary" @click.prevent="switchMode('register')">{{ t('login.signUp') }}</a>
         </div>
       </div>
     </div>
 
     <!-- Sign up view -->
     <div v-else-if="mode === 'register'" class="login-form">
-      <h1>Sign up</h1>
-      <small>Create an account to manage your files.</small>
+      <h1>{{ t('login.tabRegister') }}</h1>
+      <small>{{ t('login.signUpHint') }}</small>
 
       <!-- Notice when registration is closed -->
       <div v-if="!authConfig.allowRegistration" class="disabled-notice">
         <el-alert
-          title="Registration is currently closed"
+          :title="t('login.registrationClosed')"
           type="warning"
-          description="Public registration has been disabled by the administrator. Please contact your admin for an account."
+          :description="t('login.registrationClosedDesc')"
           show-icon
           :closable="false"
         />
@@ -556,7 +594,7 @@ defineExpose({
             type="primary"
             @click="switchMode('login')"
           >
-            Back to sign in
+            {{ t('login.backToLogin') }}
           </el-button>
         </div>
       </div>
@@ -572,19 +610,19 @@ defineExpose({
         >
           <div class="name-row">
             <el-form-item prop="lastName" class="half-item">
-              <el-input v-model="registerForm.lastName" placeholder="Last name">
+              <el-input v-model="registerForm.lastName" :placeholder="t('login.lastNamePlaceholder')">
                 <template #prefix>
                   <el-icon class="el-input__icon"><User /></el-icon>
                 </template>
               </el-input>
             </el-form-item>
             <el-form-item prop="firstName" class="half-item">
-              <el-input v-model="registerForm.firstName" placeholder="First name" />
+              <el-input v-model="registerForm.firstName" :placeholder="t('login.firstNamePlaceholder')" />
             </el-form-item>
           </div>
 
           <el-form-item prop="email">
-            <el-input v-model="registerForm.email" placeholder="Email">
+            <el-input v-model="registerForm.email" :placeholder="t('login.emailPlaceholder')">
               <template #prefix>
                 <el-icon class="el-input__icon"><Message /></el-icon>
               </template>
@@ -595,7 +633,7 @@ defineExpose({
             <el-input
               v-model="registerForm.password"
               type="password"
-              placeholder="Password (min. 6 characters)"
+              :placeholder="t('login.newPasswordPlaceholder')"
               show-password
               autocomplete="new-password"
             >
@@ -609,7 +647,7 @@ defineExpose({
             <el-input
               v-model="registerForm.confirmPassword"
               type="password"
-              placeholder="Confirm password"
+              :placeholder="t('login.confirmPasswordPlaceholder')"
               show-password
               autocomplete="new-password"
             >
@@ -624,7 +662,7 @@ defineExpose({
             <div class="captcha-row">
               <el-input
                 v-model="registerForm.captchaCode"
-                placeholder="Captcha code"
+                :placeholder="t('login.captchaPlaceholder')"
                 maxlength="4"
               >
                 <template #prefix>
@@ -633,7 +671,7 @@ defineExpose({
               </el-input>
               <div
                 class="captcha-svg-box"
-                title="Click to refresh captcha"
+                :title="t('login.captchaRefreshTitle')"
                 @click="fetchCaptcha"
               >
                 <span v-if="captchaSvg" v-html="captchaSvg"></span>
@@ -649,7 +687,7 @@ defineExpose({
             <div class="code-row">
               <el-input
                 v-model="registerForm.emailCode"
-                placeholder="6-digit verification code"
+                :placeholder="t('login.emailCodePlaceholder')"
                 maxlength="6"
               >
                 <template #prefix>
@@ -662,7 +700,7 @@ defineExpose({
                 :loading="sendingCode"
                 @click="handleSendCode('register')"
               >
-                {{ countdown > 0 ? `Resend in ${countdown}s` : 'Send code' }}
+                {{ countdown > 0 ? `${countdown}${t('login.resend')}` : t('login.sendCode') }}
               </el-button>
             </div>
           </el-form-item>
@@ -679,13 +717,13 @@ defineExpose({
             :loading="loading"
             @click="register(registerFormRef)"
           >
-            Create account
+            {{ t('login.submitRegister') }}
           </el-button>
         </div>
 
         <div class="form-links center">
           <a class="link link-primary" @click.prevent="switchMode('login')">
-            Already have an account? Sign in
+            {{ t('login.hasAccount') }}
           </a>
         </div>
       </template>
@@ -693,8 +731,8 @@ defineExpose({
 
     <!-- Reset password view -->
     <div v-else-if="mode === 'forgot'" class="login-form">
-      <h1>Reset password</h1>
-      <small>Verify your email to set a new password.</small>
+      <h1>{{ t('login.tabReset') }}</h1>
+      <small>{{ t('login.resetHint') }}</small>
       <el-form
         ref="forgotFormRef"
         :model="forgotForm"
@@ -703,7 +741,7 @@ defineExpose({
         @submit.prevent="reset(forgotFormRef)"
       >
         <el-form-item prop="email">
-          <el-input v-model="forgotForm.email" placeholder="Account email">
+          <el-input v-model="forgotForm.email" :placeholder="t('login.emailPlaceholder')">
             <template #prefix>
               <el-icon class="el-input__icon"><Message /></el-icon>
             </template>
@@ -715,7 +753,7 @@ defineExpose({
           <div class="captcha-row">
             <el-input
               v-model="forgotForm.captchaCode"
-              placeholder="Captcha code"
+              :placeholder="t('login.captchaPlaceholder')"
               maxlength="4"
             >
               <template #prefix>
@@ -724,7 +762,7 @@ defineExpose({
             </el-input>
             <div
               class="captcha-svg-box"
-              title="Click to refresh captcha"
+              :title="t('login.captchaRefreshTitle')"
               @click="fetchCaptcha"
             >
               <span v-if="captchaSvg" v-html="captchaSvg"></span>
@@ -740,7 +778,7 @@ defineExpose({
           <div class="code-row">
             <el-input
               v-model="forgotForm.emailCode"
-              placeholder="6-digit verification code"
+              :placeholder="t('login.emailCodePlaceholder')"
               maxlength="6"
             >
               <template #prefix>
@@ -753,7 +791,7 @@ defineExpose({
               :loading="sendingCode"
               @click="handleSendCode('reset_password')"
             >
-              {{ countdown > 0 ? `Resend in ${countdown}s` : 'Send code' }}
+              {{ countdown > 0 ? `${countdown}${t('login.resend')}` : t('login.sendCode') }}
             </el-button>
           </div>
         </el-form-item>
@@ -762,7 +800,7 @@ defineExpose({
           <el-input
             v-model="forgotForm.password"
             type="password"
-            placeholder="New password (min. 6 characters)"
+            :placeholder="t('login.newPasswordPlaceholder')"
             show-password
             autocomplete="new-password"
           >
@@ -776,7 +814,7 @@ defineExpose({
           <el-input
             v-model="forgotForm.confirmPassword"
             type="password"
-            placeholder="Confirm new password"
+            :placeholder="t('login.confirmPasswordPlaceholder')"
             show-password
             autocomplete="new-password"
           >
@@ -798,13 +836,13 @@ defineExpose({
           :loading="loading"
           @click="reset(forgotFormRef)"
         >
-          Reset password
+          {{ t('login.submitReset') }}
         </el-button>
       </div>
 
       <div class="form-links center">
         <a class="link" @click.prevent="switchMode('login')">
-          Remember your password? Sign in
+          {{ t('login.rememberPassword') }}
         </a>
       </div>
     </div>
@@ -813,7 +851,7 @@ defineExpose({
 
 <style scoped lang="scss">
 .login-form-wrapper {
-  padding: 40px 32px;
+  padding: 32px 32px 36px;
   background: #fff;
   border-radius: 21px;
   box-shadow:
@@ -822,6 +860,36 @@ defineExpose({
   max-width: 440px;
   width: 100%;
   box-sizing: border-box;
+
+  .lang-switch-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+
+    .lang-switch-btn {
+      font-size: 12px;
+      color: #64748b;
+      padding: 4px 10px;
+      height: 28px;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      background: #f8fafc;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+
+      .lang-icon {
+        font-size: 13px;
+      }
+
+      &:hover {
+        color: var(--el-color-primary, #008ffd);
+        border-color: var(--el-color-primary, #008ffd);
+        background: #fff;
+      }
+    }
+  }
 
   .login-form {
     overflow: hidden;

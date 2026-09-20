@@ -8,14 +8,19 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { StorageNode } from '@/api/interface'
 import {
+  deleteTrash,
   emptyTrash,
   getTrashList,
   restoreFile,
   restoreTrash,
 } from '@/api/modules/storage'
+import { parseDate } from '@/utils/date'
 import { getThumb } from '@/utils/thumb'
+
+const { t } = useI18n()
 
 interface TrashDialogProps {
   visible: boolean
@@ -44,9 +49,8 @@ const formatBytes = (bytes?: number) => {
 }
 
 const formatDate = (dateStr?: string) => {
-  if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return '-'
+  const d = parseDate(dateStr)
+  if (!d) return '-'
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
@@ -67,7 +71,7 @@ const fetchTrash = async () => {
     )
   } catch (error) {
     console.error('Fetch trash error:', error)
-    ElMessage.error('获取回收站文件失败')
+    ElMessage.error(t('trash.fetchFailed'))
   } finally {
     loading.value = false
   }
@@ -119,12 +123,11 @@ const handleRestoreSingle = async (item: StorageNode) => {
   actionLoading.value = true
   try {
     await restoreFile(item.id)
-    ElMessage.success(`"${item.name}" 已成功还原`)
+    ElMessage.success(t('trash.restoreSingleSuccess', { name: item.name }))
     emit('restored')
     await fetchTrash()
   } catch (error: any) {
-    const msg =
-      error?.response?.data?.message || '还原失败，上级文件夹可能已被删除'
+    const msg = error?.response?.data?.message || t('trash.restoreFailed')
     ElMessage.error(msg)
   } finally {
     actionLoading.value = false
@@ -141,12 +144,14 @@ const handleRestoreSelected = async () => {
     const res = await restoreTrash({
       fileIds: Array.from(selectedIds.value),
     })
-    ElMessage.success(`已成功还原 ${res.restoredDocs} 项`)
+    ElMessage.success(
+      t('trash.restoreSelectedSuccess', { count: res.restoredDocs }),
+    )
     selectedIds.value = new Set()
     emit('restored')
     await fetchTrash()
   } catch (error: any) {
-    const msg = error?.response?.data?.message || '部分文件还原失败'
+    const msg = error?.response?.data?.message || t('trash.restoreFailed')
     ElMessage.error(msg)
   } finally {
     actionLoading.value = false
@@ -158,11 +163,11 @@ const handleRestoreAll = () => {
   if (trashItems.value.length === 0) return
 
   ElMessageBox.confirm(
-    `确定要还原回收站中的全部 ${trashItems.value.length} 个项目吗？`,
-    '还原全部',
+    t('trash.restoreAllConfirm', { count: trashItems.value.length }),
+    t('trash.restoreAll'),
     {
-      confirmButtonText: '确定还原',
-      cancelButtonText: '取消',
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
       type: 'info',
     },
   )
@@ -170,12 +175,82 @@ const handleRestoreAll = () => {
       actionLoading.value = true
       try {
         const res = await restoreTrash({ restoreAll: true })
-        ElMessage.success(`已成功还原全部 ${res.restoredDocs} 项`)
+        ElMessage.success(
+          t('trash.restoreAllSuccess', { count: res.restoredDocs }),
+        )
         selectedIds.value = new Set()
         emit('restored')
         await fetchTrash()
       } catch (error: any) {
-        const msg = error?.response?.data?.message || '还原失败'
+        const msg = error?.response?.data?.message || t('trash.restoreFailed')
+        ElMessage.error(msg)
+      } finally {
+        actionLoading.value = false
+      }
+    })
+    .catch(() => {})
+}
+
+// Permanently delete a single item
+const handleDeleteSingle = (item: StorageNode) => {
+  ElMessageBox.confirm(
+    t('trash.deleteSingleConfirm', { name: item.name }),
+    t('trash.permanentDelete'),
+    {
+      confirmButtonText: t('trash.permanentDelete'),
+      cancelButtonText: t('common.cancel'),
+      confirmButtonClass: 'el-button--danger',
+      type: 'warning',
+    },
+  )
+    .then(async () => {
+      actionLoading.value = true
+      try {
+        await deleteTrash({ fileIds: [item.id] })
+        ElMessage.success(t('trash.deleteSingleSuccess', { name: item.name }))
+        selectedIds.value.delete(item.id)
+        selectedIds.value = new Set(selectedIds.value)
+        emit('restored')
+        await fetchTrash()
+      } catch (error: any) {
+        const msg = error?.response?.data?.message || t('trash.deleteFailed')
+        ElMessage.error(msg)
+      } finally {
+        actionLoading.value = false
+      }
+    })
+    .catch(() => {})
+}
+
+// Permanently delete selected items
+const handleDeleteSelected = () => {
+  const count = selectedIds.value.size
+  if (count === 0) return
+
+  ElMessageBox.confirm(
+    t('trash.deleteSelectedConfirm', { count }),
+    t('trash.deleteSelected', { count }),
+    {
+      confirmButtonText: t('trash.permanentDelete'),
+      cancelButtonText: t('common.cancel'),
+      confirmButtonClass: 'el-button--danger',
+      type: 'warning',
+    },
+  )
+    .then(async () => {
+      actionLoading.value = true
+      try {
+        const res = await deleteTrash({
+          fileIds: Array.from(selectedIds.value),
+        })
+        ElMessage.success(
+          t('trash.deleteSelectedSuccess', { count: res.deletedDocs }),
+        )
+        selectedIds.value = new Set()
+        emit('restored')
+        await fetchTrash()
+      } catch (error: any) {
+        const msg = error?.response?.data?.message || t('trash.deleteFailed')
         ElMessage.error(msg)
       } finally {
         actionLoading.value = false
@@ -188,27 +263,25 @@ const handleRestoreAll = () => {
 const handleEmptyTrash = () => {
   if (trashItems.value.length === 0) return
 
-  ElMessageBox.confirm(
-    '清空回收站将彻底删除所有项目，释放磁盘空间，且无法恢复。确定继续吗？',
-    '彻底清空回收站',
-    {
-      confirmButtonText: '清空并永久删除',
-      cancelButtonText: '取消',
-      confirmButtonClass: 'el-button--danger',
-      type: 'warning',
-    },
-  )
+  ElMessageBox.confirm(t('trash.emptyTrashConfirm'), t('trash.emptyTrash'), {
+    confirmButtonText: t('trash.emptyTrash'),
+    cancelButtonText: t('common.cancel'),
+    confirmButtonClass: 'el-button--danger',
+    type: 'warning',
+  })
     .then(async () => {
       actionLoading.value = true
       try {
         const res = await emptyTrash()
-        ElMessage.success(`回收站已清空，彻底删除 ${res.deletedDocs} 项数据`)
+        ElMessage.success(
+          t('trash.emptyTrashSuccess', { count: res.deletedDocs }),
+        )
         selectedIds.value = new Set()
         emit('restored')
         await fetchTrash()
       } catch (error) {
         console.error('Empty trash error:', error)
-        ElMessage.error('清空回收站失败')
+        ElMessage.error(t('trash.emptyFailed'))
       } finally {
         actionLoading.value = false
       }
@@ -220,7 +293,7 @@ const handleEmptyTrash = () => {
 <template>
   <el-dialog
     :model-value="visible"
-    title="回收站"
+    :title="t('trash.title')"
     width="780px"
     destroy-on-close
     class="trash-dialog"
@@ -230,7 +303,7 @@ const handleEmptyTrash = () => {
       <div class="trash-toolbar">
         <div class="toolbar-left">
           <span class="trash-count-badge">
-            共 {{ total }} 项已删除文件
+            {{ t('trash.countBadge', { total }) }}
           </span>
           <el-button
             :icon="Refresh"
@@ -250,7 +323,19 @@ const handleEmptyTrash = () => {
             :loading="actionLoading"
             @click="handleRestoreSelected"
           >
-            还原所选 ({{ selectedIds.size }})
+            {{ t('trash.restoreSelected', { count: selectedIds.size }) }}
+          </el-button>
+
+          <el-button
+            v-if="selectedIds.size > 0"
+            type="danger"
+            size="small"
+            plain
+            :icon="Delete"
+            :loading="actionLoading"
+            @click="handleDeleteSelected"
+          >
+            {{ t('trash.deleteSelected', { count: selectedIds.size }) }}
           </el-button>
 
           <el-button
@@ -261,7 +346,7 @@ const handleEmptyTrash = () => {
             :disabled="actionLoading"
             @click="handleRestoreAll"
           >
-            一键全部还原
+            {{ t('trash.restoreAll') }}
           </el-button>
 
           <el-button
@@ -273,22 +358,22 @@ const handleEmptyTrash = () => {
             :disabled="actionLoading"
             @click="handleEmptyTrash"
           >
-            清空回收站
+            {{ t('trash.emptyTrash') }}
           </el-button>
         </div>
       </div>
 
       <div v-if="loading && trashItems.length === 0" class="trash-empty-state">
         <el-icon class="is-loading" :size="28"><Loading /></el-icon>
-        <span>正在载入回收站...</span>
+        <span>{{ t('trash.loading') }}</span>
       </div>
 
       <div v-else-if="trashItems.length === 0" class="trash-empty-state">
         <div class="empty-icon-box">
           <el-icon :size="48" color="#a0aec0"><Delete /></el-icon>
         </div>
-        <span class="empty-title">回收站空空如也</span>
-        <span class="empty-subtitle">删除的文件和文件夹会安全地暂存在这里</span>
+        <span class="empty-title">{{ t('trash.emptyTitle') }}</span>
+        <span class="empty-subtitle">{{ t('trash.emptySubtitle') }}</span>
       </div>
 
       <div v-else class="trash-list-wrapper">
@@ -300,10 +385,10 @@ const handleEmptyTrash = () => {
               @change="handleToggleSelectAll"
             />
           </div>
-          <div class="col-name">名称</div>
-          <div class="col-size">大小</div>
-          <div class="col-date">删除时间</div>
-          <div class="col-action">操作</div>
+          <div class="col-name">{{ t('trash.colName') }}</div>
+          <div class="col-size">{{ t('trash.colSize') }}</div>
+          <div class="col-date">{{ t('trash.colDate') }}</div>
+          <div class="col-action">{{ t('trash.colAction') }}</div>
         </div>
 
         <el-scrollbar max-height="420px">
@@ -340,7 +425,7 @@ const handleEmptyTrash = () => {
               </div>
 
               <div class="col-action" @click.stop>
-                <el-tooltip content="还原此项目" placement="top">
+                <el-tooltip :content="t('trash.restoreItemTooltip')" placement="top">
                   <el-button
                     type="primary"
                     link
@@ -349,7 +434,19 @@ const handleEmptyTrash = () => {
                     :disabled="actionLoading"
                     @click="handleRestoreSingle(item)"
                   >
-                    还原
+                    {{ t('trash.restore') }}
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip :content="t('trash.permanentDeleteItemTooltip')" placement="top">
+                  <el-button
+                    type="danger"
+                    link
+                    size="small"
+                    :icon="Delete"
+                    :disabled="actionLoading"
+                    @click="handleDeleteSingle(item)"
+                  >
+                    {{ t('trash.permanentDelete') }}
                   </el-button>
                 </el-tooltip>
               </div>
@@ -590,12 +687,17 @@ const handleEmptyTrash = () => {
 }
 
 .col-action {
-  width: 70px;
+  width: 140px;
   text-align: right;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
 
   @media (max-width: 640px) {
-    width: 50px;
+    width: 130px;
+    gap: 2px;
   }
 }
 </style>

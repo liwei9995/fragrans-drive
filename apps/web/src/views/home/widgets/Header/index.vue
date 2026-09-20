@@ -2,13 +2,17 @@
 import { Delete, Link, Search, UserFilled } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import logo from '@/assets/logo.svg'
 import { HOME_URL } from '@/config/config'
+import { GlobalStore } from '@/store'
 import ActionButton from '../ActionButton/index.vue'
 import type { BreadcrumbItem } from '../Breadcrumb/index.vue'
 import Breadcrumb from '../Breadcrumb/index.vue'
 
+const { t } = useI18n()
+const globalStore = GlobalStore()
 const router = useRouter()
 const uploadRef = ref<UploadInstance>()
 
@@ -55,6 +59,10 @@ const handleCommand = (command: string | number | object) =>
 
 const handleClickGoHome = () => router.push(HOME_URL)
 
+const toggleLanguage = () => {
+  globalStore.setLanguage(globalStore.language === 'zh' ? 'en' : 'zh')
+}
+
 const errorHandler = () => true
 </script>
 
@@ -66,7 +74,7 @@ const errorHandler = () => true
           <button
             type="button"
             class="logo-container"
-            aria-label="返回首页"
+            :aria-label="t('home.backHome')"
             @click="handleClickGoHome"
           >
             <el-image :src="logo" style="width: 24px; height: 24px" />
@@ -77,7 +85,7 @@ const errorHandler = () => true
         <div class="content">
           <div class="filter-item">
             <el-tooltip
-              :content="onlyPublic ? '点击显示全部文件' : '仅看已开启公开直链的文件'"
+              :content="onlyPublic ? t('home.clickShowAll') : t('home.onlyPublicHint')"
               placement="bottom"
             >
               <el-button
@@ -89,22 +97,27 @@ const errorHandler = () => true
                 @click="emit('toggle-only-public')"
               >
                 <el-icon><Link /></el-icon>
-                <span>{{ onlyPublic ? '仅看公开' : '公开文件' }}</span>
+                <span>{{ onlyPublic ? t('home.onlyPublic') : t('home.publicFiles') }}</span>
               </el-button>
             </el-tooltip>
           </div>
           <div class="search" @click="emit('open-search')">
-            <el-tooltip content="全局搜索 (Cmd+K)" placement="bottom">
+            <el-tooltip :content="t('home.searchPlaceholder')" placement="bottom">
               <el-icon :size="18">
                 <Search />
               </el-icon>
             </el-tooltip>
           </div>
           <div class="trash-btn" @click="emit('open-trash')">
-            <el-tooltip content="回收站" placement="bottom">
+            <el-tooltip :content="t('home.trash')" placement="bottom">
               <el-icon :size="18">
                 <Delete />
               </el-icon>
+            </el-tooltip>
+          </div>
+          <div class="lang-btn" @click="toggleLanguage">
+            <el-tooltip :content="t('home.switchLangTip')" placement="bottom">
+              <span class="lang-code">{{ globalStore.language === 'zh' ? 'EN' : '中' }}</span>
             </el-tooltip>
           </div>
           <div class="action">

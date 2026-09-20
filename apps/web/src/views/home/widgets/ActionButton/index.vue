@@ -2,8 +2,10 @@
 import { Plus } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadProps } from 'element-plus'
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Upload from '../Upload/index.vue'
 
+const { t } = useI18n()
 const uploadRef = ref<UploadInstance>()
 
 type ActionItem = {
@@ -38,7 +40,7 @@ const handleCommand = (command: string | number | object) =>
 <template>
   <div class="action-button-wrapper">
     <el-dropdown trigger="click" @command="handleCommand">
-      <div class="action" role="button" aria-label="新建或上传" title="新建 / 上传">
+      <div class="action" role="button" :aria-label="t('home.newOrUpload')" :title="t('home.newOrUpload')">
         <el-icon :size="iconSize">
           <Plus />
         </el-icon>

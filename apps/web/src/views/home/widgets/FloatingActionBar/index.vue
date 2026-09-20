@@ -1,5 +1,6 @@
 <script setup lang="ts" name="floating-action-bar">
 import { Close, Delete } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 
 interface FloatingActionBarProps {
   selectedCount: number
@@ -8,6 +9,7 @@ interface FloatingActionBarProps {
 defineProps<FloatingActionBarProps>()
 
 const emit = defineEmits(['delete', 'clear'])
+const { t } = useI18n()
 </script>
 
 <template>
@@ -16,7 +18,7 @@ const emit = defineEmits(['delete', 'clear'])
       <div class="floating-action-bar">
         <div class="selection-info">
           <span class="count">{{ selectedCount }}</span>
-          <span class="text">项已选择</span>
+          <span class="text">{{ t('home.selectedCount') }}</span>
         </div>
         <div class="divider"></div>
         <div class="actions">
@@ -26,14 +28,14 @@ const emit = defineEmits(['delete', 'clear'])
             @click="emit('delete')"
           >
             <el-icon><Delete /></el-icon>
-            <span>删除</span>
+            <span>{{ t('common.delete') }}</span>
           </button>
         </div>
         <div class="divider"></div>
         <button
           type="button"
           class="close-btn"
-          aria-label="清除选择"
+          :aria-label="t('home.clearSelection')"
           @click="emit('clear')"
         >
           <el-icon><Close /></el-icon>

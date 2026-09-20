@@ -48,6 +48,7 @@ pub struct AppState {
         storage::remove_file,
         storage::restore_file,
         storage::restore_trashed_files,
+        storage::delete_trashed_files,
         storage::empty_trash,
         storage::get_path,
         storage::set_public_status,
@@ -58,7 +59,7 @@ pub struct AppState {
         schemas(
             users::AuthConfigResponse, users::CaptchaResponse, users::SendEmailCodeDto, users::ResetPasswordDto,
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::RefreshTokenDto, users::CreateUserResponse,
-            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse, storage::StorageUsageResponse,
+            storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::DeleteTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse, storage::StorageUsageResponse,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
         )
@@ -221,6 +222,10 @@ pub fn router(db: Database, config: Config) -> Router {
         .route(
             "/trash/restore",
             axum::routing::post(storage::restore_trashed_files),
+        )
+        .route(
+            "/trash/delete",
+            axum::routing::post(storage::delete_trashed_files),
         )
         .route("/path", axum::routing::post(storage::get_path))
         .route("/move", axum::routing::post(storage::move_file))

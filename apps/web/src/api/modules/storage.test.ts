@@ -5,6 +5,7 @@ import { ResultEnum } from '@/enums/httpEnum'
 import {
   createFolder,
   deleteFile,
+  deleteTrash,
   emptyTrash,
   getDownloadUrl,
   getFile,
@@ -110,6 +111,15 @@ describe('storage module api', () => {
   it('emptyTrash', () => {
     emptyTrash()
     expect(http.delete).toHaveBeenCalledWith(`${PORT}/storage/trash`)
+  })
+
+  it('deleteTrash', () => {
+    const params = { fileIds: ['1', '2'] }
+    deleteTrash(params)
+    expect(http.post).toHaveBeenCalledWith(
+      `${PORT}/storage/trash/delete`,
+      params,
+    )
   })
 
   it('getStorageUsage', () => {

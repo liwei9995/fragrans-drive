@@ -1,7 +1,10 @@
 <script setup lang="ts" name="breadcrumb">
 import { MoreFilled } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { HOME_URL } from '@/config/config'
+
+const { t } = useI18n()
 
 export type BreadcrumbItem = {
   id?: string
@@ -43,7 +46,7 @@ const handleClickGoHome = () => {
     <el-breadcrumb separator="›">
       <span class="el-breadcrumb__item" :class="{ current: breadcrumbItems.length === 0 }" @click="handleClickGoHome">
         <span class="el-breadcrumb__inner is-link" role="link">
-          <div class="breadcrumb-item-content">文件</div>
+          <div class="breadcrumb-item-content">{{ t('home.title') }}</div>
         </span>
         <span v-if="breadcrumbItems.length > 0" class="el-breadcrumb__separator" role="presentation">›</span>
       </span>

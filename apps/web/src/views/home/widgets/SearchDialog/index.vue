@@ -1,9 +1,13 @@
 <script setup lang="ts" name="search-dialog">
 import { ArrowRight, Close, Loading, Search } from '@element-plus/icons-vue'
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { StorageNode } from '@/api/interface'
 import { getFiles } from '@/api/modules/storage'
+import { parseDate } from '@/utils/date'
 import { getThumb } from '@/utils/thumb'
+
+const { t } = useI18n()
 
 interface SearchDialogProps {
   visible: boolean
@@ -32,9 +36,8 @@ const formatBytes = (bytes?: number) => {
 }
 
 const formatDate = (dateStr?: string) => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseDate(dateStr)
+  if (!d) return ''
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -188,7 +191,7 @@ const getHighlightSegments = (
             ref="searchInputRef"
             v-model="query"
             class="search-input"
-            placeholder="搜索文件或文件夹... (按 ↑ ↓ 移动，Enter 打开)"
+            :placeholder="t('search.placeholder')"
             spellcheck="false"
           />
           <el-icon v-if="loading" class="loading-icon is-loading"><Loading /></el-icon>
@@ -196,7 +199,7 @@ const getHighlightSegments = (
             v-else-if="query"
             type="button"
             class="clear-btn"
-            aria-label="清空"
+            :aria-label="t('search.clear')"
             @click="query = ''"
           >
             <el-icon><Close /></el-icon>
@@ -207,18 +210,18 @@ const getHighlightSegments = (
         <div v-if="query.trim()" class="search-body" ref="resultsContainerRef">
           <div v-if="loading && results.length === 0" class="search-state">
             <el-icon class="is-loading" :size="24"><Loading /></el-icon>
-            <span>正在搜索...</span>
+            <span>{{ t('search.searching') }}</span>
           </div>
 
           <div v-else-if="results.length === 0" class="search-state empty">
             <span class="empty-emoji">🔍</span>
-            <span class="empty-title">未找到匹配的文件</span>
-            <span class="empty-desc">没有找到与 "{{ query }}" 相关的项目</span>
+            <span class="empty-title">{{ t('search.noResults') }}</span>
+            <span class="empty-desc">{{ t('search.noResultsDesc', { query }) }}</span>
           </div>
 
           <div v-else class="results-list">
             <div class="results-count">
-              找到 {{ results.length }} 个相关项目
+              {{ t('search.resultsCount', { total: results.length }) }}
             </div>
             <div
               v-for="(item, index) in results"
@@ -236,7 +239,7 @@ const getHighlightSegments = (
                 />
               </div>
               <div class="item-info">
-                <div class="item-name">
+                <div class="item-name" :title="item.name">
                   <template
                     v-for="(seg, idx) in getHighlightSegments(item.name, query)"
                     :key="idx"
@@ -246,11 +249,11 @@ const getHighlightSegments = (
                   </template>
                 </div>
                 <div class="item-meta">
-                  <span v-if="item.type === 'folder'" class="meta-tag folder">文件夹</span>
-                  <span v-else-if="item.size" class="meta-size">{{ formatBytes(item.size) }}</span>
+                  <span v-if="item.type === 'folder'" class="meta-tag folder">{{ t('search.folderTag') }}</span>
+                  <span v-else class="meta-size">{{ formatBytes(item.size) || '0 B' }}</span>
                   <span class="meta-dot">·</span>
                   <span class="meta-time">{{ formatDate(item.updatedAt) }}</span>
-                  <span v-if="item.isPublic" class="meta-tag public">公开直链</span>
+                  <span v-if="item.isPublic" class="meta-tag public">{{ t('search.publicTag') }}</span>
                 </div>
               </div>
               <div class="item-action-hint">
@@ -260,8 +263,16 @@ const getHighlightSegments = (
           </div>
         </div>
 
-        <div v-else class="search-footer-hint">
-          <span>支持全盘检索文件名，快捷键 <strong>↑</strong> <strong>↓</strong> 选择，<strong>Enter</strong> 导航</span>
+        <div class="search-footer">
+          <div class="footer-left">
+            <span v-if="query.trim() && results.length > 0">{{ t('search.resultsCount', { total: results.length }) }}</span>
+            <span v-else>{{ t('search.footerHint') }}</span>
+          </div>
+          <div class="footer-shortcuts">
+            <span class="shortcut-item"><kbd>↑</kbd><kbd>↓</kbd> {{ t('search.footerNavHint') }}</span>
+            <span class="shortcut-item"><kbd>↵</kbd> {{ t('search.footerEnterHint') }}</span>
+            <span class="shortcut-item"><kbd>ESC</kbd> {{ t('common.close') }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -298,6 +309,7 @@ const getHighlightSegments = (
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  text-align: left;
 
   @media (max-width: 640px) {
     width: 100%;
@@ -319,6 +331,7 @@ const getHighlightSegments = (
   padding: 16px 20px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   gap: 12px;
+  text-align: left;
 
   @media (max-width: 640px) {
     padding: 12px 14px;
@@ -343,6 +356,7 @@ const getHighlightSegments = (
     font-size: 16px;
     font-weight: 500;
     color: #0f172a;
+    text-align: left;
 
     &::placeholder {
       color: #94a3b8;
@@ -417,6 +431,7 @@ const getHighlightSegments = (
   max-height: 420px;
   overflow-y: auto;
   padding: 8px 12px 14px;
+  text-align: left;
 }
 
 .search-state {
@@ -428,6 +443,7 @@ const getHighlightSegments = (
   gap: 12px;
   color: #64748b;
   font-size: 14px;
+  text-align: center;
 
   &.empty {
     .empty-emoji {
@@ -460,14 +476,23 @@ const getHighlightSegments = (
 .results-count {
   font-size: 12px;
   color: #64748b;
-  padding: 6px 12px;
+  padding: 4px 14px 8px;
   font-weight: 500;
+  text-align: left;
+  user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .results-count {
+    color: #94a3b8;
+  }
 }
 
 .results-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  text-align: left;
 }
 
 .result-item {
@@ -478,10 +503,17 @@ const getHighlightSegments = (
   cursor: pointer;
   transition: all 0.15s ease;
   gap: 14px;
+  text-align: left;
 
   &:hover,
   &.active {
     background-color: rgba(0, 143, 253, 0.08);
+
+    .item-action-hint {
+      color: var(--c-primary, #008ffd);
+      opacity: 1;
+      transform: translateX(2px);
+    }
   }
 
   .item-icon-wrapper {
@@ -504,7 +536,9 @@ const getHighlightSegments = (
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    justify-content: center;
+    gap: 4px;
+    text-align: left;
 
     .item-name {
       font-size: 14px;
@@ -513,6 +547,8 @@ const getHighlightSegments = (
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      text-align: left;
+      line-height: 1.4;
 
       :deep(.highlight) {
         background-color: #fef08a;
@@ -529,12 +565,15 @@ const getHighlightSegments = (
       gap: 6px;
       font-size: 12px;
       color: #64748b;
+      line-height: 1.2;
+      text-align: left;
 
       .meta-tag {
-        font-size: 10px;
+        font-size: 11px;
         padding: 1px 6px;
         border-radius: 4px;
         font-weight: 500;
+        line-height: 1.3;
 
         &.folder {
           background-color: rgba(0, 143, 253, 0.1);
@@ -557,6 +596,11 @@ const getHighlightSegments = (
   .item-action-hint {
     color: #94a3b8;
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: all 0.15s ease;
   }
 }
 
@@ -565,6 +609,10 @@ const getHighlightSegments = (
     &:hover,
     &.active {
       background-color: rgba(0, 143, 253, 0.12);
+
+      .item-action-hint {
+        color: var(--c-primary-light, #33a5fd);
+      }
     }
 
     .item-info {
@@ -601,37 +649,72 @@ const getHighlightSegments = (
   }
 }
 
-.search-footer-hint {
-  padding: 12px 20px;
+.search-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
   background-color: #f8fafc;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   font-size: 12px;
   color: #64748b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  user-select: none;
+  text-align: left;
 
-  strong {
-    background: #e2e8f0;
-    color: #1e293b;
-    border: 1px solid #cbd5e1;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-weight: 600;
-    margin: 0 2px;
+  .footer-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .footer-shortcuts {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .shortcut-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      kbd {
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 5px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        color: #475569;
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+      }
+    }
+  }
+
+  @media (max-width: 640px) {
+    padding: 8px 14px;
+
+    .footer-shortcuts {
+      display: none;
+    }
   }
 }
 
 @media (prefers-color-scheme: dark) {
-  .search-footer-hint {
+  .search-footer {
     background-color: #0f172a;
     border-top-color: rgba(255, 255, 255, 0.06);
     color: #94a3b8;
 
-    strong {
-      background: rgba(255, 255, 255, 0.1);
-      color: #f1f5f9;
-      border-color: rgba(255, 255, 255, 0.15);
+    .footer-shortcuts {
+      .shortcut-item {
+        kbd {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.15);
+          color: #f1f5f9;
+          box-shadow: none;
+        }
+      }
     }
   }
 }

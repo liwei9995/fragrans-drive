@@ -44,4 +44,24 @@ describe('GlobalStore', () => {
     store.setAvatar('https://example.com/new-avatar.png')
     expect(store.userInfo?.avatar).toBe('https://example.com/new-avatar.png')
   })
+
+  it('setLanguage updates language state and logout preserves language', () => {
+    const store = GlobalStore()
+    store.setTokens('access', 'refresh')
+    store.setUserInfo({
+      id: 'u1',
+      email: 'alex@example.com',
+      firstName: 'Alex',
+      lastName: 'Li',
+      avatar: '',
+    })
+    store.setLanguage('en')
+    expect(store.language).toBe('en')
+
+    store.logout()
+    expect(store.accessToken).toBe('')
+    expect(store.refreshToken).toBe('')
+    expect(store.userInfo).toBeNull()
+    expect(store.language).toBe('en')
+  })
 })

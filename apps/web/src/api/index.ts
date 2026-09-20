@@ -7,6 +7,7 @@ import type {
 } from 'axios'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { LOGIN_URL } from '@/config/config'
 import { ResultEnum } from '@/enums/httpEnum'
 import router from '@/routers'
 import { GlobalStore } from '@/store'
@@ -24,11 +25,17 @@ const flushQueue = (token: string | null) => {
 }
 
 const redirectToLogin = async () => {
-  GlobalStore().$reset()
+  GlobalStore().logout()
   ElMessage.error('登录失效！请您重新登录')
+  const currentPath = router.currentRoute?.value?.fullPath
+  const shouldRedirect =
+    currentPath &&
+    currentPath !== LOGIN_URL &&
+    !currentPath.startsWith(`${LOGIN_URL}?`) &&
+    !currentPath.startsWith(`${LOGIN_URL}#`)
   await router.replace({
-    path: '/login',
-    query: { redirect: router.currentRoute.value.fullPath },
+    path: LOGIN_URL,
+    query: shouldRedirect ? { redirect: currentPath } : undefined,
   })
 }
 

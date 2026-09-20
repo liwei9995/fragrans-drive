@@ -5,6 +5,7 @@ import Home from './index.vue'
 vi.mock('@/store', () => ({
   GlobalStore: vi.fn(() => ({
     $reset: vi.fn(),
+    logout: vi.fn(),
     token: '123',
   })),
 }))
