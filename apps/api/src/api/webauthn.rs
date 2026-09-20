@@ -109,11 +109,6 @@ pub async fn login_finish(
     State(state): State<AppState>,
     Json(payload): Json<WebauthnLoginFinishDto>,
 ) -> Result<impl IntoResponse, AppError> {
-    let auth_result = state
-        .webauthn
-        .finish_authentication(&payload.session_id, &payload.credential)
-        .await?;
-
     let cred_id_str = payload.credential.id.to_string();
     let repo = UserRepository::new(&state.db);
     let user = repo
@@ -121,20 +116,33 @@ pub async fn login_finish(
         .await?
         .ok_or_else(|| AppError::Unauthorized("Passkey not recognized".to_string()))?;
 
+    let stored_pk = user
+        .passkeys
+        .iter()
+        .find(|p| p.id == cred_id_str)
+        .ok_or_else(|| AppError::Unauthorized("Passkey not found on user".to_string()))?;
+
+    let passkey = stored_pk
+        .get_passkey()
+        .map_err(|e| AppError::InternalError(format!("Failed to parse stored passkey: {}", e)))?;
+
+    let auth_result = state
+        .webauthn
+        .finish_authentication(&payload.session_id, &payload.credential, Some(&passkey))
+        .await?;
+
     let user_id_obj = user
         .id
         .ok_or_else(|| AppError::InternalError("Missing user ID".to_string()))?;
     let user_id = user_id_obj.to_hex();
 
     // Update the counter on the stored passkey to prevent replay attacks
-    if let Some(stored_pk) = user.passkeys.into_iter().find(|p| p.id == cred_id_str) {
-        if let Ok(mut pk) = stored_pk.get_passkey() {
-            pk.update_credential(&auth_result);
-            if let Ok(updated_json) = serde_json::to_string(&pk) {
-                let _ = repo
-                    .update_passkey(user_id_obj, &cred_id_str, &updated_json)
-                    .await;
-            }
+    if let Ok(mut pk) = stored_pk.get_passkey() {
+        pk.update_credential(&auth_result);
+        if let Ok(updated_json) = serde_json::to_string(&pk) {
+            let _ = repo
+                .update_passkey(user_id_obj, &cred_id_str, &updated_json)
+                .await;
         }
     }
 

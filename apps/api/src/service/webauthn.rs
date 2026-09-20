@@ -186,6 +186,7 @@ impl WebauthnService {
         &self,
         session_id: &str,
         req: &PublicKeyCredential,
+        passkey: Option<&Passkey>,
     ) -> Result<AuthenticationResult, AppError> {
         let auth_state = {
             let mut lock = self.auth_states.write().await;
@@ -204,6 +205,30 @@ impl WebauthnService {
                     ));
                 }
             }
+        };
+
+        let auth_state = if let Some(pk) = passkey {
+            let mut auth_val = serde_json::to_value(&auth_state)
+                .map_err(|e| AppError::InternalError(format!("Failed to serialize auth state: {}", e)))?;
+            let pk_val = serde_json::to_value(pk)
+                .map_err(|e| AppError::InternalError(format!("Failed to serialize passkey: {}", e)))?;
+
+            if let Some(cred_val) = pk_val.get("cred") {
+                if let Some(creds) = auth_val
+                    .get_mut("ast")
+                    .and_then(|ast| ast.get_mut("credentials"))
+                    .and_then(|c| c.as_array_mut())
+                {
+                    if creds.is_empty() {
+                        creds.push(cred_val.clone());
+                    }
+                }
+            }
+
+            serde_json::from_value(auth_val)
+                .map_err(|e| AppError::InternalError(format!("Failed to deserialize updated auth state: {}", e)))?
+        } else {
+            auth_state
         };
 
         let auth_result = self
