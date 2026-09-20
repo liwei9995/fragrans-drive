@@ -121,6 +121,17 @@ const activeImageOriginalSrc = computed(() => {
   return activeFile.value.url
 })
 
+const activeVideoSrc = computed(() => {
+  if (!activeFile.value?.url) return ''
+  const sep = activeFile.value.url.includes('?') ? '&' : '?'
+  return `${activeFile.value.url}${sep}preview=1`
+})
+
+const activeVideoOriginalSrc = computed(() => {
+  if (!activeFile.value?.url) return ''
+  return activeFile.value.url
+})
+
 // Preload neighboring preview images only after active image finishes loading (Plan B)
 const preloadedUrls = new Set<string>()
 let preloadTimer: ReturnType<typeof setTimeout> | null = null
@@ -420,7 +431,8 @@ onBeforeUnmount(() => {
           <!-- Video -->
           <VideoViewer
             v-else-if="previewType === 'video'"
-            :src="activeFile.url || ''"
+            :src="activeVideoSrc"
+            :original-src="activeVideoOriginalSrc"
             :name="activeFile.name"
           />
 

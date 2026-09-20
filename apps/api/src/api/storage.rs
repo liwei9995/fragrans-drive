@@ -781,9 +781,22 @@ pub async fn get_file(
             .into_response());
     }
 
-    let (filename, mime_type, total_size, range_len, stream) = service
-        .stream_file_content(id, owner_user_id, range_start, range_end)
-        .await?;
+    let (filename, mime_type, total_size, range_len, stream) = if is_preview {
+        if let Ok(Some(video_stream)) = service
+            .stream_video_preview(&id, &owner_user_id, range_start, range_end)
+            .await
+        {
+            video_stream
+        } else {
+            service
+                .stream_file_content(id, owner_user_id, range_start, range_end)
+                .await?
+        }
+    } else {
+        service
+            .stream_file_content(id, owner_user_id, range_start, range_end)
+            .await?
+    };
     let force_download = params
         .get_str("download")
         .map(|d| d == "1" || d.eq_ignore_ascii_case("true"))
@@ -1291,10 +1304,24 @@ async fn get_public_file_impl(
 
     let service = StorageService::new(repo, state.local_storage.clone());
     let file_id = existing.id.map(|id| id.to_hex()).unwrap_or_default();
-    let (_fname, _mtype, _tsize, range_len, stream) = service
-        .stream_file_content(file_id, existing.user_id.clone(), range_start, range_end)
-        .await?;
+    let (_fname, actual_mime, total_size, range_len, stream) = if is_preview {
+        if let Ok(Some(video_stream)) = service
+            .stream_video_preview(&file_id, &existing.user_id, range_start, range_end)
+            .await
+        {
+            video_stream
+        } else {
+            service
+                .stream_file_content(file_id, existing.user_id.clone(), range_start, range_end)
+                .await?
+        }
+    } else {
+        service
+            .stream_file_content(file_id, existing.user_id.clone(), range_start, range_end)
+            .await?
+    };
 
+    res_headers.insert(CONTENT_TYPE, actual_mime.parse().unwrap());
     res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
 
     let status = if has_range || range_len < total_size {

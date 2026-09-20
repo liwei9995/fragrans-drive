@@ -427,6 +427,22 @@ impl StorageService {
                 .map_err(|error| AppError::InternalError(error.to_string()))?;
         }
 
+        if content_type.starts_with("video/") {
+            let local_storage = self.local_storage.clone();
+            let u_id = user_id.to_string();
+            let c_hash = hash.to_string();
+            tokio::spawn(async move {
+                let _ = crate::infrastructure::video::transcode::ensure_video_preview(
+                    &local_storage,
+                    &u_id,
+                    Some(&c_hash),
+                    None,
+                    None,
+                )
+                .await;
+            });
+        }
+
         let thumbnail_id = match thumbnail_item {
             Some(item) => Some(self.repo.create(item).await?),
             None => None,
@@ -482,6 +498,22 @@ impl StorageService {
                 .map(|s| s as i64)
                 .unwrap_or(size)
         };
+
+        if content_type.starts_with("video/") {
+            let local_storage = self.local_storage.clone();
+            let u_id = user_id.to_string();
+            let c_hash = hash.to_string();
+            tokio::spawn(async move {
+                let _ = crate::infrastructure::video::transcode::ensure_video_preview(
+                    &local_storage,
+                    &u_id,
+                    Some(&c_hash),
+                    None,
+                    None,
+                )
+                .await;
+            });
+        }
 
         let mut storage_item = Storage {
             id: None,
@@ -797,6 +829,82 @@ impl StorageService {
         } else {
             Err(AppError::NotFound("File content missing".into()))
         }
+    }
+
+    pub async fn stream_video_preview(
+        &self,
+        file_id: &str,
+        user_id: &str,
+        range_start: u64,
+        range_end: Option<u64>,
+    ) -> Result<Option<(String, String, u64, u64, StorageStream)>, AppError> {
+        let id_oid = ObjectId::parse_str(file_id)
+            .map_err(|_| AppError::BadRequest("Invalid id".into()))?;
+
+        let doc = self.repo.find_by_id(id_oid).await?;
+        let item = match doc {
+            Some(i) if i.user_id == user_id && !i.trashed => i,
+            _ => return Err(AppError::NotFound("File not found".into())),
+        };
+
+        let mime = item
+            .mime_type
+            .clone()
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+
+        if !mime.starts_with("video/") {
+            return Ok(None);
+        }
+
+        let preview_path = if let Some(ref hash) = item.content_hash {
+            self.local_storage
+                .get_video_preview_path(user_id, hash)
+                .map_err(|e| AppError::InternalError(e.to_string()))?
+        } else if let Some(ref md5_hash) = item.md5_hash {
+            LegacyReader::new(&self.local_storage)
+                .get_legacy_video_preview_path(md5_hash)
+                .map_err(|e| AppError::InternalError(e.to_string()))?
+        } else {
+            return Ok(None);
+        };
+
+        if preview_path.exists()
+            && let Some((total_len, range_len, stream)) = LocalStorage::stream_plain_file(
+                preview_path,
+                range_start,
+                range_end,
+            )
+            .await
+            .map_err(|e| AppError::InternalError(e.to_string()))?
+        {
+            return Ok(Some((
+                item.name,
+                "video/mp4".to_string(),
+                total_len,
+                range_len,
+                stream,
+            )));
+        }
+
+        // Preview not ready yet: trigger background transcode
+        let local_storage = self.local_storage.clone();
+        let user_id_owned = user_id.to_string();
+        let content_hash_owned = item.content_hash.clone();
+        let md5_hash_owned = item.md5_hash.clone();
+        let iv_owned = item.iv.clone();
+        tokio::spawn(async move {
+            let _ = crate::infrastructure::video::transcode::ensure_video_preview(
+                &local_storage,
+                &user_id_owned,
+                content_hash_owned.as_deref(),
+                md5_hash_owned.as_deref(),
+                iv_owned.as_deref(),
+            )
+            .await;
+        });
+
+        // Fallback to original stream
+        Ok(None)
     }
 
     pub async fn move_file(

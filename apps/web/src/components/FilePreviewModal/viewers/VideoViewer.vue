@@ -11,13 +11,45 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface Props {
   src: string
+  originalSrc?: string
   name?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   src: '',
+  originalSrc: '',
   name: '',
 })
+
+const currentQuality = ref<'preview' | 'original'>('preview')
+const currentSrc = computed(() => {
+  if (currentQuality.value === 'original' && props.originalSrc) {
+    return props.originalSrc
+  }
+  return props.src
+})
+
+const changeQuality = (quality: 'preview' | 'original') => {
+  if (quality === currentQuality.value) return
+  if (!videoRef.value) {
+    currentQuality.value = quality
+    return
+  }
+  const savedTime = videoRef.value.currentTime
+  const wasPlaying = !videoRef.value.paused
+  currentQuality.value = quality
+
+  const onMeta = () => {
+    if (videoRef.value) {
+      videoRef.value.currentTime = savedTime
+      if (wasPlaying) {
+        videoRef.value.play().catch(() => {})
+      }
+      videoRef.value.removeEventListener('loadedmetadata', onMeta)
+    }
+  }
+  videoRef.value.addEventListener('loadedmetadata', onMeta)
+}
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
@@ -214,6 +246,7 @@ watch(
     currentTime.value = 0
     duration.value = 0
     bufferedPercent.value = 0
+    currentQuality.value = 'preview'
   },
 )
 
@@ -243,7 +276,7 @@ onBeforeUnmount(() => {
     <div class="video-stage" @click="togglePlay">
       <video
         ref="videoRef"
-        :src="src"
+        :src="currentSrc"
         class="video-element"
         playsinline
         preload="auto"
@@ -306,6 +339,33 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="right-controls">
+            <!-- Quality Menu -->
+            <el-dropdown
+              v-if="originalSrc"
+              trigger="click"
+              @command="changeQuality"
+            >
+              <button class="quality-btn" title="清晰度切换">
+                {{ currentQuality === 'preview' ? '流畅 720p' : '原画' }}
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    command="preview"
+                    :class="{ 'is-active': currentQuality === 'preview' }"
+                  >
+                    流畅 720p
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    command="original"
+                    :class="{ 'is-active': currentQuality === 'original' }"
+                  >
+                    原画
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+
             <!-- Speed Menu -->
             <el-dropdown trigger="click" @command="changeSpeed">
               <button class="speed-btn" title="播放倍速">
@@ -548,7 +608,8 @@ onBeforeUnmount(() => {
         }
       }
 
-      .speed-btn {
+      .speed-btn,
+      .quality-btn {
         background: transparent;
         border: 1px solid rgba(255, 255, 255, 0.2);
         color: #f1f5f9;

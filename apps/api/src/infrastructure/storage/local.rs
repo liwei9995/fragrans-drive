@@ -103,6 +103,21 @@ impl LocalStorage {
         Ok(path)
     }
 
+    pub fn get_video_preview_path(
+        &self,
+        user_id: &str,
+        sha256_hash: &str,
+    ) -> Result<PathBuf, StorageIoError> {
+        let mut path = self.get_path(user_id, sha256_hash)?;
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| StorageIoError::Format("Invalid path".into()))?
+            .to_string_lossy()
+            .to_string();
+        path.set_file_name(format!("{}.preview.mp4", file_name));
+        Ok(path)
+    }
+
     pub async fn store_from_async_read<R: tokio::io::AsyncRead + Unpin>(
         &self,
         user_id: &str,
@@ -384,6 +399,11 @@ impl LocalStorage {
             && preview_path.exists()
         {
             let _ = fs::remove_file(preview_path).await;
+        }
+        if let Ok(video_preview_path) = self.get_video_preview_path(user_id, content_hash)
+            && video_preview_path.exists()
+        {
+            let _ = fs::remove_file(video_preview_path).await;
         }
         Ok(())
     }
@@ -683,6 +703,71 @@ impl LocalStorage {
 
         Ok((plaintext_size, range_len, Box::pin(stream)))
     }
+
+    pub async fn stream_plain_file(
+        path: std::path::PathBuf,
+        range_start: u64,
+        range_end: Option<u64>,
+    ) -> Result<Option<(u64, u64, StorageStream)>, StorageIoError> {
+        if !path.exists() {
+            return Ok(None);
+        }
+        let mut in_file = tokio::fs::File::open(path).await?;
+        let total_len = in_file.metadata().await?.len();
+        if total_len == 0 {
+            let stream: StorageStream = Box::pin(futures::stream::empty());
+            return Ok(Some((0, 0, stream)));
+        }
+
+        let actual_end = std::cmp::min(
+            range_end.unwrap_or(total_len.saturating_sub(1)),
+            total_len.saturating_sub(1),
+        );
+        let range_start = std::cmp::min(range_start, total_len);
+        let range_len = if range_start <= actual_end {
+            actual_end - range_start + 1
+        } else {
+            0
+        };
+
+        use std::io::SeekFrom;
+        use tokio::io::AsyncSeekExt;
+        in_file.seek(SeekFrom::Start(range_start)).await?;
+
+        struct PlainStreamState {
+            in_file: tokio::fs::File,
+            remaining: u64,
+        }
+
+        let state = PlainStreamState {
+            in_file,
+            remaining: range_len,
+        };
+
+        use tokio::io::AsyncReadExt;
+        let stream: StorageStream = Box::pin(futures::stream::unfold(state, |mut s| async move {
+            if s.remaining == 0 {
+                return None;
+            }
+            let to_read = std::cmp::min(s.remaining, 64 * 1024) as usize;
+            let mut buf = vec![0u8; to_read];
+            match s.in_file.read_exact(&mut buf).await {
+                Ok(_) => {
+                    s.remaining -= to_read as u64;
+                    Some((Ok(axum::body::Bytes::from(buf)), s))
+                }
+                Err(e) => Some((
+                    Err(StorageIoError::Io(e)),
+                    PlainStreamState {
+                        in_file: s.in_file,
+                        remaining: 0,
+                    },
+                )),
+            }
+        }));
+
+        Ok(Some((total_len, range_len, stream)))
+    }
 }
 pub mod legacy {
     use super::{LocalStorage, StorageIoError, StorageStream};
@@ -726,6 +811,20 @@ pub mod legacy {
                 .to_string_lossy()
                 .to_string();
             path.set_file_name(format!("{}.preview", file_name));
+            Ok(path)
+        }
+
+        pub fn get_legacy_video_preview_path(
+            &self,
+            md5_hash: &str,
+        ) -> Result<std::path::PathBuf, StorageIoError> {
+            let mut path = self.get_legacy_path(md5_hash)?;
+            let file_name = path
+                .file_name()
+                .ok_or_else(|| StorageIoError::Format("Invalid path".into()))?
+                .to_string_lossy()
+                .to_string();
+            path.set_file_name(format!("{}.preview.mp4", file_name));
             Ok(path)
         }
 

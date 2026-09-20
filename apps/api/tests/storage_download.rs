@@ -857,3 +857,64 @@ async fn download_with_preview_returns_resized_image_and_caches() {
 
     ctx.teardown().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn download_with_preview_returns_video_stream_and_supports_ranges() {
+    let ctx = setup().await;
+
+    // Create a dummy video payload (5000 bytes)
+    let video_bytes = vec![0x42u8; 5000];
+
+    let req = multipart_upload_image_request(
+        "/v1/storage/upload",
+        &ctx.auth_token,
+        "sample_video.mp4",
+        "video/mp4",
+        &video_bytes,
+    );
+    let res = ctx.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let data: Vec<String> = serde_json::from_slice(&response_bytes(res).await).unwrap();
+    let file_id = data[0].clone();
+
+    let (status, url) = download_url(&ctx, &format!(r#"{{"fileId":"{file_id}"}}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    let token = url.split("token=").last().unwrap();
+
+    // 1. Request preview with preview=1 (falls back to original stream if transcode not done yet)
+    let prev_req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={token}&preview=1"))
+        .body(Body::empty())
+        .unwrap();
+    let prev_res = ctx.app.clone().oneshot(prev_req).await.unwrap();
+    assert_eq!(prev_res.status(), StatusCode::OK);
+    assert_eq!(
+        prev_res.headers().get("content-type").unwrap(),
+        "video/mp4"
+    );
+    assert_eq!(
+        prev_res.headers().get("accept-ranges").unwrap(),
+        "bytes"
+    );
+
+    // 2. Request range on video preview
+    let range_req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/storage/{file_id}?token={token}&preview=1"))
+        .header("Range", "bytes=0-99")
+        .body(Body::empty())
+        .unwrap();
+    let range_res = ctx.app.clone().oneshot(range_req).await.unwrap();
+    assert_eq!(range_res.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(
+        range_res.headers().get("content-range").unwrap().to_str().unwrap().starts_with("bytes 0-99/"),
+        true
+    );
+    let range_data = response_bytes(range_res).await;
+    assert_eq!(range_data.len(), 100);
+
+    ctx.teardown().await;
+}
+
