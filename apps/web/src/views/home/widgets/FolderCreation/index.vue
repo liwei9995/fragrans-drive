@@ -1,6 +1,7 @@
 <script setup lang="ts" name="storage-item">
 import { CircleCloseFilled, SuccessFilled } from '@element-plus/icons-vue'
-import { ref } from 'vue'
+import type { InputInstance } from 'element-plus'
+import { nextTick, onMounted, ref } from 'vue'
 import type { Item } from '@/hooks/useCreateFolder'
 import { useCreateFolder } from '@/hooks/useCreateFolder'
 
@@ -18,6 +19,22 @@ const props = withDefaults(defineProps<FolderCreationProps>(), {
 })
 
 const folderName = ref('新建文件夹')
+const inputRef = ref<InputInstance>()
+
+onMounted(() => {
+  nextTick(() => {
+    const inputEl =
+      (inputRef.value?.ref as HTMLInputElement | undefined) ||
+      (inputRef.value?.$el?.querySelector?.('input') as HTMLInputElement | null)
+    if (inputEl) {
+      inputEl.focus()
+      inputEl.select()
+    } else {
+      inputRef.value?.focus?.()
+      inputRef.value?.select?.()
+    }
+  })
+})
 
 const handleCreateFolder = () =>
   useCreateFolder(
@@ -32,7 +49,7 @@ const handleClose = () => props.close && props.close()
 <template>
   <div class="folder-creation-wrapper">
     <el-image class="icon" :src="thumbUrl" fit="contain" />
-    <el-input v-model="folderName" class="folder-name" autofocus maxlength="30" />
+    <el-input ref="inputRef" v-model="folderName" class="folder-name" autofocus maxlength="30" />
     <div class="actions">
       <el-icon circle size="20" class="primary" @click="handleCreateFolder">
         <SuccessFilled />
