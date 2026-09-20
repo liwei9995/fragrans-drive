@@ -242,7 +242,8 @@ const handleRegisterPasskey = async () => {
   registeringPasskey.value = true
   try {
     const { sessionId, challenge } = await webauthnRegisterStart()
-    const credential = await startRegistration({ optionsJSON: challenge })
+    const options = (challenge as any).publicKey || challenge
+    const credential = await startRegistration({ optionsJSON: options })
     const isMac = /Macintosh|Mac OS X/i.test(navigator.userAgent)
     const defaultName = isMac ? 'Mac Touch ID' : 'Passkey'
     await webauthnRegisterFinish({

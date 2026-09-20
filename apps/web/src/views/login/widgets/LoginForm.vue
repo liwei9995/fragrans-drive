@@ -380,8 +380,9 @@ const handleTouchIdLogin = async () => {
     const email = loginForm.email?.trim() || undefined
     const startRes = await webauthnLoginStart(email)
     const { sessionId, challenge } = startRes
+    const options = (challenge as any).publicKey || challenge
 
-    const credential = await startAuthentication({ optionsJSON: challenge })
+    const credential = await startAuthentication({ optionsJSON: options })
     const finishRes = await webauthnLoginFinish({ sessionId, credential })
 
     const { redirect } = route.query
