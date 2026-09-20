@@ -1,5 +1,5 @@
 FROM rust:alpine AS builder
-RUN apk add --no-cache musl-dev gcc curl unzip pkgconfig openssl-dev
+RUN apk add --no-cache musl-dev gcc curl unzip pkgconfig openssl-dev openssl-libs-static
 
 WORKDIR /usr/src/fragrans
 
