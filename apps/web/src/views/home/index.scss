@@ -96,7 +96,7 @@
               }
 
               @media (width <= 576px) {
-                width: 100px;
+                width: 106px;
               }
             }
           }
@@ -148,6 +148,10 @@
           .items-wrapper {
             height: 0;
             padding-bottom: 0;
+
+            .items {
+              padding-bottom: 96px;
+            }
           }
         }
       }

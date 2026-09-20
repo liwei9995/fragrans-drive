@@ -143,7 +143,7 @@ const errorHandler = () => true
     <ActionButton
       :action-items="actionItems"
       :upload-file-limit="uploadFileLimit"
-      :icon-size="28"
+      :icon-size="24"
       :tap-action-item="handleCommand"
       :on-upload-change="onUploadChange"
       :on-upload-exceed="onUploadExceed"
