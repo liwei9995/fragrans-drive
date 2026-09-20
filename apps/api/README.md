@@ -15,18 +15,22 @@ A high-performance file storage service rewritten in **Rust**.
   - **Content deduplication**: Identical file content is stored once on disk.
   - **Sharded paths**: Uses an `aa/bb/cc/hash` layout to avoid overcrowded directories.
   - **Encrypted at rest**: Physical files are encrypted (AES-based) so data is safe on disk.
-- **Image processing**: Automatically generates WebP/JPEG thumbnails for uploaded images.
-- **Secure auth**: JWT-based authentication.
-- **Minimal deployment**: Multi-stage Docker image, roughly ~30MB.
+- **Media processing**:
+  - **Image thumbnails**: Automatically generates WebP/JPEG thumbnails for uploaded images, plus 1600px on-demand derivatives for high-res preview.
+  - **Video covers**: Extracts lightweight 360px JPEG covers using FFmpeg (with on-demand lazy backfilling for legacy files and startup scanning).
+  - **Video transcoding**: Asynchronous 720p Web preview transcoding with byte-range streaming support.
+- **Secure auth & protection**: JWT-based authentication, optional email verification codes, captcha protection, and IP/token-based rate limiting.
+- **Minimal deployment**: Multi-stage Docker image, roughly ~30MB (with FFmpeg runtime).
 
 ## Tech Stack
 
-- **Language**: Rust
+- **Language**: Rust (2024 edition)
 - **Web framework**: [Axum](https://github.com/tokio-rs/axum)
 - **Async runtime**: [Tokio](https://tokio.rs/)
 - **Database**: MongoDB (official Rust driver)
 - **Crypto & hashing**: `bcrypt`, `aes`, `ctr`, `md5`
-- **Image processing**: `image` crate
+- **Media processing**: `image` crate, `ffmpeg`
+- **Security**: Token-bucket rate limiting, captcha, SMTP email verification
 
 ## Quick Start
 
@@ -34,6 +38,7 @@ A high-performance file storage service rewritten in **Rust**.
 
 - Rust toolchain (1.75+)
 - MongoDB (5.0+ recommended)
+- FFmpeg (for video thumbnail extraction and 720p transcoding)
 
 ### Local development
 

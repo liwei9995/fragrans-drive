@@ -16,12 +16,13 @@ Fragrans Drive is a full-stack personal cloud drive application based on Vue 3, 
 
 ## Features
 
-- Email-based authentication with persistent local login state
-- Folder browsing, paginated loading, and breadcrumb navigation
-- Create, rename, move, delete, and perform batch operations on files/folders
-- File selection and drag-and-drop uploads with real-time progress tracking
-- Image and video previews with authenticated file downloads
-- Fully responsive user interface for both desktop and mobile devices
+- **Authentication & Security**: Email-based authentication with persistent login state, optional email verification codes, captcha protection, and API rate limiting
+- **File Management**: Folder browsing, paginated loading, breadcrumb navigation, and batch operations (create, rename, move, delete)
+- **Convenient Interactions**: Automatic text selection in rename and folder creation dialogs for instant typing
+- **Uploads**: File selection and drag-and-drop uploads with real-time queue and progress tracking
+- **Video Processing & Streaming**: Automatic video cover thumbnail extraction (FFmpeg), on-demand 720p web transcoding, and seamless quality switching
+- **High-Performance Image Preview**: On-demand 1600px derivative caching, LQIP placeholders, and idle neighbor preloading
+- **Mobile-First Experience**: Responsive layout with dynamic viewport height (`100dvh`), Safe Area insets (`env(safe-area-inset-*)`), and mobile floating action button
 
 Watch the [Introduction Video](https://www.youtube.com/embed/Uzeur9v44LE) to see the basic features in action.
 
@@ -30,7 +31,7 @@ Watch the [Introduction Video](https://www.youtube.com/embed/Uzeur9v44LE) to see
 | Category | Technologies |
 | --- | --- |
 | **Frontend** | Vue 3.5, Vue Router 5, Pinia 4, Element Plus 2.14, Vite 8, TypeScript 6 |
-| **Backend** | Rust 2024, Axum, MongoDB |
+| **Backend** | Rust 2024, Axum, MongoDB, FFmpeg |
 | **Code Quality** | Biome 2, vue-tsc 3 |
 | **Testing** | Vitest 4, Vue Test Utils, Playwright |
 | **Deployment** | Docker, Docker Compose, CircleCI, Aliyun ACR |
@@ -40,6 +41,7 @@ Watch the [Introduction Video](https://www.youtube.com/embed/Uzeur9v44LE) to see
 - Node.js 22 or higher
 - pnpm 11.23.0 (Enabling via Corepack is recommended)
 - Rust toolchain (for backend development)
+- FFmpeg (required for local backend video thumbnailing & transcoding)
 - Docker & Docker Compose (for production deployment)
 
 ## Local Development
