@@ -67,7 +67,7 @@ jobs:
           command: |
             echo "Generating .env file from CircleCI environment variables..."
             # Inject environment variables into .env, including UNIQUE_TAG
-            cat <<EOF > .env
+            cat \<<EOF > .env
             COMPOSE_PROJECT_NAME=ci-yi-svc-storage
             MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME
             MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD
