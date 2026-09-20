@@ -3,49 +3,49 @@ import { PORT } from '@/api/config/servicePort'
 import type { Auth, Login, User } from '@/api/interface/index'
 
 /**
- * @name 用户与认证模块
+ * @name User and authentication module
  */
-// 用户登录接口
+// User login endpoint
 export const authLogin = (params: Login.ReqLoginForm) => {
   return http.post<Login.ResLogin>(`${PORT}/auth/login`, params)
 }
 
-// 获取认证配置（是否允许注册、邮箱验证、图形验证码等）
+// Get auth configuration (registration allowed, email verification, captcha required, etc.)
 export const getAuthConfig = () => {
   return http.get<Auth.AuthConfig>(`${PORT}/auth/config`)
 }
 
-// 获取图形验证码
+// Get captcha SVG endpoint
 export const getCaptcha = () => {
   return http.get<Auth.CaptchaData>(`${PORT}/auth/captcha`)
 }
 
-// 发送邮箱验证码（需先通过图形验证码）
+// Send email verification code (requires captcha solution first)
 export const sendEmailCode = (params: Auth.ReqSendEmailCode) => {
   return http.post<{ message: string }>(`${PORT}/auth/send-code`, params)
 }
 
-// 用户注册接口
+// User registration endpoint
 export const registerUser = (params: Auth.ReqRegister) => {
   return http.post<{ id: string }>(`${PORT}/users`, params)
 }
 
-// 找回密码/重置密码
+// Password recovery/reset endpoint
 export const resetPassword = (params: Auth.ReqResetPassword) => {
   return http.post<{ message: string }>(`${PORT}/auth/reset-password`, params)
 }
 
-// 获取当前用户个人资料
+// Get current user profile endpoint
 export const getProfile = () => {
   return http.get<User.UserProfile>(`${PORT}/profile`)
 }
 
-// 修改当前用户个人资料
+// Update current user profile endpoint
 export const updateProfile = (params: User.UpdateProfileParams) => {
   return http.patch<User.UserProfile>(`${PORT}/profile`, params)
 }
 
-// 修改密码（已登录状态）
+// Update password (authenticated state)
 export const updatePassword = (params: User.UpdatePasswordParams) => {
   return http.post<void>(`${PORT}/users/password`, params)
 }

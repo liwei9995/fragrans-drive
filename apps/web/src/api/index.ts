@@ -33,24 +33,24 @@ const redirectToLogin = async () => {
 }
 
 const config = {
-  // 默认地址请求地址，可在 .env 开头文件中修改
+  // Default base request URL, can be configured in .env files
   baseURL: import.meta.env.VITE_API_URL as string,
-  // 设置超时时间（10s）
+  // Request timeout (10s)
   timeout: ResultEnum.TIMEOUT as number,
-  // 跨域时候允许携带凭证
+  // Allow credentials for cross-origin requests
   // withCredentials: true
 }
 
 class RequestHttp {
   service: AxiosInstance
   public constructor(config: AxiosRequestConfig) {
-    // 实例化axios
+    // Instantiate axios
     this.service = axios.create(config)
 
     /**
-     * @description 请求拦截器
-     * 客户端发送请求 -> [请求拦截器] -> 服务器
-     * token校验(JWT) : 接受服务器返回的token,存储到vuex/pinia/本地储存当中
+     * @description Request interceptor
+     * Client request -> [Request Interceptor] -> Server
+     * Token validation (JWT): receive token from server and store in pinia/local storage
      */
     this.service.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
@@ -68,8 +68,8 @@ class RequestHttp {
     )
 
     /**
-     * @description 响应拦截器
-     *  服务器换返回信息 -> [拦截统一处理] -> 客户端JS获取到信息
+     * @description Response interceptor
+     * Server response -> [Response Interceptor] -> Client JS
      */
     this.service.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -78,7 +78,7 @@ class RequestHttp {
       async (error: AxiosError) => {
         const { response } = error
 
-        // 请求超时单独判断，因为请求超时没有 response
+        // Check timeout separately, since timeout error has no response
         if (error.message.indexOf('timeout') !== -1)
           ElMessage.error('请求超时！请您稍后重试')
 
@@ -156,7 +156,7 @@ class RequestHttp {
         } else if (response) {
           checkStatus(response.status)
         }
-        // 服务器结果都没有返回(可能服务器错误可能客户端断网)，断网处理:可以跳转到断网页面
+        // If no response returned (server error or client offline), handle offline navigation
         if (!window.navigator.onLine) router.replace({ path: '/500' })
 
         return Promise.reject(error)
@@ -164,7 +164,7 @@ class RequestHttp {
     )
   }
 
-  // * 常用请求方法封装
+  // * Common request method wrappers
   // ponytail: axios 1.19's AxiosResponseResult does not collapse when R is a
   // free generic; interceptor already unwraps response.data to T.
   get<T = unknown>(url: string, params?: object, _object = {}): Promise<T> {

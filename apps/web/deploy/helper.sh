@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# 定义变量
+# Define variables
 REGISTRY_NAME="hub.docker.com"
 CONTAINER_NAME="fragrans-drive"
 CONTAINER_PORT=8061
@@ -10,30 +10,30 @@ CONTAINER_INNER_PORT=80
 COMMIT_SHA=$(git rev-parse --short HEAD)
 API_UPSTREAM=${API_UPSTREAM:-http://host.docker.internal:3821}
 
-# 构建 fragrans-drive 镜像
+# Build fragrans-drive image
 docker build --pull --no-cache -t "$REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA" .
 
-# 登录 Docker Registry
+# Login to Docker Registry
 # echo $DOCKER_REGISTRY_PASSWORD | docker login $REGISTRY_NAME -u $DOCKER_REGISTRY_USER --password-stdin
 
-# 推送 fragrans-drive 到镜像仓库
+# Push fragrans-drive to image registry
 # docker push $REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA
 
-# 从镜像仓库再次拉取 fragrans-drive 镜像
+# Pull fragrans-drive image from registry
 # docker pull $REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA
 
-# 登出 Docker Registry
+# Logout from Docker Registry
 # docker logout
 
-# 删除已经生成或正在运行的容器
+# Remove existing or running container
 cid=$(docker ps -aq --filter "name=^/${CONTAINER_NAME}$")
 
 if [ -n "$cid" ]; then
   docker rm -f "$cid"
 fi
 
-# 启动服务
-# Mac OS X 操作系统
+# Start service
+# macOS operating system
 if [ "$(uname -s)" = "Darwin" ]; then
   docker run --name "$CONTAINER_NAME" \
     -d \
@@ -42,7 +42,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
     --add-host host.docker.internal:host-gateway \
     --restart=always \
     "$REGISTRY_NAME/$CONTAINER_NAME:$COMMIT_SHA"
-# GNU/Linux操作系统
+# GNU/Linux operating system
 elif [ "$(uname -s)" = "Linux" ]; then
   docker run --name "$CONTAINER_NAME" \
     -d \

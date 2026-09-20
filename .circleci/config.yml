@@ -8,23 +8,23 @@ jobs:
     steps:
       - checkout
 
-      # 启用远程 Docker 环境用于构建镜像
+      # Enable remote Docker environment for image builds
       - setup_remote_docker:
           version: default
 
-      # 1. 登录阿里云容器镜像服务并构建、推送镜像
+      # 1. Log in to Aliyun ACR, then build and push images
       - run:
           name: Build and Push Docker Images
           command: |
             echo "Logging into Aliyun ACR..."
             docker login --username "$ALIYUN_REGISTRY_USER" --password "$ALIYUN_REGISTRY_PASSWORD" "$ALIYUN_REGISTRY_URL"
 
-            # 计算版本号与 Tags
+            # Calculate version tags
             TIMESTAMP=$(date +%Y%m%d%H%M)
             SHORT_SHA=$(echo $CIRCLE_SHA1 | cut -c1-8)
             UNIQUE_TAG="prod-${TIMESTAMP}-${SHORT_SHA}"
 
-            # 从 package.json 中提取 version
+            # Extract version from package.json
             APP_VERSION=$(grep -o '"version": "[^"]*"' package.json | head -n 1 | cut -d'"' -f4)
             SEMVER_TAG="v${APP_VERSION}"
             LATEST_TAG="prod-latest"
@@ -49,10 +49,10 @@ jobs:
             docker push ${API_IMAGE}:${SEMVER_TAG}
             docker push ${API_IMAGE}:${LATEST_TAG}
 
-            # 将 UNIQUE_TAG 写入环境变量文件，以便后续步骤使用
+            # Write UNIQUE_TAG to BASH_ENV for subsequent steps
             echo "export UNIQUE_TAG=${UNIQUE_TAG}" >> $BASH_ENV
 
-      # 2. 配置 SSH 以安全连接到阿里云服务器
+      # 2. Setup SSH key to connect to Aliyun server
       - run:
           name: Add Aliyun Host to known_hosts and Setup SSH Key
           command: |
@@ -61,13 +61,13 @@ jobs:
             chmod 600 ~/.ssh/aliyun_ed25519
             ssh-keyscan -H $ALIYUN_HOST >> ~/.ssh/known_hosts
 
-      # 3. 生成 .env 并部署配置到阿里云
+      # 3. Generate .env and deploy configuration to Aliyun
       - run:
           name: Deploy to Aliyun
           command: |
             echo "Generating .env file from CircleCI environment variables..."
-            # 将运行所需的变量注入 .env 文件，包括构建的 UNIQUE_TAG
-            cat \<<EOF > .env
+            # Inject environment variables into .env, including UNIQUE_TAG
+            cat <<EOF > .env
             COMPOSE_PROJECT_NAME=ci-yi-svc-storage
             MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME
             MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD
@@ -92,10 +92,10 @@ jobs:
             SSH_OPTS="-i ~/.ssh/aliyun_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o BatchMode=yes"
             ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "mkdir -p $ALIYUN_DEPLOY_PATH"
 
-            # 只需上传 docker-compose.yaml 和 .env，无需上传源码
+            # Only upload docker-compose.yaml and .env without source code
             scp $SSH_OPTS docker-compose.yaml .env $ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/
 
-            # 在远程登录镜像库 -> 拉取最新版本镜像 -> 启动服务 -> 清理废弃镜像
+            # Login to ACR on remote host -> pull latest images -> start services -> prune dangling images
             ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "cd $ALIYUN_DEPLOY_PATH && \
               docker login --username '$ALIYUN_REGISTRY_USER' --password '$ALIYUN_REGISTRY_PASSWORD' '$ALIYUN_REGISTRY_URL' && \
               docker-compose pull && \
@@ -109,7 +109,7 @@ workflows:
       - build-and-deploy:
           filters:
             branches:
-              # 允许在 main 和 feat/monorepo 分支上触发部署
+              # Trigger deployment on main and feat/monorepo branches
               only: 
                 - main
                 - feat/monorepo

@@ -72,8 +72,8 @@ test.describe('Storage E2E', () => {
     await page
       .locator('.el-dropdown-menu__item:visible', { hasText: '移动' })
       .click()
-    // Move dialog appears. Select root or some folder, click 确定
-    // Just click 确定 (which might be disabled if same folder, but wait, we need to click "全部文件" in the tree)
+    // Move dialog appears. Select root or target folder, click Confirm
+    // Click Confirm (or select "All Files" in the tree)
     await page
       .locator('.el-dialog')
       .getByRole('button', { name: '取消' })

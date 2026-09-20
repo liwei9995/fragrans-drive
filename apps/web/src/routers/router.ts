@@ -56,7 +56,7 @@ export const errorRouter = [
       title: '500页面',
     },
   },
-  // 解决刷新页面，路由警告
+  // Catch-all route to prevent route warnings on refresh
   {
     path: '/:pathMatch(.*)*',
     component: () => import('@/components/ErrorMessage/404.vue'),
@@ -66,7 +66,7 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes: [...staticRouter, ...errorRouter],
   strict: false,
-  // 切换页面，滚动到最顶部
+  // Scroll to top on page switch
   scrollBehavior: () => ({ left: 0, top: 0 }),
 })
 

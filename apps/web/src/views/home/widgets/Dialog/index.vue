@@ -51,7 +51,7 @@ onMounted(() => {
       selectAll()
     }
   })
-  // 兜底：处理部分浏览器或动画延迟导致的选择未生效
+  // Fallback: handle cases where browser or animation delays prevent selection from taking effect
   setTimeout(() => {
     if (!hasUserTyped) {
       selectAll()

@@ -1,6 +1,6 @@
-// 请求枚举配置
+// HTTP request enum configuration
 /**
- * @description：请求配置
+ * @description Request configuration
  */
 export enum ResultEnum {
   UNAUTHORIZED = 401,

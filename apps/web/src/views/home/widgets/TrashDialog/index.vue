@@ -114,7 +114,7 @@ const handleToggleSelect = (id: string) => {
   selectedIds.value = new Set(selectedIds.value)
 }
 
-// 还原单项
+// Restore a single item
 const handleRestoreSingle = async (item: StorageNode) => {
   actionLoading.value = true
   try {
@@ -131,7 +131,7 @@ const handleRestoreSingle = async (item: StorageNode) => {
   }
 }
 
-// 还原选中项
+// Restore selected items
 const handleRestoreSelected = async () => {
   const count = selectedIds.value.size
   if (count === 0) return
@@ -153,7 +153,7 @@ const handleRestoreSelected = async () => {
   }
 }
 
-// 还原全部
+// Restore all items
 const handleRestoreAll = () => {
   if (trashItems.value.length === 0) return
 
@@ -184,7 +184,7 @@ const handleRestoreAll = () => {
     .catch(() => {})
 }
 
-// 清空回收站
+// Empty trash
 const handleEmptyTrash = () => {
   if (trashItems.value.length === 0) return
 

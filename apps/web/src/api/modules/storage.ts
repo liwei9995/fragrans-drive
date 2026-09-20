@@ -10,36 +10,36 @@ import type {
 import { ResultEnum } from '@/enums/httpEnum'
 
 /**
- * @name 文件存储模块
+ * @name File storage module
  */
-// 创建文件夹接口
+// Create folder endpoint
 export const createFolder = (params: Storage.ReqStorageFolder) => {
   return http.post<StorageFolderResult>(`${PORT}/storage/folder`, params)
 }
 
-// 获取文件/文件夹列表接口
+// Get file/folder list endpoint
 export const getFiles = (params?: Storage.ReqStorageList) => {
   return http.post<StorageListResponse>(`${PORT}/storage/list`, params)
 }
 
-// 删除文件/文件夹接口
+// Delete file/folder endpoint
 export const deleteFile = (id: string) => {
   return http.delete<void>(`${PORT}/storage/${id}`)
 }
 
-// 移动文件/文件夹接口
+// Move file/folder endpoint
 export const moveFile = (params: Storage.ReqStorageMove) => {
   return http.post<void>(`${PORT}/storage/move`, params)
 }
 
-// 获取文件接口
+// Get file download stream endpoint
 export const getFile = (id: string) => {
   return http.download(`${PORT}/storage/${id}`, {
     timeout: ResultEnum.TIMEOUT_DOWNLOAD as number,
   })
 }
 
-// 修改文件/文件夹信息接口
+// Update file/folder information endpoint
 export const updateFile = (
   id: string,
   params: Storage.ReqStorageUpdateFileName,
@@ -47,17 +47,17 @@ export const updateFile = (
   return http.put<StorageUpdateResult>(`${PORT}/storage/${id}`, params)
 }
 
-// 获取文件/文件夹所在路径
+// Get file/folder path endpoint
 export const getPath = (fileId: string) => {
   return http.post<StoragePathItem[]>(`${PORT}/storage/path`, { fileId })
 }
 
-// 获取带 Download 票的文件下载地址
+// Get file download URL with ticket
 export const getDownloadUrl = (fileId: string) => {
   return http.post<string>(`${PORT}/storage/download/url`, { fileId })
 }
 
-// 设置文件公开直链状态
+// Set file public direct link status
 export const setPublicStatus = (
   id: string,
   params: Storage.ReqSetPublicStatus,
@@ -68,12 +68,12 @@ export const setPublicStatus = (
   )
 }
 
-// 获取回收站列表
+// Get trash list endpoint
 export const getTrashList = (params?: Storage.ReqStorageList) => {
   return http.post<StorageListResponse>(`${PORT}/storage/trash/list`, params)
 }
 
-// 恢复指定或全部回收站文件
+// Restore specified or all files from trash
 export const restoreTrash = (params: Storage.TrashRestoreParams) => {
   return http.post<Storage.TrashRestoreResponse>(
     `${PORT}/storage/trash/restore`,
@@ -81,17 +81,17 @@ export const restoreTrash = (params: Storage.TrashRestoreParams) => {
   )
 }
 
-// 恢复单个文件
+// Restore single file from trash
 export const restoreFile = (id: string) => {
   return http.post<StorageUpdateResult>(`${PORT}/storage/${id}/restore`)
 }
 
-// 清空回收站
+// Empty trash endpoint
 export const emptyTrash = () => {
   return http.delete<Storage.TrashCleanupResponse>(`${PORT}/storage/trash`)
 }
 
-// 获取存储容量与文件统计
+// Get storage usage and file statistics
 export const getStorageUsage = () => {
   return http.get<Storage.StorageUsage>(`${PORT}/storage/usage`)
 }

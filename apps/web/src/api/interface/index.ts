@@ -1,4 +1,4 @@
-// 请求响应参数(不包含data)
+// Request response parameters (excluding data)
 export interface Result {
   code: string
   msg: string
@@ -52,7 +52,7 @@ export interface StorageUpdateResult extends StorageNode {
   exist: boolean
 }
 
-// 登录
+// Authentication
 export namespace Login {
   export interface ReqLoginForm {
     email: string
@@ -71,7 +71,7 @@ export namespace Login {
   }
 }
 
-// 文件存储
+// File storage
 export namespace Storage {
   export interface ReqStorageFolder {
     name: string
@@ -141,7 +141,7 @@ export namespace Storage {
   }
 }
 
-// * 用户管理模块
+// * User management module
 export namespace User {
   export interface ResUserList {
     userId: string
@@ -183,7 +183,7 @@ export namespace User {
   }
 }
 
-// * 认证与安全模块
+// * Authentication and security module
 export namespace Auth {
   export interface AuthConfig {
     allowRegistration: boolean

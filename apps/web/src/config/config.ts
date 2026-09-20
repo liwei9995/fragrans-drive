@@ -1,5 +1,5 @@
-// * 首页地址（默认）
+// * Home URL (default)
 export const HOME_URL = '/home'
 
-// * 登录地址
+// * Login URL
 export const LOGIN_URL = '/login'

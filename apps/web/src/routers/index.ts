@@ -3,10 +3,10 @@ import router from '@/routers/router'
 import { GlobalStore } from '@/store'
 
 /**
- * @description 路由拦截 beforeEach（路由配置无数种方法，个人觉得最简便）
+ * @description Navigation guard beforeEach
  * */
 router.beforeEach((to) => {
-  // 判断当前路由是否需要访问权限
+  // Check if current route requires authentication
   if (!to.matched.some((record) => record.meta.requiresAuth)) return true
 
   const globalStore = GlobalStore()

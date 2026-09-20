@@ -63,7 +63,7 @@ watch(
   () => (id.value = props.id),
 )
 
-// 排除当前要移动的文件/文件夹，避免选到自己或无效目标
+// Exclude the current file/folder being moved to prevent selecting itself or invalid targets
 const filteredDocs = computed(() => {
   const docs = listData.value?.docs ?? []
   if (!props.id) return docs

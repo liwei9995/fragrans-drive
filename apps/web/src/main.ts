@@ -10,9 +10,9 @@ import 'element-plus/theme-chalk/el-message-box.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-notification.css'
 import 'element-plus/theme-chalk/el-overlay.css'
-// element dark(内置暗黑模式)
+// element dark (built-in dark mode)
 import 'element-plus/theme-chalk/dark/css-vars.css'
-// element 基于断点的隐藏类
+// element breakpoint-based display helper classes
 import 'element-plus/theme-chalk/display.css'
 // vue Router
 import router from '@/routers/index'

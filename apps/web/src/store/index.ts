@@ -3,9 +3,9 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import piniaPersistConfig from '@/config/piniaPersist'
 import type { GlobalState } from './interface'
 
-// defineStore 调用后返回一个函数，调用该函数获得 Store 实体
+// defineStore returns a function that can be called to obtain the store instance
 export const GlobalStore = defineStore('GlobalState', {
-  // state: 返回对象的函数
+  // state: function that returns the state object
   state: (): GlobalState => ({
     accessToken: '',
     refreshToken: '',
@@ -32,7 +32,7 @@ export const GlobalStore = defineStore('GlobalState', {
   persist: piniaPersistConfig('GlobalState'),
 })
 
-// piniaPersist(持久化)
+// piniaPersist (persistence)
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 

@@ -1,2 +1,2 @@
-// 后端微服务端口名
+// Backend service API version prefix
 export const PORT = 'v1'
