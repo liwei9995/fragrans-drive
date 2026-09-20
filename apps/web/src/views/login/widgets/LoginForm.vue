@@ -325,7 +325,7 @@ const login = (formEl: FormInstance | undefined) => {
         password: loginForm.password,
       })
 
-      globalStore.setTokens(res.access_token, res.refresh_token)
+      globalStore.setAccessToken(res.access_token)
       loginFormRef.value?.clearValidate()
 
       const targetPath = getRedirectPath()
@@ -404,7 +404,7 @@ const handleTouchIdLogin = async () => {
     const credential = await startAuthentication({ optionsJSON: options })
     const finishRes = await webauthnLoginFinish({ sessionId, credential })
 
-    globalStore.setTokens(finishRes.access_token, finishRes.refresh_token)
+    globalStore.setAccessToken(finishRes.access_token)
     loginFormRef.value?.clearValidate()
     ElMessage.success(t('login.touchIdSuccess'))
 

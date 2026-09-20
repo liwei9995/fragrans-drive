@@ -443,14 +443,25 @@ async fn download_url_rejects_unowned_file() {
         .unwrap();
     let user_id2 = inserted.to_hex();
 
-    let token2 = fragrans::api::middleware::create_token(
+    let jti2 = uuid::Uuid::new_v4().to_string();
+    fragrans::infrastructure::db::refresh_session_repo::RefreshSessionRepository::new(&ctx.db)
+        .create(
+            &user_id2,
+            &jti2,
+            0,
+            mongodb::bson::DateTime::from_millis((chrono::Utc::now().timestamp() + 3600) * 1000),
+        )
+        .await
+        .unwrap();
+    let token2 = fragrans::api::middleware::create_token_with_jti(
         "test-secret-key-that-is-long-enough",
         &user_id2,
         fragrans::api::middleware::TokenPurpose::Access,
         None,
         (chrono::Utc::now().timestamp() + 3600) as usize,
         None,
-        None,
+        Some(0),
+        Some(jti2),
     )
     .unwrap();
 
@@ -891,14 +902,8 @@ async fn download_with_preview_returns_video_stream_and_supports_ranges() {
         .unwrap();
     let prev_res = ctx.app.clone().oneshot(prev_req).await.unwrap();
     assert_eq!(prev_res.status(), StatusCode::OK);
-    assert_eq!(
-        prev_res.headers().get("content-type").unwrap(),
-        "video/mp4"
-    );
-    assert_eq!(
-        prev_res.headers().get("accept-ranges").unwrap(),
-        "bytes"
-    );
+    assert_eq!(prev_res.headers().get("content-type").unwrap(), "video/mp4");
+    assert_eq!(prev_res.headers().get("accept-ranges").unwrap(), "bytes");
 
     // 2. Request range on video preview
     let range_req = Request::builder()
@@ -910,7 +915,13 @@ async fn download_with_preview_returns_video_stream_and_supports_ranges() {
     let range_res = ctx.app.clone().oneshot(range_req).await.unwrap();
     assert_eq!(range_res.status(), StatusCode::PARTIAL_CONTENT);
     assert_eq!(
-        range_res.headers().get("content-range").unwrap().to_str().unwrap().starts_with("bytes 0-99/"),
+        range_res
+            .headers()
+            .get("content-range")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("bytes 0-99/"),
         true
     );
     let range_data = response_bytes(range_res).await;
@@ -918,4 +929,3 @@ async fn download_with_preview_returns_video_stream_and_supports_ranges() {
 
     ctx.teardown().await;
 }
-

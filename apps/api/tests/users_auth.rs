@@ -52,6 +52,7 @@ async fn test_user_registration_and_login() {
         .expect("login request");
 
     assert_eq!(login_res.status(), StatusCode::OK);
+    let refresh_cookie = refresh_cookie(&login_res);
     let login_data: serde_json::Value =
         serde_json::from_slice(&response_bytes(login_res).await).expect("parse login");
     let token = login_data["access_token"]
@@ -59,12 +60,8 @@ async fn test_user_registration_and_login() {
         .expect("token exists")
         .to_string();
     assert!(!token.is_empty());
-    let refresh_token = login_data["refresh_token"]
-        .as_str()
-        .expect("refresh_token exists")
-        .to_string();
-    assert!(!refresh_token.is_empty());
-    assert_ne!(token, refresh_token);
+    assert!(!refresh_cookie.is_empty());
+    assert!(login_data.get("refresh_token").is_none());
 
     // 3. Get profile using the token
     let profile_res = ctx
@@ -128,10 +125,11 @@ async fn refresh_rotates_tokens_and_rejects_access_token() {
         .await
         .expect("login");
     assert_eq!(login_res.status(), StatusCode::OK);
+    let cookie = refresh_cookie(&login_res);
     let login_data: serde_json::Value =
         serde_json::from_slice(&response_bytes(login_res).await).expect("parse login");
     let access = login_data["access_token"].as_str().unwrap().to_string();
-    let refresh = login_data["refresh_token"].as_str().unwrap().to_string();
+    let refresh = cookie.split_once('=').unwrap().1.to_string();
     let access_claims = jsonwebtoken::decode::<fragrans::api::middleware::Claims>(
         &access,
         &jsonwebtoken::DecodingKey::from_secret(b"test-secret-key-that-is-long-enough"),
@@ -147,17 +145,16 @@ async fn refresh_rotates_tokens_and_rejects_access_token() {
     .unwrap()
     .claims;
     let now = chrono::Utc::now().timestamp() as usize;
-    assert!((access_claims.exp - now).abs_diff(3600 * 2) <= 2);
+    assert!((access_claims.exp - now).abs_diff(900) <= 2);
     assert!((refresh_claims.exp - now).abs_diff(3600 * 24 * 7) <= 2);
 
     let access_as_refresh = ctx
         .app
         .clone()
-        .oneshot(json_auth_request(
+        .oneshot(cookie_request(
             "POST",
             "/v1/auth/refresh",
-            "",
-            serde_json::json!({ "refresh_token": access }),
+            &format!("__Host-fragrans-refresh={access}"),
         ))
         .await
         .expect("refresh with access");
@@ -166,31 +163,22 @@ async fn refresh_rotates_tokens_and_rejects_access_token() {
     let refresh_res = ctx
         .app
         .clone()
-        .oneshot(json_auth_request(
-            "POST",
-            "/v1/auth/refresh",
-            "",
-            serde_json::json!({ "refresh_token": refresh }),
-        ))
+        .oneshot(cookie_request("POST", "/v1/auth/refresh", &cookie))
         .await
         .expect("refresh");
     assert_eq!(refresh_res.status(), StatusCode::OK);
+    let new_cookie = refresh_cookie(&refresh_res);
     let refresh_data: serde_json::Value =
         serde_json::from_slice(&response_bytes(refresh_res).await).expect("parse refresh");
     let new_access = refresh_data["access_token"].as_str().unwrap().to_string();
-    let new_refresh = refresh_data["refresh_token"].as_str().unwrap().to_string();
+    let new_refresh = new_cookie.split_once('=').unwrap().1.to_string();
     assert!(!new_access.is_empty());
     assert_ne!(new_refresh, refresh);
 
     let replay_res = ctx
         .app
         .clone()
-        .oneshot(json_auth_request(
-            "POST",
-            "/v1/auth/refresh",
-            "",
-            serde_json::json!({ "refresh_token": refresh }),
-        ))
+        .oneshot(cookie_request("POST", "/v1/auth/refresh", &cookie))
         .await
         .expect("replay old refresh token");
     assert_eq!(replay_res.status(), StatusCode::UNAUTHORIZED);
@@ -225,10 +213,10 @@ async fn password_change_invalidates_refresh_token() {
         ))
         .await
         .expect("login");
+    let cookie = refresh_cookie(&login_res);
     let login_data: serde_json::Value =
         serde_json::from_slice(&response_bytes(login_res).await).expect("parse login");
     let access = login_data["access_token"].as_str().unwrap().to_string();
-    let refresh = login_data["refresh_token"].as_str().unwrap().to_string();
 
     // Attempt password change with incorrect old password
     let wrong_old_pwd_res = ctx
@@ -269,12 +257,7 @@ async fn password_change_invalidates_refresh_token() {
     let refresh_res = ctx
         .app
         .clone()
-        .oneshot(json_auth_request(
-            "POST",
-            "/v1/auth/refresh",
-            "",
-            serde_json::json!({ "refresh_token": refresh }),
-        ))
+        .oneshot(cookie_request("POST", "/v1/auth/refresh", &cookie))
         .await
         .expect("refresh after password change");
     assert_eq!(refresh_res.status(), StatusCode::UNAUTHORIZED);
@@ -293,6 +276,101 @@ async fn password_change_invalidates_refresh_token() {
 
 #[tokio::test]
 #[serial]
+async fn logout_revokes_both_tokens() {
+    let ctx = setup().await;
+    let login = ctx
+        .app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/auth/login",
+            "",
+            serde_json::json!({
+                "email": format!("user-{}@example.com", ctx.db.name()),
+                "password": "password123"
+            }),
+        ))
+        .await
+        .unwrap();
+    let cookie = refresh_cookie(&login);
+    let data: serde_json::Value = serde_json::from_slice(&response_bytes(login).await).unwrap();
+    let access = data["access_token"].as_str().unwrap();
+
+    let logout = ctx
+        .app
+        .clone()
+        .oneshot(cookie_request("POST", "/v1/auth/logout", &cookie))
+        .await
+        .unwrap();
+    assert_eq!(logout.status(), StatusCode::NO_CONTENT);
+    assert!(
+        logout
+            .headers()
+            .get(axum::http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("Max-Age=0")
+    );
+    let profile = ctx
+        .app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/profile", access))
+        .await
+        .unwrap();
+    assert_eq!(profile.status(), StatusCode::UNAUTHORIZED);
+    let refresh = ctx
+        .app
+        .clone()
+        .oneshot(cookie_request("POST", "/v1/auth/refresh", &cookie))
+        .await
+        .unwrap();
+    assert_eq!(refresh.status(), StatusCode::UNAUTHORIZED);
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn refresh_rejects_foreign_origin_and_legacy_access_token() {
+    let ctx = setup().await;
+    let mut foreign = cookie_request(
+        "POST",
+        "/v1/auth/refresh",
+        "__Host-fragrans-refresh=invalid",
+    );
+    foreign.headers_mut().insert(
+        axum::http::header::ORIGIN,
+        "https://evil.example".parse().unwrap(),
+    );
+    assert_eq!(
+        ctx.app.clone().oneshot(foreign).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+
+    let legacy = fragrans::api::middleware::create_token(
+        "test-secret-key-that-is-long-enough",
+        &ctx.user_id,
+        fragrans::api::middleware::TokenPurpose::Access,
+        None,
+        (chrono::Utc::now().timestamp() + 3600) as usize,
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        ctx.app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/profile", &legacy))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
 async fn login_rate_limit_blocks_after_burst() {
     let ctx = setup().await;
 
@@ -302,7 +380,7 @@ async fn login_rate_limit_blocks_after_burst() {
     });
 
     let mut hit_rate_limit = false;
-    // Login limiter capacity is 10
+    // Account limiter blocks repeated attempts even before the IP limit is reached.
     for _ in 0..12 {
         let res = ctx
             .app
@@ -316,7 +394,6 @@ async fn login_rate_limit_blocks_after_burst() {
             .await
             .expect("login attempt");
         if res.status() == StatusCode::TOO_MANY_REQUESTS {
-            assert!(res.headers().contains_key(axum::http::header::RETRY_AFTER));
             hit_rate_limit = true;
             break;
         }

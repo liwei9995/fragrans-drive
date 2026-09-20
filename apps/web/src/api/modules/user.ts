@@ -1,3 +1,4 @@
+import axios from 'axios'
 import http from '@/api'
 import { PORT } from '@/api/config/servicePort'
 import type { Auth, Login, User } from '@/api/interface/index'
@@ -9,6 +10,13 @@ import type { Auth, Login, User } from '@/api/interface/index'
 export const authLogin = (params: Login.ReqLoginForm) => {
   return http.post<Login.ResLogin>(`${PORT}/auth/login`, params)
 }
+
+export const authLogout = () =>
+  axios.post(
+    `${import.meta.env.VITE_API_URL}/${PORT}/auth/logout`,
+    {},
+    { withCredentials: true },
+  )
 
 // Get auth configuration (registration allowed, email verification, captcha required, etc.)
 export const getAuthConfig = () => {
@@ -74,10 +82,10 @@ export const getPasskeys = () => {
 }
 
 // Start passkey registration ceremony
-export const webauthnRegisterStart = () => {
+export const webauthnRegisterStart = (password: string) => {
   return http.post<{ sessionId: string; challenge: any }>(
     `${PORT}/auth/webauthn/register-start`,
-    {},
+    { password },
   )
 }
 
@@ -94,6 +102,8 @@ export const webauthnRegisterFinish = (params: {
 }
 
 // Delete a passkey
-export const deletePasskey = (id: string) => {
-  return http.delete<void>(`${PORT}/auth/webauthn/passkeys/${id}`)
+export const deletePasskey = (id: string, password: string) => {
+  return http.delete<void>(`${PORT}/auth/webauthn/passkeys/${id}`, undefined, {
+    data: { password },
+  })
 }

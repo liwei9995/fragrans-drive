@@ -105,6 +105,8 @@ export default {
     profile: 'Profile',
     trash: 'Trash',
     logout: 'Log Out',
+    logoutServerFailed:
+      'Signed out locally, but the server could not revoke this session. Try again when online or change your password.',
     logoutConfirm: 'Are you sure you want to log out?',
     batchDelete: 'Move to Trash',
     batchDeleteCount: 'Move to Trash ({count})',

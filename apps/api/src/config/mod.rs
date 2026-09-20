@@ -35,6 +35,7 @@ pub struct Config {
     pub allow_registration: bool,
     pub email_verification_required: bool,
     pub captcha_required: bool,
+    pub trust_proxy_headers: bool,
     pub smtp_host: Option<String>,
     pub smtp_port: Option<u16>,
     pub smtp_user: Option<String>,
@@ -78,6 +79,12 @@ impl Config {
 
         let domain =
             env::var("DRIVE_DOMAIN").unwrap_or_else(|_| format!("http://localhost:{}", port));
+        let parsed_domain = webauthn_rs::prelude::Url::parse(&domain)
+            .map_err(|_| ConfigError::InvalidFormat("DRIVE_DOMAIN"))?;
+        let local = matches!(parsed_domain.host_str(), Some("localhost" | "127.0.0.1"));
+        if parsed_domain.scheme() != "https" && !(local && parsed_domain.scheme() == "http") {
+            return Err(ConfigError::InvalidFormat("DRIVE_DOMAIN"));
+        }
 
         let storage_destination = env::var("STORAGE_DESTINATION")
             .unwrap_or_else(|_| "bucket/storage".to_string())
@@ -102,6 +109,7 @@ impl Config {
         let captcha_required = env::var("CAPTCHA_REQUIRED")
             .map(|v| v != "false" && v != "0")
             .unwrap_or(true);
+        let trust_proxy_headers = env::var("TRUST_PROXY_HEADERS").as_deref() == Ok("true");
 
         let smtp_host = env::var("SMTP_HOST").ok().filter(|s| !s.trim().is_empty());
         let smtp_port = env::var("SMTP_PORT")
@@ -123,6 +131,7 @@ impl Config {
             allow_registration,
             email_verification_required,
             captcha_required,
+            trust_proxy_headers,
             smtp_host,
             smtp_port,
             smtp_user,
@@ -284,6 +293,25 @@ mod tests {
         assert!(matches!(
             Config::from_env(),
             Err(ConfigError::InvalidFormat("MAX_UPLOAD_BYTES"))
+        ));
+    }
+
+    #[test]
+    #[serial]
+    fn rejects_insecure_remote_origin() {
+        reset_env();
+        unsafe {
+            env::set_var("MONGO_URI", "mongodb://localhost:27017");
+            env::set_var("JWT_SECRET_KEY", "01234567890123456789012345678901");
+            env::set_var(
+                "STORAGE_MASTER_KEY_HEX",
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            );
+            env::set_var("DRIVE_DOMAIN", "http://drive.example.com");
+        }
+        assert!(matches!(
+            Config::from_env(),
+            Err(ConfigError::InvalidFormat("DRIVE_DOMAIN"))
         ));
     }
 }

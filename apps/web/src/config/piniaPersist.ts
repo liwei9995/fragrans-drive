@@ -9,6 +9,7 @@ const piniaPersistConfig = (key: string) => {
   const persist: PersistenceOptions = {
     key,
     storage: window.localStorage,
+    pick: ['language'],
     // storage: window.sessionStorage,
   }
 

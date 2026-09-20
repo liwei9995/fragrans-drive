@@ -4,7 +4,7 @@ import LoginForm from './LoginForm.vue'
 
 vi.mock('@/store', () => ({
   GlobalStore: vi.fn(() => ({
-    setTokens: vi.fn(),
+    setAccessToken: vi.fn(),
   })),
 }))
 
@@ -17,7 +17,6 @@ vi.mock('@/api/modules/user', () => ({
   authLogin: vi.fn(() =>
     Promise.resolve({
       access_token: 'access_123',
-      refresh_token: 'refresh_123',
     }),
   ),
   getAuthConfig: vi.fn(() =>

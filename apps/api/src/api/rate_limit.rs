@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Request, State},
+    extract::{ConnectInfo, Request, State},
     http::{HeaderMap, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -7,6 +7,7 @@ use axum::{
 use serde_json::json;
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -17,10 +18,11 @@ pub struct RateLimiter {
     max_tokens: f64,
     refill_rate_per_sec: f64,
     window: Duration,
+    trust_proxy_headers: bool,
 }
 
 impl RateLimiter {
-    pub fn new(max_requests: u32, window: Duration) -> Self {
+    pub fn new(max_requests: u32, window: Duration, trust_proxy_headers: bool) -> Self {
         let max_tokens = max_requests as f64;
         let refill_rate_per_sec = max_tokens / window.as_secs_f64();
         Self {
@@ -28,6 +30,7 @@ impl RateLimiter {
             max_tokens,
             refill_rate_per_sec,
             window,
+            trust_proxy_headers,
         }
     }
 
@@ -57,22 +60,15 @@ impl RateLimiter {
     }
 }
 
-pub fn client_ip_from_headers(headers: &HeaderMap) -> String {
-    if let Some(forwarded) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
-        && let Some(first) = forwarded.split(',').next()
+pub fn client_ip(headers: &HeaderMap, peer: Option<SocketAddr>, trust_proxy: bool) -> String {
+    if trust_proxy
+        && let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok())
+        && let Ok(ip) = ip.parse::<std::net::IpAddr>()
     {
-        let ip = first.trim();
-        if !ip.is_empty() {
-            return ip.to_string();
-        }
+        return ip.to_string();
     }
-    if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
-        let ip = real_ip.trim();
-        if !ip.is_empty() {
-            return ip.to_string();
-        }
-    }
-    "127.0.0.1".to_string()
+    peer.map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string())
 }
 
 pub async fn rate_limit_middleware(
@@ -80,7 +76,11 @@ pub async fn rate_limit_middleware(
     req: Request,
     next: Next,
 ) -> Response {
-    let client_ip = client_ip_from_headers(req.headers());
+    let peer = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|c| c.0);
+    let client_ip = client_ip(req.headers(), peer, limiter.trust_proxy_headers);
     match limiter.check(&client_ip) {
         Ok(()) => next.run(req).await,
         Err(retry_after) => {
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_rate_limiter_allows_burst_then_blocks() {
-        let limiter = RateLimiter::new(3, Duration::from_secs(60));
+        let limiter = RateLimiter::new(3, Duration::from_secs(60), false);
         assert!(limiter.check("ip-1").is_ok());
         assert!(limiter.check("ip-1").is_ok());
         assert!(limiter.check("ip-1").is_ok());
@@ -126,13 +126,15 @@ mod tests {
             "x-forwarded-for",
             "203.0.113.195, 70.41.3.18".parse().unwrap(),
         );
-        assert_eq!(client_ip_from_headers(&headers), "203.0.113.195");
+        let peer = "198.51.100.2:443".parse().unwrap();
+        assert_eq!(client_ip(&headers, Some(peer), false), "198.51.100.2");
 
         let mut headers_real = HeaderMap::new();
         headers_real.insert("x-real-ip", "198.51.100.1".parse().unwrap());
-        assert_eq!(client_ip_from_headers(&headers_real), "198.51.100.1");
+        assert_eq!(client_ip(&headers_real, Some(peer), true), "198.51.100.1");
+        assert_eq!(client_ip(&headers_real, Some(peer), false), "198.51.100.2");
 
         let empty = HeaderMap::new();
-        assert_eq!(client_ip_from_headers(&empty), "127.0.0.1");
+        assert_eq!(client_ip(&empty, None, false), "127.0.0.1");
     }
 }

@@ -89,14 +89,14 @@ impl UserRepository {
         &self,
         id: ObjectId,
         passkey_id: &str,
-    ) -> Result<(), mongodb::error::Error> {
-        self.collection
+    ) -> Result<bool, mongodb::error::Error> {
+        let result = self.collection
             .update_one(
-                doc! { "_id": id },
-                doc! { "$pull": { "passkeys": { "id": passkey_id } } },
+                doc! { "_id": id, "passkeys.id": passkey_id },
+                doc! { "$pull": { "passkeys": { "id": passkey_id } }, "$inc": { "tokenVersion": 1 } },
             )
             .await?;
-        Ok(())
+        Ok(result.modified_count == 1)
     }
 
     pub async fn find_by_passkey_id(
@@ -112,15 +112,16 @@ impl UserRepository {
         &self,
         id: ObjectId,
         passkey_id: &str,
+        old_passkey_json: &str,
         updated_passkey_json: &str,
-    ) -> Result<(), mongodb::error::Error> {
-        self.collection
+    ) -> Result<bool, mongodb::error::Error> {
+        let result = self.collection
             .update_one(
-                doc! { "_id": id, "passkeys.id": passkey_id },
+                doc! { "_id": id, "passkeys": { "$elemMatch": { "id": passkey_id, "passkeyJson": old_passkey_json } } },
                 doc! { "$set": { "passkeys.$.passkeyJson": updated_passkey_json } },
             )
             .await?;
-        Ok(())
+        Ok(result.matched_count == 1)
     }
 
     #[allow(dead_code)]

@@ -9,16 +9,11 @@ export const GlobalStore = defineStore('GlobalState', {
   // state: function that returns the state object
   state: (): GlobalState => ({
     accessToken: '',
-    refreshToken: '',
     userInfo: null,
     language: getStoredLanguage(),
   }),
   getters: {},
   actions: {
-    setTokens(accessToken: string, refreshToken: string) {
-      this.accessToken = accessToken
-      this.refreshToken = refreshToken
-    },
     setAccessToken(token: string) {
       this.accessToken = token
     },
@@ -41,7 +36,6 @@ export const GlobalStore = defineStore('GlobalState', {
     },
     logout() {
       this.accessToken = ''
-      this.refreshToken = ''
       this.userInfo = null
     },
   },

@@ -19,7 +19,7 @@ import {
   getPath,
   updateFile,
 } from '@/api/modules/storage'
-import { getProfile } from '@/api/modules/user'
+import { authLogout, getProfile } from '@/api/modules/user'
 import FilePreviewModal from '@/components/FilePreviewModal/index.vue'
 import type { FilePreviewItem } from '@/components/FilePreviewModal/types'
 import Card from '@/components/StorageCard/index.vue'
@@ -314,7 +314,7 @@ const handleCloseUploadStatus = () => {
 
 const handleCloseVideoPlayer = () => (videoPlayerVisible.value = false)
 
-const handleTapActionItem = (command: string | number | object) => {
+const handleTapActionItem = async (command: string | number | object) => {
   if (command === 'folder') {
     folderDialogFormVisible.value = true
   } else if (command === 'profile') {
@@ -322,8 +322,13 @@ const handleTapActionItem = (command: string | number | object) => {
   } else if (command === 'trash') {
     trashDialogVisible.value = true
   } else if (command === 'logout') {
+    try {
+      await authLogout()
+    } catch {
+      ElMessage.error(t('home.logoutServerFailed'))
+    }
     globalStore.logout()
-    router.push(LOGIN_URL)
+    await router.push(LOGIN_URL)
   }
 }
 

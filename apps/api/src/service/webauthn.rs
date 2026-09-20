@@ -11,7 +11,7 @@ use crate::domain::user::{StoredPasskey, User};
 
 pub struct WebauthnService {
     webauthn: Arc<Webauthn>,
-    reg_states: Arc<RwLock<HashMap<String, (PasskeyRegistration, Instant)>>>,
+    reg_states: Arc<RwLock<HashMap<String, (String, PasskeyRegistration, Instant)>>>,
     auth_states: Arc<RwLock<HashMap<String, (PasskeyAuthentication, Instant)>>>,
 }
 
@@ -67,7 +67,9 @@ impl WebauthnService {
         let user_uuid = Uuid::from_bytes(bytes);
 
         let display_name = if !user.first_name.is_empty() || !user.last_name.is_empty() {
-            format!("{} {}", user.first_name, user.last_name).trim().to_string()
+            format!("{} {}", user.first_name, user.last_name)
+                .trim()
+                .to_string()
         } else {
             user.email.clone()
         };
@@ -81,23 +83,24 @@ impl WebauthnService {
                     list.push(pk.cred_id().clone());
                 }
             }
-            if list.is_empty() {
-                None
-            } else {
-                Some(list)
-            }
+            if list.is_empty() { None } else { Some(list) }
         };
 
         let (challenge, reg_state) = self
             .webauthn
             .start_passkey_registration(user_uuid, &user.email, &display_name, exclude_credentials)
-            .map_err(|e| AppError::InternalError(format!("Failed to start passkey registration: {}", e)))?;
+            .map_err(|e| {
+                AppError::InternalError(format!("Failed to start passkey registration: {}", e))
+            })?;
 
         let session_id = Uuid::new_v4().to_string();
         {
             let mut lock = self.reg_states.write().await;
-            lock.retain(|_, (_, time)| time.elapsed() < Duration::from_secs(300));
-            lock.insert(session_id.clone(), (reg_state, Instant::now()));
+            lock.retain(|_, (_, _, time)| time.elapsed() < Duration::from_secs(300));
+            lock.insert(
+                session_id.clone(),
+                (user_id.to_hex(), reg_state, Instant::now()),
+            );
         }
 
         Ok((challenge, session_id))
@@ -106,13 +109,19 @@ impl WebauthnService {
     pub async fn finish_registration(
         &self,
         session_id: &str,
+        user_id: &str,
         req: &RegisterPublicKeyCredential,
         device_name: Option<String>,
     ) -> Result<StoredPasskey, AppError> {
         let reg_state = {
             let mut lock = self.reg_states.write().await;
             match lock.remove(session_id) {
-                Some((state, time)) => {
+                Some((owner, state, time)) => {
+                    if owner != user_id {
+                        return Err(AppError::Forbidden(
+                            "Registration session belongs to another user".to_string(),
+                        ));
+                    }
                     if time.elapsed() > Duration::from_secs(300) {
                         return Err(AppError::BadRequest(
                             "Registration ceremony timed out".to_string(),
@@ -131,7 +140,9 @@ impl WebauthnService {
         let passkey = self
             .webauthn
             .finish_passkey_registration(req, &reg_state)
-            .map_err(|e| AppError::BadRequest(format!("Registration verification failed: {}", e)))?;
+            .map_err(|e| {
+                AppError::BadRequest(format!("Registration verification failed: {}", e))
+            })?;
 
         let passkey_json = serde_json::to_string(&passkey)
             .map_err(|e| AppError::InternalError(format!("Failed to serialize passkey: {}", e)))?;
@@ -140,6 +151,9 @@ impl WebauthnService {
         let name = device_name
             .filter(|n| !n.trim().is_empty())
             .unwrap_or_else(|| "Touch ID / Passkey".to_string());
+        if name.len() > 100 {
+            return Err(AppError::BadRequest("Passkey name is too long".to_string()));
+        }
 
         Ok(StoredPasskey {
             id: cred_id_str,
@@ -208,10 +222,12 @@ impl WebauthnService {
         };
 
         let auth_state = if let Some(pk) = passkey {
-            let mut auth_val = serde_json::to_value(&auth_state)
-                .map_err(|e| AppError::InternalError(format!("Failed to serialize auth state: {}", e)))?;
-            let pk_val = serde_json::to_value(pk)
-                .map_err(|e| AppError::InternalError(format!("Failed to serialize passkey: {}", e)))?;
+            let mut auth_val = serde_json::to_value(&auth_state).map_err(|e| {
+                AppError::InternalError(format!("Failed to serialize auth state: {}", e))
+            })?;
+            let pk_val = serde_json::to_value(pk).map_err(|e| {
+                AppError::InternalError(format!("Failed to serialize passkey: {}", e))
+            })?;
 
             if let Some(cred_val) = pk_val.get("cred") {
                 if let Some(creds) = auth_val
@@ -225,8 +241,9 @@ impl WebauthnService {
                 }
             }
 
-            serde_json::from_value(auth_val)
-                .map_err(|e| AppError::InternalError(format!("Failed to deserialize updated auth state: {}", e)))?
+            serde_json::from_value(auth_val).map_err(|e| {
+                AppError::InternalError(format!("Failed to deserialize updated auth state: {}", e))
+            })?
         } else {
             auth_state
         };
@@ -234,7 +251,9 @@ impl WebauthnService {
         let auth_result = self
             .webauthn
             .finish_passkey_authentication(req, &auth_state)
-            .map_err(|e| AppError::Unauthorized(format!("Touch ID authentication failed: {}", e)))?;
+            .map_err(|e| {
+                AppError::Unauthorized(format!("Touch ID authentication failed: {}", e))
+            })?;
 
         Ok(auth_result)
     }

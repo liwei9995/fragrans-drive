@@ -66,8 +66,13 @@ const renderedHtml = computed(() => {
 
   let text = markdownText.value
 
-  // 1. Escape basic HTML entities to avoid unescaped tags
-  text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // 1. Escape HTML text and attribute delimiters before adding markup.
+  text = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 
   // 2. Fenced Code blocks ```lang\ncode\n```
   text = text.replace(

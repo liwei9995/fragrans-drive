@@ -6,6 +6,7 @@ services:
       - 8062:80
     environment:
       API_UPSTREAM: http://api:3821
+      TRUSTED_INGRESS_CIDR: ${TRUSTED_INGRESS_CIDR:-127.0.0.1/32}
     depends_on:
       - api
 
@@ -14,8 +15,8 @@ services:
     restart: always
     volumes:
       - storage-files:/app/bucket
-    ports:
-      - 127.0.0.1:8085:3821
+    expose:
+      - "3821"
     environment:
       MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/fragrans?authSource=admin
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -25,6 +26,7 @@ services:
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       CAPTCHA_REQUIRED: ${CAPTCHA_REQUIRED:-true}
       EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-true}
+      TRUST_PROXY_HEADERS: "true"
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

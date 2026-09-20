@@ -10,22 +10,20 @@ describe('GlobalStore', () => {
   it('initial state', () => {
     const store = GlobalStore()
     expect(store.accessToken).toBe('')
-    expect(store.refreshToken).toBe('')
+    expect('refreshToken' in store.$state).toBe(false)
   })
 
-  it('setTokens updates both tokens', () => {
+  it('stores access token only in memory', () => {
     const store = GlobalStore()
-    store.setTokens('access', 'refresh')
+    store.setAccessToken('access')
     expect(store.accessToken).toBe('access')
-    expect(store.refreshToken).toBe('refresh')
   })
 
-  it('setAccessToken updates only access token', () => {
+  it('setAccessToken updates the access token', () => {
     const store = GlobalStore()
-    store.setTokens('access', 'refresh')
+    store.setAccessToken('access')
     store.setAccessToken('next-access')
     expect(store.accessToken).toBe('next-access')
-    expect(store.refreshToken).toBe('refresh')
   })
 
   it('setUserInfo and setAvatar update userInfo state', () => {
@@ -47,7 +45,7 @@ describe('GlobalStore', () => {
 
   it('setLanguage updates language state and logout preserves language', () => {
     const store = GlobalStore()
-    store.setTokens('access', 'refresh')
+    store.setAccessToken('access')
     store.setUserInfo({
       id: 'u1',
       email: 'alex@example.com',
@@ -60,7 +58,6 @@ describe('GlobalStore', () => {
 
     store.logout()
     expect(store.accessToken).toBe('')
-    expect(store.refreshToken).toBe('')
     expect(store.userInfo).toBeNull()
     expect(store.language).toBe('en')
   })

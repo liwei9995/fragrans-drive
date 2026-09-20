@@ -107,7 +107,7 @@ describe('api index', () => {
 
   it('request interceptor adds token', async () => {
     const store = GlobalStore()
-    store.setTokens('test-token', 'refresh-token')
+    store.setAccessToken('test-token')
 
     const config = {
       headers: new AxiosHeaders(),
@@ -126,7 +126,10 @@ describe('api index', () => {
 
   it('response interceptor handles 401', async () => {
     const store = GlobalStore()
-    store.setTokens('old-token', '')
+    store.setAccessToken('old-token')
+    const postSpy = vi
+      .spyOn(axios, 'post')
+      .mockRejectedValue(new Error('No session'))
 
     await expect(
       responseInterceptor().rejected({
@@ -137,7 +140,8 @@ describe('api index', () => {
     ).rejects.toMatchObject({ message: 'unauthorized' })
     expect(ElMessage.error).toHaveBeenCalledWith('登录失效！请您重新登录')
     expect(store.accessToken).toBe('')
-    expect(store.refreshToken).toBe('')
+    expect(postSpy).toHaveBeenCalledTimes(1)
+    postSpy.mockRestore()
     expect(router.replace).toHaveBeenCalledWith({
       path: '/login',
       query: { redirect: '/home/folder' },
@@ -146,7 +150,7 @@ describe('api index', () => {
 
   it('does not refresh failed login requests', async () => {
     const store = GlobalStore()
-    store.setTokens('old-access', 'refresh-token')
+    store.setAccessToken('old-access')
     const postSpy = vi.spyOn(axios, 'post')
 
     await expect(
@@ -168,13 +172,11 @@ describe('api index', () => {
 
   it('refreshes once for concurrent 401s', async () => {
     const store = GlobalStore()
-    store.setTokens('old-access', 'refresh-token')
+    store.setAccessToken('old-access')
 
-    let resolveRefresh!: (value: {
-      data: { access_token: string; refresh_token: string }
-    }) => void
+    let resolveRefresh!: (value: { data: { access_token: string } }) => void
     const refreshCall = new Promise<{
-      data: { access_token: string; refresh_token: string }
+      data: { access_token: string }
     }>((resolve) => {
       resolveRefresh = resolve
     })
@@ -210,7 +212,7 @@ describe('api index', () => {
     expect(postSpy).toHaveBeenCalledTimes(1)
 
     resolveRefresh({
-      data: { access_token: 'new-access', refresh_token: 'new-refresh' },
+      data: { access_token: 'new-access' },
     })
 
     await expect(first).resolves.toBe('retried')
@@ -218,11 +220,10 @@ describe('api index', () => {
     expect(postSpy).toHaveBeenCalledTimes(1)
     expect(postSpy).toHaveBeenCalledWith(
       expect.stringContaining('/v1/auth/refresh'),
-      { refresh_token: 'refresh-token' },
-      { timeout: 10000 },
+      {},
+      { timeout: 10000, withCredentials: true },
     )
     expect(store.accessToken).toBe('new-access')
-    expect(store.refreshToken).toBe('new-refresh')
     expect(RequestHttp.service.defaults.adapter).toHaveBeenCalled()
     expect(router.replace).not.toHaveBeenCalled()
 
@@ -232,7 +233,7 @@ describe('api index', () => {
 
   it('rejects queued requests when refresh times out', async () => {
     const store = GlobalStore()
-    store.setTokens('old-access', 'refresh-token')
+    store.setAccessToken('old-access')
 
     let rejectRefresh!: (reason: Error) => void
     const refreshCall = new Promise((_, reject) => {
@@ -264,7 +265,6 @@ describe('api index', () => {
     expect(results.every((result) => result.status === 'rejected')).toBe(true)
     expect(postSpy).toHaveBeenCalledTimes(1)
     expect(store.accessToken).toBe('')
-    expect(store.refreshToken).toBe('')
     expect(router.replace).toHaveBeenCalledWith({
       path: '/login',
       query: { redirect: '/home/folder' },

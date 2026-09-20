@@ -21,6 +21,8 @@ pub struct AppState {
     pub local_storage: crate::infrastructure::storage::local::LocalStorage,
     pub auth_security: Arc<auth_security::AuthSecurityManager>,
     pub webauthn: Arc<crate::service::webauthn::WebauthnService>,
+    pub login_accounts: rate_limit::RateLimiter,
+    pub security_actions: rate_limit::RateLimiter,
 }
 
 #[derive(OpenApi)]
@@ -32,6 +34,7 @@ pub struct AppState {
         users::reset_password,
         users::login,
         users::refresh,
+        users::logout,
         users::create_user,
         users::update_password,
         users::update_profile,
@@ -58,7 +61,7 @@ pub struct AppState {
     components(
         schemas(
             users::AuthConfigResponse, users::CaptchaResponse, users::SendEmailCodeDto, users::ResetPasswordDto,
-            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::RefreshTokenDto, users::CreateUserResponse,
+            users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::CreateUserResponse,
             storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::DeleteTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse, storage::StorageUsageResponse,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
@@ -92,13 +95,24 @@ impl utoipa::Modify for SecurityAddon {
 }
 
 pub fn router(db: Database, config: Config) -> Router {
+    router_with_auth_security(
+        db,
+        config,
+        Arc::new(auth_security::AuthSecurityManager::new()),
+    )
+}
+
+pub fn router_with_auth_security(
+    db: Database,
+    config: Config,
+    auth_security: Arc<auth_security::AuthSecurityManager>,
+) -> Router {
     let local_storage = crate::infrastructure::storage::local::LocalStorage::new(
         config.storage_destination.clone(),
         config.storage_master_key,
     )
     .expect("Failed to initialize local storage");
 
-    let auth_security = Arc::new(auth_security::AuthSecurityManager::new());
     let webauthn = Arc::new(
         crate::service::webauthn::WebauthnService::new(&config)
             .expect("Failed to initialize WebAuthn service"),
@@ -110,15 +124,44 @@ pub fn router(db: Database, config: Config) -> Router {
         local_storage,
         auth_security,
         webauthn,
+        login_accounts: rate_limit::RateLimiter::new(5, std::time::Duration::from_secs(300), false),
+        security_actions: rate_limit::RateLimiter::new(
+            5,
+            std::time::Duration::from_secs(300),
+            false,
+        ),
     };
 
-    let login_limiter = rate_limit::RateLimiter::new(10, std::time::Duration::from_secs(60));
-    let register_limiter = rate_limit::RateLimiter::new(5, std::time::Duration::from_secs(60));
-    let public_limiter = rate_limit::RateLimiter::new(120, std::time::Duration::from_secs(60));
+    let login_limiter = rate_limit::RateLimiter::new(
+        10,
+        std::time::Duration::from_secs(60),
+        state.config.trust_proxy_headers,
+    );
+    let register_limiter = rate_limit::RateLimiter::new(
+        5,
+        std::time::Duration::from_secs(60),
+        state.config.trust_proxy_headers,
+    );
+    let public_limiter = rate_limit::RateLimiter::new(
+        120,
+        std::time::Duration::from_secs(60),
+        state.config.trust_proxy_headers,
+    );
+    let captcha_limiter = rate_limit::RateLimiter::new(
+        30,
+        std::time::Duration::from_secs(60),
+        state.config.trust_proxy_headers,
+    );
 
     let auth_routes = Router::new()
         .route("/config", axum::routing::get(users::get_auth_config))
-        .route("/captcha", axum::routing::get(users::get_captcha))
+        .route(
+            "/captcha",
+            axum::routing::get(users::get_captcha).layer(axum::middleware::from_fn_with_state(
+                captcha_limiter,
+                rate_limit::rate_limit_middleware,
+            )),
+        )
         .route(
             "/send-code",
             axum::routing::post(users::send_email_code).layer(
@@ -151,40 +194,55 @@ pub fn router(db: Database, config: Config) -> Router {
         )
         .route(
             "/webauthn/login-finish",
-            axum::routing::post(webauthn::login_finish).layer(axum::middleware::from_fn_with_state(
-                login_limiter,
-                rate_limit::rate_limit_middleware,
-            )),
+            axum::routing::post(webauthn::login_finish).layer(
+                axum::middleware::from_fn_with_state(
+                    login_limiter,
+                    rate_limit::rate_limit_middleware,
+                ),
+            ),
         )
         .route(
             "/webauthn/passkeys",
-            axum::routing::get(webauthn::list_passkeys).layer(axum::middleware::from_fn_with_state(
-                state.clone(),
-                middleware::auth_guard,
-            )),
+            axum::routing::get(webauthn::list_passkeys).layer(
+                axum::middleware::from_fn_with_state(state.clone(), middleware::auth_guard),
+            ),
         )
         .route(
             "/webauthn/register-start",
-            axum::routing::post(webauthn::register_start).layer(axum::middleware::from_fn_with_state(
-                state.clone(),
-                middleware::auth_guard,
-            )),
+            axum::routing::post(webauthn::register_start)
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    middleware::auth_guard,
+                ))
+                .layer(axum::middleware::from_fn_with_state(
+                    register_limiter.clone(),
+                    rate_limit::rate_limit_middleware,
+                )),
         )
         .route(
             "/webauthn/register-finish",
-            axum::routing::post(webauthn::register_finish).layer(axum::middleware::from_fn_with_state(
-                state.clone(),
-                middleware::auth_guard,
-            )),
+            axum::routing::post(webauthn::register_finish).layer(
+                axum::middleware::from_fn_with_state(state.clone(), middleware::auth_guard),
+            ),
         )
         .route(
             "/webauthn/passkeys/{id}",
-            axum::routing::delete(webauthn::delete_passkey).layer(axum::middleware::from_fn_with_state(
-                state.clone(),
-                middleware::auth_guard,
+            axum::routing::delete(webauthn::delete_passkey).layer(
+                axum::middleware::from_fn_with_state(state.clone(), middleware::auth_guard),
+            ),
+        )
+        .route(
+            "/refresh",
+            axum::routing::post(users::refresh).layer(axum::middleware::from_fn_with_state(
+                rate_limit::RateLimiter::new(
+                    30,
+                    std::time::Duration::from_secs(60),
+                    state.config.trust_proxy_headers,
+                ),
+                rate_limit::rate_limit_middleware,
             )),
         )
-        .route("/refresh", axum::routing::post(users::refresh))
+        .route("/logout", axum::routing::post(users::logout))
         .with_state(state.clone());
 
     // User registration does not require auth; other user routes require JWT.

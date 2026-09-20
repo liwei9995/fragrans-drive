@@ -60,11 +60,9 @@ export namespace Login {
   }
   export interface ResLogin {
     access_token: string
-    refresh_token: string
   }
   export interface ResRefresh {
     access_token: string
-    refresh_token: string
   }
   export interface ResAuthButtons {
     [propName: string]: unknown

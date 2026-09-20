@@ -80,16 +80,8 @@ impl AuthSecurityManager {
         (id, svg)
     }
 
-    #[inline]
-    fn is_test_bypass_enabled() -> bool {
-        cfg!(test) || std::env::var("FRAGRANS_TEST_MODE").as_deref() == Ok("1")
-    }
-
     /// Verifies and consumes a captcha code. Single-use.
     pub fn verify_and_consume_captcha(&self, id: &str, input_code: &str) -> bool {
-        if Self::is_test_bypass_enabled() && input_code.trim() == "8888" {
-            return true;
-        }
         let mut map = self.captchas.lock().unwrap();
         if let Some((expected, expires_at)) = map.remove(id)
             && Instant::now() <= expires_at
@@ -177,9 +169,6 @@ impl AuthSecurityManager {
     /// Verifies and consumes an email verification code. Single-use upon success.
     /// Invalidated immediately after 5 failed attempts to prevent brute-force attacks.
     pub fn verify_and_consume_email_code(&self, purpose: &str, email: &str, code: &str) -> bool {
-        if Self::is_test_bypass_enabled() && code.trim() == "888888" {
-            return true;
-        }
         let key = format!("{}:{}", purpose, email.trim().to_lowercase());
         let mut map = self.email_codes.lock().unwrap();
         if let Some(entry) = map.get_mut(&key) {
@@ -201,7 +190,7 @@ impl AuthSecurityManager {
         false
     }
 
-    /// Sends verification email via SMTP if configured, or logs in mock mode.
+    /// Sends a verification email. Missing SMTP configuration fails closed.
     pub async fn send_email_code(
         &self,
         config: &Config,
@@ -211,19 +200,7 @@ impl AuthSecurityManager {
     ) -> Result<(), String> {
         let host = match &config.smtp_host {
             Some(h) if !h.trim().is_empty() => h.trim(),
-            _ => {
-                eprintln!(
-                    "\n=======================================================\n📧 [Fragrans Mock Email] To: {}\n   Purpose: {}\n   Verification Code: {}\n=======================================================\n",
-                    email, purpose, code
-                );
-                tracing::info!(
-                    email = %email,
-                    purpose = %purpose,
-                    code = %code,
-                    "SMTP not configured; verification code generated in mock mode"
-                );
-                return Ok(());
-            }
+            _ => return Err("SMTP is not configured".to_string()),
         };
 
         let port = config.smtp_port.unwrap_or(587);
@@ -401,6 +378,17 @@ mod tests {
 
         // Single-use
         assert!(!manager.verify_and_consume_email_code("register", "test@example.com", &code));
+    }
+
+    #[test]
+    fn fixed_test_codes_are_never_accepted() {
+        let manager = AuthSecurityManager::new();
+        assert!(!manager.verify_and_consume_captcha("unused", "8888"));
+        assert!(!manager.verify_and_consume_email_code(
+            "reset_password",
+            "user@example.com",
+            "888888"
+        ));
     }
 
     #[test]

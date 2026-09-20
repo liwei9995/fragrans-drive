@@ -77,13 +77,15 @@ async fn test_registration_disabled_rejects_requests() {
         allow_registration: false, // Registration disabled
         email_verification_required: false,
         captcha_required: false,
+        trust_proxy_headers: false,
         smtp_host: None,
         smtp_port: None,
         smtp_user: None,
         smtp_pass: None,
         smtp_from: None,
     };
-    let app = api::router(ctx.db.clone(), custom_config);
+    let app =
+        api::router_with_auth_security(ctx.db.clone(), custom_config, ctx.auth_security.clone());
 
     // 1. Check auth config reflects disabled registration
     let config_res = app
@@ -101,6 +103,7 @@ async fn test_registration_disabled_rejects_requests() {
     assert_eq!(config_data["allowRegistration"], false);
 
     // 2. Attempting to send register email code fails with 403 Forbidden
+    let (captcha_id, captcha_code) = ctx.captcha();
     let send_code_res = app
         .clone()
         .oneshot(json_auth_request(
@@ -110,8 +113,8 @@ async fn test_registration_disabled_rejects_requests() {
             serde_json::json!({
                 "email": "closed@example.com",
                 "purpose": "register",
-                "captchaId": "test",
-                "captchaCode": "8888" // bypass code for test
+                "captchaId": captcha_id,
+                "captchaCode": captcha_code
             }),
         ))
         .await
@@ -155,13 +158,15 @@ async fn test_captcha_and_email_verification_flow() {
         allow_registration: true,
         email_verification_required: true, // Email verification required
         captcha_required: true,            // Captcha required
-        smtp_host: None,                   // Mock email mode
+        trust_proxy_headers: false,
+        smtp_host: None, // Delivery must fail closed without SMTP.
         smtp_port: None,
         smtp_user: None,
         smtp_pass: None,
         smtp_from: None,
     };
-    let app = api::router(ctx.db.clone(), custom_config);
+    let app =
+        api::router_with_auth_security(ctx.db.clone(), custom_config, ctx.auth_security.clone());
 
     let test_email = format!("secure-user-{}@example.com", uuid::Uuid::new_v4());
 
@@ -183,7 +188,8 @@ async fn test_captcha_and_email_verification_flow() {
         .expect("send code fail");
     assert_eq!(fail_captcha_res.status(), StatusCode::BAD_REQUEST);
 
-    // 2. Send code with valid test captcha succeeds
+    // 2. Valid captcha reaches mail delivery; absent SMTP fails closed.
+    let (captcha_id, captcha_code) = ctx.captcha();
     let send_res = app
         .clone()
         .oneshot(json_auth_request(
@@ -193,13 +199,16 @@ async fn test_captcha_and_email_verification_flow() {
             serde_json::json!({
                 "email": test_email,
                 "purpose": "register",
-                "captchaId": "test",
-                "captchaCode": "8888"
+                "captchaId": captcha_id,
+                "captchaCode": captcha_code
             }),
         ))
         .await
         .expect("send code ok");
-    assert_eq!(send_res.status(), StatusCode::OK);
+    assert_eq!(send_res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let email_code = ctx
+        .auth_security
+        .generate_email_code("register", &test_email);
 
     // 3. Register with wrong email verification code fails
     let reg_fail_res = app
@@ -213,8 +222,6 @@ async fn test_captcha_and_email_verification_flow() {
                 "password": "password123",
                 "firstName": "Verified",
                 "lastName": "User",
-                "captchaId": "test",
-                "captchaCode": "8888",
                 "emailCode": "000000"
             }),
         ))
@@ -222,7 +229,7 @@ async fn test_captcha_and_email_verification_flow() {
         .expect("reg fail");
     assert_eq!(reg_fail_res.status(), StatusCode::BAD_REQUEST);
 
-    // 4. Register with valid verification code (888888 in test mode) succeeds
+    // 4. Register with a real verification code succeeds.
     let reg_ok_res = app
         .clone()
         .oneshot(json_auth_request(
@@ -234,9 +241,7 @@ async fn test_captcha_and_email_verification_flow() {
                 "password": "password123",
                 "firstName": "Verified",
                 "lastName": "User",
-                "captchaId": "test",
-                "captchaCode": "8888",
-                "emailCode": "888888"
+                "emailCode": email_code
             }),
         ))
         .await
@@ -272,7 +277,8 @@ async fn test_forgot_and_reset_password() {
         .expect("register request");
     assert_eq!(reg_res.status(), StatusCode::CREATED);
 
-    // 2. Request reset password code
+    // 2. Sending fails closed without SMTP; seed the code for reset validation.
+    let (captcha_id, captcha_code) = ctx.captcha();
     let send_res = app
         .clone()
         .oneshot(json_auth_request(
@@ -282,13 +288,16 @@ async fn test_forgot_and_reset_password() {
             serde_json::json!({
                 "email": email,
                 "purpose": "reset_password",
-                "captchaId": "test",
-                "captchaCode": "8888"
+                "captchaId": captcha_id,
+                "captchaCode": captcha_code
             }),
         ))
         .await
         .expect("send reset code");
-    assert_eq!(send_res.status(), StatusCode::OK);
+    assert_eq!(send_res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let email_code = ctx
+        .auth_security
+        .generate_email_code("reset_password", &email);
 
     // 3. Reset password with wrong code fails
     let reset_fail = app
@@ -317,7 +326,7 @@ async fn test_forgot_and_reset_password() {
             "",
             serde_json::json!({
                 "email": email,
-                "code": "888888",
+                "code": email_code,
                 "password": "new_password_123",
                 "changePassword": "new_password_123"
             }),
@@ -367,6 +376,7 @@ async fn test_forgot_password_user_enumeration_protection() {
     let ctx = setup().await;
     let app = ctx.app.clone();
     let nonexistent_email = format!("nonexistent-{}@example.com", uuid::Uuid::new_v4());
+    let (captcha_id, captcha_code) = ctx.captcha();
 
     // Requesting reset code for non-existent email returns 200 generic success without leaking error
     let res = app
@@ -378,8 +388,8 @@ async fn test_forgot_password_user_enumeration_protection() {
             serde_json::json!({
                 "email": nonexistent_email,
                 "purpose": "reset_password",
-                "captchaId": "test",
-                "captchaCode": "8888"
+                "captchaId": captcha_id,
+                "captchaCode": captcha_code
             }),
         ))
         .await
@@ -405,7 +415,8 @@ async fn test_email_rate_limiting_cooldown() {
     let app = ctx.app.clone();
     let email = format!("ratelimit-{}@example.com", uuid::Uuid::new_v4());
 
-    // First send succeeds
+    // First attempt reaches the mailer and fails closed without SMTP.
+    let (captcha_id, captcha_code) = ctx.captcha();
     let res1 = app
         .clone()
         .oneshot(json_auth_request(
@@ -415,15 +426,16 @@ async fn test_email_rate_limiting_cooldown() {
             serde_json::json!({
                 "email": email,
                 "purpose": "register",
-                "captchaId": "test",
-                "captchaCode": "8888"
+                "captchaId": captcha_id,
+                "captchaCode": captcha_code
             }),
         ))
         .await
         .expect("send code 1");
-    assert_eq!(res1.status(), StatusCode::OK);
+    assert_eq!(res1.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     // Immediate second send to the same email fails with 429 Too Many Requests
+    let (captcha_id, captcha_code) = ctx.captcha();
     let res2 = app
         .clone()
         .oneshot(json_auth_request(
@@ -433,8 +445,8 @@ async fn test_email_rate_limiting_cooldown() {
             serde_json::json!({
                 "email": email,
                 "purpose": "register",
-                "captchaId": "test",
-                "captchaCode": "8888"
+                "captchaId": captcha_id,
+                "captchaCode": captcha_code
             }),
         ))
         .await

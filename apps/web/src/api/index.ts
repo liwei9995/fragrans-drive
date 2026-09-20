@@ -93,7 +93,9 @@ class RequestHttp {
           const retryConfig = error.config as RetryConfig | undefined
           const requestUrl = String(retryConfig?.url ?? '')
           const isRefreshRequest = requestUrl.includes('/auth/refresh')
-          const isLoginRequest = requestUrl.includes('/auth/login')
+          const isLoginRequest =
+            requestUrl.includes('/auth/login') ||
+            requestUrl.includes('/webauthn/login-finish')
 
           if (isLoginRequest) {
             const message =
@@ -109,10 +111,6 @@ class RequestHttp {
           }
 
           const globalStore = GlobalStore()
-          if (!globalStore.refreshToken) {
-            await redirectToLogin()
-            return Promise.reject(error)
-          }
 
           if (isRefreshing) {
             return new Promise((resolve, reject) => {
@@ -131,15 +129,12 @@ class RequestHttp {
           try {
             const { data } = await axios.post<{
               access_token: string
-              refresh_token: string
             }>(
               `${config.baseURL}/v1/auth/refresh`,
-              {
-                refresh_token: globalStore.refreshToken,
-              },
-              { timeout: config.timeout },
+              {},
+              { timeout: config.timeout, withCredentials: true },
             )
-            globalStore.setTokens(data.access_token, data.refresh_token)
+            globalStore.setAccessToken(data.access_token)
             isRefreshing = false
             flushQueue(data.access_token)
             retryConfig._retry = true

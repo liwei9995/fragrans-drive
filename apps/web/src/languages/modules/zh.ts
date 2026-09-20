@@ -103,6 +103,8 @@ export default {
     profile: '个人中心',
     trash: '回收站',
     logout: '退出登录',
+    logoutServerFailed:
+      '已在本机退出，但服务器未能撤销会话。联网后请重试或修改密码。',
     logoutConfirm: '确定要退出登录吗？',
     batchDelete: '批量移入回收站',
     batchDeleteCount: '移入回收站 ({count})',

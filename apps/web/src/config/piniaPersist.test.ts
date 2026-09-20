@@ -6,5 +6,6 @@ describe('piniaPersistConfig', () => {
     const config = piniaPersistConfig('test-key')
     expect(config.key).toBe('test-key')
     expect(config.storage).toBe(window.localStorage)
+    expect(config.pick).toEqual(['language'])
   })
 })

@@ -30,7 +30,7 @@ pub struct Claims {
 pub enum TokenPurpose {
     Access,
     Download,
-    Refresh,
+    RefreshCookie,
 }
 
 #[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
@@ -136,14 +136,22 @@ pub async fn auth_guard(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    if let Some(token_version) = claims.token_version {
-        let repo = crate::infrastructure::db::user_repo::UserRepository::new(&state.db);
-        let id = mongodb::bson::oid::ObjectId::parse_str(&claims.user_id)
-            .map_err(|_| StatusCode::UNAUTHORIZED)?;
-        match repo.find_by_id(id).await {
-            Ok(Some(u)) if u.token_version == token_version => {}
-            _ => return Err(StatusCode::UNAUTHORIZED),
-        }
+    let token_version = claims.token_version.ok_or(StatusCode::UNAUTHORIZED)?;
+    let jti = claims.jti.as_deref().ok_or(StatusCode::UNAUTHORIZED)?;
+    let repo = crate::infrastructure::db::user_repo::UserRepository::new(&state.db);
+    let id = mongodb::bson::oid::ObjectId::parse_str(&claims.user_id)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    match repo.find_by_id(id).await {
+        Ok(Some(u)) if u.token_version == token_version => {}
+        _ => return Err(StatusCode::UNAUTHORIZED),
+    }
+    let sessions =
+        crate::infrastructure::db::refresh_session_repo::RefreshSessionRepository::new(&state.db);
+    if !matches!(
+        sessions.exists(&claims.user_id, jti, token_version).await,
+        Ok(true)
+    ) {
+        return Err(StatusCode::UNAUTHORIZED);
     }
 
     req.extensions_mut().insert(UserContext {

@@ -1,4 +1,6 @@
 // element plus
+
+import axios from 'axios'
 import { createApp } from 'vue'
 import App from './App.vue'
 // reset style sheet
@@ -22,12 +24,31 @@ import router from '@/routers/index'
 import pinia, { GlobalStore } from '@/store/index'
 
 const app = createApp(App)
-
-app.use(pinia).use(router).use(i18n)
-
+app.use(pinia)
 const globalStore = GlobalStore()
-if (globalStore.language) {
-  ;(i18n.global.locale as any).value = globalStore.language
+try {
+  // Remove tokens persisted by older releases while retaining the language.
+  window.localStorage.setItem(
+    'GlobalState',
+    JSON.stringify({ language: globalStore.language }),
+  )
+} catch {
+  /* storage unavailable */
 }
+;(i18n.global.locale as any).value = globalStore.language
 
-app.mount('#app')
+async function bootstrap() {
+  try {
+    const { data } = await axios.post<{ access_token: string }>(
+      `${import.meta.env.VITE_API_URL}/v1/auth/refresh`,
+      {},
+      { withCredentials: true, timeout: 10000 },
+    )
+    globalStore.setAccessToken(data.access_token)
+  } catch {
+    /* No active session. */
+  }
+  app.use(router).use(i18n)
+  app.mount('#app')
+}
+void bootstrap()

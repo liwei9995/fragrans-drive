@@ -15,12 +15,14 @@ import {
   browserSupportsWebAuthn,
   startRegistration,
 } from '@simplewebauthn/browser'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import type { Storage, User as UserType } from '@/api/interface'
 import { getStorageUsage } from '@/api/modules/storage'
 import {
+  authLogout,
   deletePasskey,
   getPasskeys,
   getProfile,
@@ -30,6 +32,7 @@ import {
   webauthnRegisterStart,
 } from '@/api/modules/user'
 import AvatarCropper from '@/components/AvatarCropper/index.vue'
+import { LOGIN_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
 import { formatLocaleDate } from '@/utils/date'
 
@@ -45,6 +48,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const globalStore = GlobalStore()
+const router = useRouter()
 const activeTab = ref('storage')
 const loading = ref(false)
 const savingProfile = ref(false)
@@ -194,6 +198,13 @@ const handleChangePassword = async () => {
       changePassword: passwordForm.confirmPassword,
     })
     ElMessage.success(t('profile.passwordUpdated'))
+    try {
+      await authLogout()
+    } catch {
+      /* Password change already revoked the session. */
+    }
+    globalStore.logout()
+    await router.replace(LOGIN_URL)
     passwordForm.oldPassword = ''
     passwordForm.password = ''
     passwordForm.confirmPassword = ''
@@ -244,7 +255,12 @@ watch(
 const handleRegisterPasskey = async () => {
   registeringPasskey.value = true
   try {
-    const { sessionId, challenge } = await webauthnRegisterStart()
+    const { value: password } = await ElMessageBox.prompt(
+      t('profile.oldPasswordPlaceholder'),
+      t('profile.registerTouchId'),
+      { inputType: 'password' },
+    )
+    const { sessionId, challenge } = await webauthnRegisterStart(password)
     const options = (challenge as any).publicKey || challenge
     const credential = await startRegistration({ optionsJSON: options })
     const isMac = /Macintosh|Mac OS X/i.test(navigator.userAgent)
@@ -257,7 +273,11 @@ const handleRegisterPasskey = async () => {
     ElMessage.success(t('profile.registerTouchIdSuccess'))
     await loadPasskeys()
   } catch (error: any) {
-    if (error?.name === 'NotAllowedError') {
+    if (
+      error?.name === 'NotAllowedError' ||
+      error === 'cancel' ||
+      error === 'close'
+    ) {
       return
     }
     console.error('Passkey registration failed:', error)
@@ -271,10 +291,22 @@ const handleRegisterPasskey = async () => {
 
 const handleDeletePasskey = async (id: string) => {
   try {
-    await deletePasskey(id)
+    const { value: password } = await ElMessageBox.prompt(
+      t('profile.oldPasswordPlaceholder'),
+      t('profile.deletePasskeyConfirm'),
+      { inputType: 'password' },
+    )
+    await deletePasskey(id, password)
     ElMessage.success(t('profile.deletePasskeySuccess'))
-    await loadPasskeys()
+    try {
+      await authLogout()
+    } catch {
+      /* Passkey deletion already revoked the session. */
+    }
+    globalStore.logout()
+    await router.replace(LOGIN_URL)
   } catch (error: any) {
+    if (error === 'cancel' || error === 'close') return
     console.error('Delete passkey error:', error)
     ElMessage.error(t('common.error'))
   }

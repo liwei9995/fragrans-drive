@@ -1,21 +1,22 @@
 use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    response::IntoResponse,
     Json,
+    extract::{Path, State},
+    http::{StatusCode, header},
+    response::IntoResponse,
 };
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use webauthn_rs::prelude::*;
 
-use crate::api::error::AppError;
-use crate::api::users::{issue_auth_tokens, LoginResponse};
 use crate::api::AppState;
+use crate::api::error::AppError;
+use crate::api::users::{LoginResponse, issue_auth_tokens};
 use crate::domain::user::PasskeyInfo;
 use crate::infrastructure::db::{
     refresh_session_repo::RefreshSessionRepository, user_repo::UserRepository,
 };
+use crate::utils::crypto::verify_password;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct WebauthnLoginStartDto {
@@ -55,6 +56,11 @@ pub struct WebauthnRegisterFinishDto {
     pub name: Option<String>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ConfirmPasswordDto {
+    pub password: String,
+}
+
 /// Start Touch ID / Passkey authentication ceremony
 #[utoipa::path(
     post,
@@ -83,10 +89,7 @@ pub async fn login_start(
         None
     };
 
-    let (challenge, session_id) = state
-        .webauthn
-        .start_authentication(user.as_ref())
-        .await?;
+    let (challenge, session_id) = state.webauthn.start_authentication(user.as_ref()).await?;
 
     Ok(Json(WebauthnLoginStartResponse {
         session_id,
@@ -136,14 +139,24 @@ pub async fn login_finish(
         .ok_or_else(|| AppError::InternalError("Missing user ID".to_string()))?;
     let user_id = user_id_obj.to_hex();
 
-    // Update the counter on the stored passkey to prevent replay attacks
-    if let Ok(mut pk) = stored_pk.get_passkey() {
-        pk.update_credential(&auth_result);
-        if let Ok(updated_json) = serde_json::to_string(&pk) {
-            let _ = repo
-                .update_passkey(user_id_obj, &cred_id_str, &updated_json)
-                .await;
-        }
+    // Persist counter/backup-state changes before granting a session.
+    let mut pk = passkey;
+    pk.update_credential(&auth_result)
+        .ok_or_else(|| AppError::Unauthorized("Passkey mismatch".to_string()))?;
+    let updated_json = serde_json::to_string(&pk)
+        .map_err(|e| AppError::InternalError(format!("Failed to serialize passkey: {e}")))?;
+    if !repo
+        .update_passkey(
+            user_id_obj,
+            &cred_id_str,
+            &stored_pk.passkey_json,
+            &updated_json,
+        )
+        .await?
+    {
+        return Err(AppError::Unauthorized(
+            "Passkey changed during authentication".to_string(),
+        ));
     }
 
     let tokens = issue_auth_tokens(&state.config.jwt_secret, &user_id, user.token_version)?;
@@ -156,10 +169,15 @@ pub async fn login_finish(
         )
         .await?;
 
-    Ok(Json(LoginResponse {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-    }))
+    Ok((
+        [(
+            header::SET_COOKIE,
+            super::users::refresh_cookie(&tokens.refresh_token),
+        )],
+        Json(LoginResponse {
+            access_token: tokens.access_token,
+        }),
+    ))
 }
 
 /// List all passkeys / Touch ID credentials registered for current user
@@ -201,7 +219,12 @@ pub async fn list_passkeys(
 pub async fn register_start(
     State(state): State<AppState>,
     user_ctx: crate::api::middleware::UserContext,
+    Json(payload): Json<ConfirmPasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
+    state
+        .security_actions
+        .check(&user_ctx.user_id)
+        .map_err(|_| AppError::TooManyRequests("Too many security changes".to_string()))?;
     let id = ObjectId::parse_str(&user_ctx.user_id)
         .map_err(|_| AppError::Unauthorized("Invalid user ID".to_string()))?;
     let repo = UserRepository::new(&state.db);
@@ -209,6 +232,9 @@ pub async fn register_start(
         .find_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    if !verify_password(&payload.password, &user.password) {
+        return Err(AppError::Unauthorized("Incorrect password".to_string()));
+    }
 
     let (challenge, session_id) = state.webauthn.start_registration(&user).await?;
 
@@ -244,7 +270,12 @@ pub async fn register_finish(
 
     let stored_passkey = state
         .webauthn
-        .finish_registration(&payload.session_id, &payload.credential, payload.name)
+        .finish_registration(
+            &payload.session_id,
+            &user_ctx.user_id,
+            &payload.credential,
+            payload.name,
+        )
         .await?;
 
     let info = PasskeyInfo::from(&stored_passkey);
@@ -267,11 +298,28 @@ pub async fn delete_passkey(
     State(state): State<AppState>,
     Path(passkey_id): Path<String>,
     user_ctx: crate::api::middleware::UserContext,
+    Json(payload): Json<ConfirmPasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
+    state
+        .security_actions
+        .check(&user_ctx.user_id)
+        .map_err(|_| AppError::TooManyRequests("Too many security changes".to_string()))?;
     let id = ObjectId::parse_str(&user_ctx.user_id)
         .map_err(|_| AppError::Unauthorized("Invalid user ID".to_string()))?;
     let repo = UserRepository::new(&state.db);
-    repo.delete_passkey(id, &passkey_id).await?;
+    let user = repo
+        .find_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    if !verify_password(&payload.password, &user.password) {
+        return Err(AppError::Unauthorized("Incorrect password".to_string()));
+    }
+    if !repo.delete_passkey(id, &passkey_id).await? {
+        return Err(AppError::NotFound("Passkey not found".to_string()));
+    }
+    RefreshSessionRepository::new(&state.db)
+        .delete_all_for_user(&user_ctx.user_id)
+        .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -1,15 +1,13 @@
 use crate::api::AppState;
 use crate::api::error::AppError;
-use crate::api::middleware::{
-    Claims, TokenPurpose, UserContext, create_token, create_token_with_jti,
-};
+use crate::api::middleware::{Claims, TokenPurpose, UserContext, create_token_with_jti};
 use crate::domain::user::{User, UserResponse};
 use crate::infrastructure::db::refresh_session_repo::RefreshSessionRepository;
 use crate::infrastructure::db::user_repo::UserRepository;
 use crate::utils::crypto::{hash_password, verify_password};
 use axum::{
     extract::{Json, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
 };
 use chrono::Utc;
@@ -18,8 +16,50 @@ use mongodb::bson::{Bson, DateTime as BsonDateTime, doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-const ACCESS_TTL_SECS: i64 = 3600 * 2;
+const ACCESS_TTL_SECS: i64 = 900;
 const REFRESH_TTL_SECS: i64 = 3600 * 24 * 7;
+const REFRESH_COOKIE: &str = "__Host-fragrans-refresh";
+
+pub(crate) fn refresh_cookie(token: &str) -> String {
+    format!(
+        "{REFRESH_COOKIE}={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={REFRESH_TTL_SECS}"
+    )
+}
+
+fn clear_refresh_cookie() -> String {
+    format!("{REFRESH_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
+}
+
+fn refresh_token_from_cookie(headers: &HeaderMap) -> Result<&str, AppError> {
+    headers
+        .get(header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|cookies| {
+            cookies
+                .split(';')
+                .map(str::trim)
+                .find_map(|cookie| cookie.strip_prefix(&format!("{REFRESH_COOKIE}=")))
+        })
+        .filter(|token| !token.is_empty())
+        .ok_or_else(invalid_token)
+}
+
+fn check_origin(headers: &HeaderMap, domain: &str) -> Result<(), AppError> {
+    let origin = headers
+        .get(header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| AppError::Forbidden("Missing origin".to_string()))?;
+    let expected = webauthn_rs::prelude::Url::parse(domain)
+        .map_err(|_| AppError::InternalError("Invalid DRIVE_DOMAIN".to_string()))?;
+    let expected = expected.origin().ascii_serialization();
+    if origin == expected
+        || (expected.starts_with("http://localhost:") && origin == "http://localhost:5173")
+    {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden("Invalid origin".to_string()))
+    }
+}
 
 fn invalid_token() -> AppError {
     AppError::Unauthorized("Invalid token".to_string())
@@ -40,7 +80,7 @@ pub(crate) fn issue_auth_tokens(
     let now = Utc::now().timestamp();
     let refresh_exp = now + REFRESH_TTL_SECS;
     let refresh_jti = uuid::Uuid::new_v4().to_string();
-    let access_token = create_token(
+    let access_token = create_token_with_jti(
         secret,
         user_id,
         TokenPurpose::Access,
@@ -48,11 +88,12 @@ pub(crate) fn issue_auth_tokens(
         (now + ACCESS_TTL_SECS) as usize,
         None,
         Some(token_version),
+        Some(refresh_jti.clone()),
     )?;
     let refresh_token = create_token_with_jti(
         secret,
         user_id,
-        TokenPurpose::Refresh,
+        TokenPurpose::RefreshCookie,
         None,
         refresh_exp as usize,
         None,
@@ -151,12 +192,6 @@ pub struct LoginDto {
 #[derive(Serialize, ToSchema)]
 pub struct LoginResponse {
     pub access_token: String,
-    pub refresh_token: String,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct RefreshTokenDto {
-    pub refresh_token: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -185,6 +220,10 @@ pub async fn login(
             "Invalid email or password".to_string(),
         ));
     }
+    state
+        .login_accounts
+        .check(&email)
+        .map_err(|_| AppError::TooManyRequests("Too many login attempts".to_string()))?;
 
     let repo = UserRepository::new(&state.db);
     let user = match repo.find_by_email(&email).await? {
@@ -216,16 +255,17 @@ pub async fn login(
         )
         .await?;
 
-    Ok(Json(LoginResponse {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-    }))
+    Ok((
+        [(header::SET_COOKIE, refresh_cookie(&tokens.refresh_token))],
+        Json(LoginResponse {
+            access_token: tokens.access_token,
+        }),
+    ))
 }
 
 #[utoipa::path(
     post,
     path = "/v1/auth/refresh",
-    request_body = RefreshTokenDto,
     responses(
         (status = 200, description = "Tokens refreshed", body = LoginResponse),
         (status = 401, description = "Invalid refresh token")
@@ -234,17 +274,18 @@ pub async fn login(
 )]
 pub async fn refresh(
     State(state): State<AppState>,
-    Json(payload): Json<RefreshTokenDto>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
+    check_origin(&headers, &state.config.domain)?;
     let claims = decode::<Claims>(
-        &payload.refresh_token,
+        refresh_token_from_cookie(&headers)?,
         &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
         &Validation::default(),
     )
     .map_err(|_| invalid_token())?
     .claims;
 
-    if claims.purpose != TokenPurpose::Refresh {
+    if claims.purpose != TokenPurpose::RefreshCookie {
         return Err(invalid_token());
     }
 
@@ -276,10 +317,42 @@ pub async fn refresh(
         )
         .await?;
 
-    Ok(Json(LoginResponse {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-    }))
+    Ok((
+        [(header::SET_COOKIE, refresh_cookie(&tokens.refresh_token))],
+        Json(LoginResponse {
+            access_token: tokens.access_token,
+        }),
+    ))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/logout",
+    responses((status = 204, description = "Session revoked and refresh cookie cleared")),
+    tag = "auth"
+)]
+pub async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    check_origin(&headers, &state.config.domain)?;
+    if let Ok(token) = refresh_token_from_cookie(&headers)
+        && let Ok(data) = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+            &Validation::default(),
+        )
+        && data.claims.purpose == TokenPurpose::RefreshCookie
+        && let (Some(jti), Some(version)) = (data.claims.jti.as_deref(), data.claims.token_version)
+    {
+        RefreshSessionRepository::new(&state.db)
+            .consume(&data.claims.user_id, jti, version)
+            .await?;
+    }
+    Ok((
+        StatusCode::NO_CONTENT,
+        [(header::SET_COOKIE, clear_refresh_cookie())],
+    ))
 }
 
 #[utoipa::path(
@@ -664,6 +737,10 @@ pub async fn update_password(
     user_ctx: UserContext,
     Json(payload): Json<UpdatePasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
+    state
+        .security_actions
+        .check(&user_ctx.user_id)
+        .map_err(|_| AppError::TooManyRequests("Too many security changes".to_string()))?;
     if payload.old_password.is_empty() {
         return Err(AppError::BadRequest(
             "Current password is required".to_string(),

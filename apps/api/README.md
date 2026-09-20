@@ -115,7 +115,9 @@ Main endpoints:
 
 | Module      | Path                 | Method   | Description                          |
 | ----------- | -------------------- | -------- | ------------------------------------ |
-| **Auth**    | `/v1/auth/login`     | POST     | User login (returns a token)         |
+| **Auth**    | `/v1/auth/login`     | POST     | Returns a 15-minute access token and sets an HttpOnly refresh cookie |
+| **Auth**    | `/v1/auth/refresh`   | POST     | Rotates the refresh cookie and returns an access token |
+| **Auth**    | `/v1/auth/logout`    | POST     | Revokes the current session and clears its cookie |
 | **Users**   | `/v1/users`          | GET/POST | User management (token required)     |
 | **Storage** | `/v1/storage/upload` | POST     | File upload (token required)         |
 | **Storage** | `/v1/storage/list`   | POST     | List files (token required)          |
@@ -137,7 +139,7 @@ docker build -t fragrans-rust .
 docker-compose up -d
 ```
 
-The published host port defaults to `8085`.
+The API is private to the Docker network; the web proxy is published on port `8062`. Serve that proxy over HTTPS so Secure login cookies work. Set `DRIVE_DOMAIN` to the browser-facing HTTPS origin and configure SMTP before enabling registration or password reset. If TLS terminates at an upstream proxy, set `TRUSTED_INGRESS_CIDR` to that proxy's source IP as seen by the web container. The web proxy overwrites `X-Real-IP`; only enable `TRUST_PROXY_HEADERS` when direct API access is blocked.
 
 ## Directory layout
 

@@ -13,6 +13,7 @@ use fragrans::{
 };
 use http_body_util::BodyExt;
 use mongodb::{Client, Database, bson::doc, options::ClientOptions};
+use std::sync::Arc;
 use std::{env, time::Duration};
 use tempfile::TempDir;
 
@@ -23,6 +24,7 @@ pub struct TestContext {
     pub user_id: String,
     pub auth_token: String,
     pub download_token: String,
+    pub auth_security: Arc<api::auth_security::AuthSecurityManager>,
 }
 
 impl TestContext {
@@ -32,10 +34,6 @@ impl TestContext {
 }
 
 pub async fn setup() -> TestContext {
-    unsafe {
-        env::set_var("FRAGRANS_TEST_MODE", "1");
-    }
-
     let mongo_uri = env::var("TEST_MONGO_URI")
         .or_else(|_| env::var("MONGO_URI"))
         .unwrap_or_else(|_| "mongodb://test:nest@127.0.0.1:25018/?authSource=admin".to_string());
@@ -70,13 +68,15 @@ pub async fn setup() -> TestContext {
         allow_registration: true,
         email_verification_required: false,
         captcha_required: false,
+        trust_proxy_headers: false,
         smtp_host: None,
         smtp_port: None,
         smtp_user: None,
         smtp_pass: None,
         smtp_from: None,
     };
-    let app = api::router(db.clone(), config);
+    let auth_security = Arc::new(api::auth_security::AuthSecurityManager::new());
+    let app = api::router_with_auth_security(db.clone(), config, auth_security.clone());
 
     let user = User {
         id: None,
@@ -103,16 +103,28 @@ pub async fn setup() -> TestContext {
         .expect("Inserted ID is not ObjectId");
     let user_id = inserted.to_hex();
 
-    let token = api::middleware::create_token(
+    let jti = uuid::Uuid::new_v4().to_string();
+    let token = api::middleware::create_token_with_jti(
         &jwt_secret,
         &user_id,
         api::middleware::TokenPurpose::Access,
         None,
         (chrono::Utc::now().timestamp() + 3600) as usize,
         None,
-        None,
+        Some(0),
+        Some(jti.clone()),
     )
     .expect("Failed to encode token");
+
+    fragrans::infrastructure::db::refresh_session_repo::RefreshSessionRepository::new(&db)
+        .create(
+            &user_id,
+            &jti,
+            0,
+            mongodb::bson::DateTime::from_millis((Utc::now().timestamp() + 3600) * 1000),
+        )
+        .await
+        .expect("create session");
 
     let download_token = api::middleware::create_token(
         &jwt_secret,
@@ -132,6 +144,16 @@ pub async fn setup() -> TestContext {
         user_id,
         auth_token: token.clone(),
         download_token,
+        auth_security,
+    }
+}
+
+impl TestContext {
+    pub fn captcha(&self) -> (String, String) {
+        let (id, svg) = self.auth_security.generate_captcha();
+        let re = regex::Regex::new(r"<text[^>]*>([^<])</text>").unwrap();
+        let code = re.captures_iter(&svg).map(|c| c[1].to_string()).collect();
+        (id, code)
     }
 }
 
@@ -142,6 +164,31 @@ pub fn auth_request(method: &str, uri: &str, token: &str) -> Request<Body> {
         .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .body(Body::empty())
         .expect("request")
+}
+
+pub fn cookie_request(method: &str, uri: &str, cookie: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::COOKIE, cookie)
+        .header(header::ORIGIN, "http://localhost:3821")
+        .body(Body::empty())
+        .expect("cookie request")
+}
+
+pub fn refresh_cookie(response: &axum::response::Response) -> String {
+    let set_cookie = response
+        .headers()
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        set_cookie.contains("HttpOnly")
+            && set_cookie.contains("Secure")
+            && set_cookie.contains("SameSite=Strict")
+    );
+    set_cookie.split(';').next().unwrap().to_string()
 }
 
 pub async fn response_bytes(response: axum::response::Response) -> bytes::Bytes {
