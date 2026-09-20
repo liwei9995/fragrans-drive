@@ -660,9 +660,8 @@ impl LocalStorage {
                 if intersect_start < intersect_end {
                     let start_idx = (intersect_start - current_chunk_offset) as usize;
                     let end_idx = (intersect_end - current_chunk_offset) as usize;
-                    Ok(axum::body::Bytes::from(
-                        plaintext[start_idx..end_idx].to_vec(),
-                    ))
+                    let bytes = axum::body::Bytes::from(plaintext);
+                    Ok(bytes.slice(start_idx..end_idx))
                 } else {
                     Ok(axum::body::Bytes::new())
                 }

@@ -25,6 +25,7 @@ const containerRef = ref<HTMLElement | null>(null)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
+const bufferedPercent = ref(0)
 const volume = ref(1)
 const isMuted = ref(false)
 const playbackRate = ref(1)
@@ -151,9 +152,29 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
+const onProgress = () => {
+  if (!videoRef.value || !duration.value) return
+  const buf = videoRef.value.buffered
+  if (buf.length > 0) {
+    const cur = videoRef.value.currentTime
+    let maxBuf = 0
+    for (let i = 0; i < buf.length; i++) {
+      if (buf.start(i) <= cur && cur <= buf.end(i)) {
+        maxBuf = buf.end(i)
+        break
+      }
+      if (buf.end(i) > maxBuf) {
+        maxBuf = buf.end(i)
+      }
+    }
+    bufferedPercent.value = Math.min(100, (maxBuf / duration.value) * 100)
+  }
+}
+
 const onTimeUpdate = () => {
   if (videoRef.value) {
     currentTime.value = videoRef.value.currentTime
+    onProgress()
   }
 }
 
@@ -161,6 +182,7 @@ const onLoadedMetadata = () => {
   if (videoRef.value) {
     duration.value = videoRef.value.duration
     isLoading.value = false
+    onProgress()
   }
 }
 
@@ -191,6 +213,7 @@ watch(
     isLoading.value = true
     currentTime.value = 0
     duration.value = 0
+    bufferedPercent.value = 0
   },
 )
 
@@ -223,8 +246,10 @@ onBeforeUnmount(() => {
         :src="src"
         class="video-element"
         playsinline
+        preload="auto"
         @timeupdate="onTimeUpdate"
         @loadedmetadata="onLoadedMetadata"
+        @progress="onProgress"
         @play="onPlay"
         @pause="onPause"
         @waiting="onWaiting"
@@ -250,6 +275,10 @@ onBeforeUnmount(() => {
         <!-- Scrub bar -->
         <div class="scrub-container" @click="handleSeek">
           <div class="scrub-track">
+            <div
+              class="scrub-buffered"
+              :style="{ width: `${bufferedPercent}%` }"
+            />
             <div
               class="scrub-progress"
               :style="{ width: `${progressPercent}%` }"
@@ -407,6 +436,17 @@ onBeforeUnmount(() => {
         background: rgba(255, 255, 255, 0.25);
         border-radius: 2px;
         transition: height 0.15s ease;
+
+        .scrub-buffered {
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          background: rgba(255, 255, 255, 0.35);
+          border-radius: 2px;
+          pointer-events: none;
+          transition: width 0.2s ease;
+        }
 
         .scrub-progress {
           position: absolute;

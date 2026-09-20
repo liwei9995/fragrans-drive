@@ -715,12 +715,14 @@ pub async fn get_file(
         (claims.user_id, claims.exp)
     };
 
+    let mut has_range = false;
     let mut range_start = 0;
     let mut range_end = None;
     if let Some(range_header) = headers.get(axum::http::header::RANGE)
         && let Ok(range_str) = range_header.to_str()
         && let Some(stripped) = range_str.strip_prefix("bytes=")
     {
+        has_range = true;
         let parts: Vec<&str> = stripped.split('-').collect();
         if parts.len() == 2 {
             if let Ok(start) = parts[0].parse::<u64>() {
@@ -818,8 +820,8 @@ pub async fn get_file(
     res_headers.insert(X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
     res_headers.insert(ACCEPT_RANGES, "bytes".parse().unwrap());
 
-    let status = if range_len < total_size {
-        let actual_end = range_start + range_len - 1;
+    let status = if has_range || range_len < total_size {
+        let actual_end = range_start + range_len.saturating_sub(1);
         res_headers.insert(
             CONTENT_RANGE,
             format!("bytes {}-{}/{}", range_start, actual_end, total_size)
@@ -1268,12 +1270,14 @@ async fn get_public_file_impl(
             .into_response());
     }
 
+    let mut has_range = false;
     let mut range_start = 0;
     let mut range_end = None;
     if let Some(range_header) = headers.get(axum::http::header::RANGE)
         && let Ok(range_str) = range_header.to_str()
         && let Some(stripped) = range_str.strip_prefix("bytes=")
     {
+        has_range = true;
         let parts: Vec<&str> = stripped.split('-').collect();
         if parts.len() == 2 {
             if let Ok(start) = parts[0].parse::<u64>() {
@@ -1293,8 +1297,8 @@ async fn get_public_file_impl(
 
     res_headers.insert(CONTENT_LENGTH, range_len.to_string().parse().unwrap());
 
-    let status = if range_len < total_size {
-        let actual_end = range_start + range_len - 1;
+    let status = if has_range || range_len < total_size {
+        let actual_end = range_start + range_len.saturating_sub(1);
         res_headers.insert(
             CONTENT_RANGE,
             format!("bytes {}-{}/{}", range_start, actual_end, total_size)

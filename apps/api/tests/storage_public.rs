@@ -198,6 +198,42 @@ async fn test_public_direct_link_lifecycle() {
     let res = ctx.app.clone().oneshot(new_req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
 
+    // Range request: bytes=0- returns 206 Partial Content with Content-Range
+    let range_all_req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/p/{new_slug}"))
+        .header(header::RANGE, "bytes=0-")
+        .body(Body::empty())
+        .unwrap();
+    let res = ctx.app.clone().oneshot(range_all_req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(
+        res.headers().get(header::CONTENT_RANGE).unwrap().to_str().unwrap(),
+        "bytes 0-23/24"
+    );
+    assert_eq!(
+        response_bytes(res).await.as_ref(),
+        b"hello public direct link"
+    );
+
+    // Range request: partial range bytes=6-11
+    let range_sub_req = Request::builder()
+        .method("GET")
+        .uri(format!("/v1/p/{new_slug}"))
+        .header(header::RANGE, "bytes=6-11")
+        .body(Body::empty())
+        .unwrap();
+    let res = ctx.app.clone().oneshot(range_sub_req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(
+        res.headers().get(header::CONTENT_RANGE).unwrap().to_str().unwrap(),
+        "bytes 6-11/24"
+    );
+    assert_eq!(
+        response_bytes(res).await.as_ref(),
+        b"public"
+    );
+
     // 7. Disable public status
     let disable_req = Request::builder()
         .method("PUT")
