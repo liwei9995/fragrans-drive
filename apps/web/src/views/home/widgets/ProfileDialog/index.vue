@@ -93,7 +93,7 @@ const userName = computed(() => {
   const first = profile.value?.firstName?.trim() || ''
   const last = profile.value?.lastName?.trim() || ''
   const full = [first, last].filter(Boolean).join(' ')
-  return full || profile.value?.email || '未设置昵称'
+  return full || profile.value?.email || 'No name set'
 })
 
 const loadData = async () => {
@@ -145,11 +145,11 @@ const handleSaveProfile = async () => {
     profile.value = updated
     profileForm.avatar = updated.avatar || ''
     globalStore.setUserInfo(updated)
-    ElMessage.success('个人资料保存成功')
+    ElMessage.success('Profile saved successfully')
     emit('updated', updated)
   } catch (error) {
     console.error('Update profile error:', error)
-    ElMessage.error('保存失败，请稍后重试')
+    ElMessage.error('Failed to save profile. Please try again later.')
   } finally {
     savingProfile.value = false
   }
@@ -167,19 +167,19 @@ const handleClearAvatar = async () => {
 
 const handleChangePassword = async () => {
   if (!passwordForm.oldPassword) {
-    ElMessage.warning('请输入当前密码')
+    ElMessage.warning('Please enter your current password')
     return
   }
   if (!passwordForm.password) {
-    ElMessage.warning('请输入新密码')
+    ElMessage.warning('Please enter a new password')
     return
   }
   if (passwordForm.password.length < 6) {
-    ElMessage.warning('新密码长度不能少于 6 位')
+    ElMessage.warning('Password must be at least 6 characters')
     return
   }
   if (passwordForm.password !== passwordForm.confirmPassword) {
-    ElMessage.warning('两次输入的新密码不一致')
+    ElMessage.warning('Passwords do not match')
     return
   }
 
@@ -190,12 +190,12 @@ const handleChangePassword = async () => {
       password: passwordForm.password,
       changePassword: passwordForm.confirmPassword,
     })
-    ElMessage.success('密码修改成功')
+    ElMessage.success('Password changed successfully')
     passwordForm.oldPassword = ''
     passwordForm.password = ''
     passwordForm.confirmPassword = ''
   } catch (error: any) {
-    const msg = error?.response?.data?.message || '密码修改失败'
+    const msg = error?.response?.data?.message || 'Failed to change password'
     ElMessage.error(msg)
   } finally {
     savingPassword.value = false
@@ -244,14 +244,14 @@ const handleRegisterPasskey = async () => {
     const { sessionId, challenge } = await webauthnRegisterStart()
     const credential = await startRegistration({ optionsJSON: challenge })
     const isMac = /Macintosh|Mac OS X/i.test(navigator.userAgent)
-    const defaultName = isMac ? 'Mac Touch ID' : '设备通行密钥'
+    const defaultName = isMac ? 'Mac Touch ID' : 'Passkey'
     await webauthnRegisterFinish({
       sessionId,
       credential,
       name: defaultName,
     })
     ElMessage.success(
-      'Touch ID 凭据绑定成功！您现在可以使用 Touch ID 快速登录了。',
+      'Touch ID passkey registered successfully! You can now sign in using Touch ID.',
     )
     await loadPasskeys()
   } catch (error: any) {
@@ -260,7 +260,9 @@ const handleRegisterPasskey = async () => {
     }
     console.error('Passkey registration failed:', error)
     const msg =
-      error?.response?.data?.message || error?.message || '绑定失败，请稍后重试'
+      error?.response?.data?.message ||
+      error?.message ||
+      'Registration failed. Please try again later.'
     ElMessage.error(msg)
   } finally {
     registeringPasskey.value = false
@@ -270,22 +272,22 @@ const handleRegisterPasskey = async () => {
 const handleDeletePasskey = async (id: string) => {
   try {
     await deletePasskey(id)
-    ElMessage.success('已移除该凭据')
+    ElMessage.success('Passkey removed successfully')
     await loadPasskeys()
   } catch (error: any) {
     console.error('Delete passkey error:', error)
-    ElMessage.error('移除失败，请稍后重试')
+    ElMessage.error('Failed to remove passkey. Please try again later.')
   }
 }
 
 const formatDate = (dateStr?: string) => {
-  if (!dateStr) return '未知时间'
+  if (!dateStr) return 'Unknown'
   try {
     const d = new Date(dateStr)
-    return d.toLocaleString('zh-CN', {
+    return d.toLocaleString('en-US', {
       year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+      month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })
@@ -298,7 +300,7 @@ const formatDate = (dateStr?: string) => {
 <template>
   <el-dialog
     :model-value="visible"
-    title="个人中心"
+    title="Profile & Settings"
     width="640px"
     destroy-on-close
     class="profile-dialog"
@@ -309,7 +311,7 @@ const formatDate = (dateStr?: string) => {
       <div class="user-overview">
         <div
           class="user-avatar-wrapper"
-          title="点击更换头像"
+          title="Click to change avatar"
           @click="cropperVisible = true"
         >
           <el-avatar
@@ -321,7 +323,7 @@ const formatDate = (dateStr?: string) => {
           </el-avatar>
           <div class="avatar-hover-overlay">
             <el-icon :size="18"><Camera /></el-icon>
-            <span>更换头像</span>
+            <span>Change</span>
           </div>
         </div>
         <div class="user-overview-info">
@@ -338,14 +340,14 @@ const formatDate = (dateStr?: string) => {
           <template #label>
             <span class="tab-label">
               <el-icon><PieChart /></el-icon>
-              <span>存储配额</span>
+              <span>Storage</span>
             </span>
           </template>
 
           <div class="storage-section">
             <div class="quota-card">
               <div class="quota-header">
-                <span class="quota-title">空间使用率</span>
+                <span class="quota-title">Storage Usage</span>
                 <span class="quota-ratio">
                   <strong>{{ formatBytes(usage.usedBytes) }}</strong> / {{ formatBytes(usage.quotaBytes) }}
                 </span>
@@ -358,21 +360,21 @@ const formatDate = (dateStr?: string) => {
                 striped-flow
               />
               <div class="quota-footer-tip">
-                已使用 {{ usedPercentage }}% 的总存储空间
+                {{ usedPercentage }}% of total storage used
               </div>
             </div>
 
             <div class="stats-grid">
               <div class="stat-box">
-                <span class="stat-label">已使用存储</span>
+                <span class="stat-label">Used Storage</span>
                 <span class="stat-value">{{ formatBytes(usage.usedBytes) }}</span>
               </div>
               <div class="stat-box">
-                <span class="stat-label">文件总数</span>
-                <span class="stat-value">{{ usage.fileCount }} 个</span>
+                <span class="stat-label">Total Files</span>
+                <span class="stat-value">{{ usage.fileCount }} files</span>
               </div>
               <div class="stat-box">
-                <span class="stat-label">配额上限</span>
+                <span class="stat-label">Quota Limit</span>
                 <span class="stat-value">{{ formatBytes(usage.quotaBytes) }}</span>
               </div>
             </div>
@@ -384,25 +386,25 @@ const formatDate = (dateStr?: string) => {
           <template #label>
             <span class="tab-label">
               <el-icon><User /></el-icon>
-              <span>基本资料</span>
+              <span>Profile</span>
             </span>
           </template>
 
           <el-form :model="profileForm" label-position="top" class="profile-form">
             <div class="form-row">
-              <el-form-item label="姓氏 (Last Name)">
-                <el-input v-model="profileForm.lastName" placeholder="请输入姓氏" />
+              <el-form-item label="Last Name">
+                <el-input v-model="profileForm.lastName" placeholder="Enter last name" />
               </el-form-item>
-              <el-form-item label="名字 (First Name)">
-                <el-input v-model="profileForm.firstName" placeholder="请输入名字" />
+              <el-form-item label="First Name">
+                <el-input v-model="profileForm.firstName" placeholder="Enter first name" />
               </el-form-item>
             </div>
 
-            <el-form-item label="个人头像">
+            <el-form-item label="Avatar">
               <div class="avatar-setting-row">
                 <div
                   class="avatar-thumbnail-wrapper"
-                  title="点击更换头像"
+                  title="Click to change avatar"
                   @click="cropperVisible = true"
                 >
                   <el-avatar
@@ -425,7 +427,7 @@ const formatDate = (dateStr?: string) => {
                       :icon="Upload"
                       @click="cropperVisible = true"
                     >
-                      上传并裁剪头像
+                      Upload & Crop
                     </el-button>
                     <el-button
                       v-if="profileForm.avatar"
@@ -434,13 +436,13 @@ const formatDate = (dateStr?: string) => {
                       :icon="Delete"
                       @click="handleClearAvatar"
                     >
-                      清除头像
+                      Remove
                     </el-button>
                   </div>
                   <div class="avatar-url-row">
                     <el-input
                       v-model="profileForm.avatar"
-                      placeholder="或输入外部图片 URL (https://...)"
+                      placeholder="Or enter image URL (https://...)"
                       clearable
                       size="small"
                     />
@@ -450,14 +452,14 @@ const formatDate = (dateStr?: string) => {
             </el-form-item>
 
             <div class="form-row">
-              <el-form-item label="性别">
+              <el-form-item label="Gender">
                 <el-select v-model="profileForm.gender" style="width: 100%">
-                  <el-option :value="0" label="保密" />
-                  <el-option :value="1" label="男" />
-                  <el-option :value="2" label="女" />
+                  <el-option :value="0" label="Private" />
+                  <el-option :value="1" label="Male" />
+                  <el-option :value="2" label="Female" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="年龄">
+              <el-form-item label="Age">
                 <el-input-number
                   v-model="profileForm.age"
                   :min="0"
@@ -474,7 +476,7 @@ const formatDate = (dateStr?: string) => {
                 :loading="savingProfile"
                 @click="handleSaveProfile"
               >
-                保存个人资料
+                Save Profile
               </el-button>
             </div>
           </el-form>
@@ -485,41 +487,41 @@ const formatDate = (dateStr?: string) => {
           <template #label>
             <span class="tab-label">
               <el-icon><Key /></el-icon>
-              <span>安全设置</span>
+              <span>Security</span>
             </span>
           </template>
 
           <div class="security-pane">
             <div class="security-sub-header">
-              <span class="sub-title">修改登录密码</span>
+              <span class="sub-title">Change Password</span>
             </div>
 
             <el-form :model="passwordForm" label-position="top" class="security-form">
-              <el-form-item label="当前密码">
+              <el-form-item label="Current Password">
                 <el-input
                   v-model="passwordForm.oldPassword"
                   type="password"
                   show-password
-                  placeholder="请输入当前正在使用的密码"
+                  placeholder="Enter current password"
                 />
               </el-form-item>
 
               <div class="form-row">
-                <el-form-item label="新密码">
+                <el-form-item label="New Password">
                   <el-input
                     v-model="passwordForm.password"
                     type="password"
                     show-password
-                    placeholder="请输入不少于 6 位的新密码"
+                    placeholder="Enter at least 6 characters"
                   />
                 </el-form-item>
 
-                <el-form-item label="确认新密码">
+                <el-form-item label="Confirm New Password">
                   <el-input
                     v-model="passwordForm.confirmPassword"
                     type="password"
                     show-password
-                    placeholder="请再次输入新密码"
+                    placeholder="Confirm new password"
                   />
                 </el-form-item>
               </div>
@@ -531,7 +533,7 @@ const formatDate = (dateStr?: string) => {
                   :loading="savingPassword"
                   @click="handleChangePassword"
                 >
-                  确认修改密码
+                  Update Password
                 </el-button>
               </div>
             </el-form>
@@ -542,9 +544,9 @@ const formatDate = (dateStr?: string) => {
             <div class="passkey-section">
               <div class="passkey-header">
                 <div class="passkey-header-text">
-                  <span class="sub-title">Touch ID / 通行密钥</span>
+                  <span class="sub-title">Touch ID / Passkeys</span>
                   <span class="sub-desc">
-                    绑定此设备的 Touch ID 或生物识别，下次登录时可一键指纹免密进入。
+                    Sign in quickly and securely using your device's Touch ID or biometric passkey.
                   </span>
                 </div>
                 <el-button
@@ -574,17 +576,17 @@ const formatDate = (dateStr?: string) => {
                     <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
                     <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
                   </svg>
-                  <span>绑定此设备</span>
+                  <span>Register this device</span>
                 </el-button>
               </div>
 
               <div v-if="!supportsWebAuthn" class="passkey-unsupported">
-                当前浏览器或环境暂不支持 WebAuthn / Touch ID。请在支持的浏览器（如 Safari, Chrome）并启用 HTTPS 或 localhost 环境下使用。
+                WebAuthn / Touch ID is not supported in this browser or environment. Please use a modern browser (e.g. Safari, Chrome) over HTTPS or localhost.
               </div>
 
               <div v-loading="loadingPasskeys" class="passkey-list">
                 <div v-if="passkeys.length === 0" class="passkey-empty">
-                  <span>暂无已绑定的 Touch ID / 设备凭据</span>
+                  <span>No passkeys or Touch ID credentials registered yet</span>
                 </div>
                 <div
                   v-for="item in passkeys"
@@ -613,14 +615,14 @@ const formatDate = (dateStr?: string) => {
                       </svg>
                     </div>
                     <div class="passkey-info">
-                      <div class="passkey-name">{{ item.name || 'Touch ID 凭据' }}</div>
-                      <div class="passkey-date">绑定时间: {{ formatDate(item.createdAt) }}</div>
+                      <div class="passkey-name">{{ item.name || 'Touch ID Credential' }}</div>
+                      <div class="passkey-date">Added on: {{ formatDate(item.createdAt) }}</div>
                     </div>
                   </div>
                   <el-popconfirm
-                    title="确定移除该 Touch ID 凭据吗？移除后将无法使用该设备指纹登录。"
-                    confirm-button-text="确定"
-                    cancel-button-text="取消"
+                    title="Are you sure you want to remove this Touch ID passkey? You will no longer be able to use it to sign in."
+                    confirm-button-text="Confirm"
+                    cancel-button-text="Cancel"
                     @confirm="handleDeletePasskey(item.id)"
                   >
                     <template #reference>
@@ -630,7 +632,7 @@ const formatDate = (dateStr?: string) => {
                         :icon="Delete"
                         size="small"
                       >
-                        移除
+                        Remove
                       </el-button>
                     </template>
                   </el-popconfirm>

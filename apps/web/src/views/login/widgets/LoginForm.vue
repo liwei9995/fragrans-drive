@@ -520,7 +520,7 @@ defineExpose({
             <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
             <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
           </svg>
-          <span>Touch ID / 指纹快速登录</span>
+          <span>Sign in with Touch ID</span>
         </el-button>
       </div>
 
