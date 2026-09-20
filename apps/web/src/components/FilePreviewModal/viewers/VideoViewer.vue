@@ -476,11 +476,15 @@ onBeforeUnmount(() => {
     left: 0;
     right: 0;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.3) 70%, transparent 100%);
-    padding: 20px 24px 16px;
+    padding: 20px 24px calc(16px + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 10px;
     z-index: 10;
+
+    @media (max-width: 640px) {
+      padding: 16px 14px calc(24px + env(safe-area-inset-bottom, 0px));
+    }
 
     .scrub-container {
       width: 100%;

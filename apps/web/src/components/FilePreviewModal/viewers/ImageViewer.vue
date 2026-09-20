@@ -499,7 +499,7 @@ onBeforeUnmount(() => {
 
   .image-toolbar {
     position: absolute;
-    bottom: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     display: flex;
     align-items: center;
     gap: 8px;
@@ -513,18 +513,18 @@ onBeforeUnmount(() => {
     white-space: nowrap;
     max-width: 95vw;
 
-    @media (max-width: 640px) {
-      bottom: 16px;
-      padding: 4px 10px;
-      gap: 4px;
+    @media (max-width: 768px) {
+      bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+      padding: 6px 12px;
+      gap: 6px;
 
       .dimension-tag {
         display: none;
       }
 
       .tool-btn {
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
       }
     }
 

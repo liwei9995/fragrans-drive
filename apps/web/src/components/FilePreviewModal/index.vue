@@ -501,14 +501,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
-.file-preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(13, 15, 20, 0.94);
+  .file-preview-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13, 15, 20, 0.94);
 
   .preview-backdrop {
     position: absolute;
@@ -522,27 +525,29 @@ onBeforeUnmount(() => {
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     z-index: 1;
 
     .preview-header {
-      height: 56px;
+      height: calc(56px + env(safe-area-inset-top, 0px));
+      padding: env(safe-area-inset-top, 0px) 20px 0;
+      box-sizing: border-box;
       background: rgba(15, 23, 42, 0.85);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       backdrop-filter: blur(20px);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
       user-select: none;
       z-index: 10;
       gap: 10px;
 
       @media (max-width: 768px) {
-        height: 50px;
-        padding: 0 10px;
+        height: calc(52px + max(env(safe-area-inset-top, 0px), 8px));
+        padding: max(env(safe-area-inset-top, 0px), 8px) 10px 0;
         gap: 6px;
       }
 
