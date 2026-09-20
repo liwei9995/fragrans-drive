@@ -89,6 +89,7 @@ pub async fn setup() -> TestContext {
         avatar: None,
         roles: vec!["user".to_string()],
         token_version: 0,
+        passkeys: Vec::new(),
         created_at: Some(Utc::now()),
         updated_at: Some(Utc::now()),
     };

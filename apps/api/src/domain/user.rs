@@ -73,6 +73,9 @@ pub struct User {
     #[serde(rename = "tokenVersion", default)]
     pub token_version: i32,
 
+    #[serde(default)]
+    pub passkeys: Vec<StoredPasskey>,
+
     #[serde(
         rename = "createdAt",
         skip_serializing_if = "Option::is_none",
@@ -86,4 +89,45 @@ pub struct User {
         with = "crate::utils::serde_datetime"
     )]
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct StoredPasskey {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "passkeyJson")]
+    pub passkey_json: String,
+    #[serde(
+        rename = "createdAt",
+        skip_serializing_if = "Option::is_none",
+        with = "crate::utils::serde_datetime"
+    )]
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+impl StoredPasskey {
+    pub fn get_passkey(&self) -> Result<webauthn_rs::prelude::Passkey, serde_json::Error> {
+        serde_json::from_str(&self.passkey_json)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PasskeyInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(
+        rename = "createdAt",
+        serialize_with = "crate::utils::serde_json_response::serialize_optional_datetime_as_ms_string"
+    )]
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+impl From<&StoredPasskey> for PasskeyInfo {
+    fn from(sp: &StoredPasskey) -> Self {
+        Self {
+            id: sp.id.clone(),
+            name: sp.name.clone(),
+            created_at: sp.created_at,
+        }
+    }
 }

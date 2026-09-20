@@ -1,5 +1,10 @@
 <script setup lang="ts" name="LoginForm">
 import { Key, Lock, Message, Refresh, User } from '@element-plus/icons-vue'
+import {
+  browserSupportsWebAuthn,
+  platformAuthenticatorIsAvailable,
+  startAuthentication,
+} from '@simplewebauthn/browser'
 import type { ElForm } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
@@ -12,6 +17,8 @@ import {
   registerUser,
   resetPassword,
   sendEmailCode,
+  webauthnLoginFinish,
+  webauthnLoginStart,
 } from '@/api/modules/user'
 import { HOME_URL } from '@/config/config'
 import { GlobalStore } from '@/store'
@@ -25,6 +32,8 @@ type Mode = 'login' | 'register' | 'forgot'
 
 const mode = ref<Mode>('login')
 const loading = ref<boolean>(false)
+const supportsTouchId = ref<boolean>(false)
+const touchIdLoading = ref<boolean>(false)
 const sendingCode = ref<boolean>(false)
 const countdown = ref<number>(0)
 let timer: ReturnType<typeof setInterval> | null = null
@@ -364,9 +373,50 @@ const reset = (formEl: FormInstance | undefined) => {
   })
 }
 
+// Touch ID / Passkey Login
+const handleTouchIdLogin = async () => {
+  touchIdLoading.value = true
+  try {
+    const email = loginForm.email?.trim() || undefined
+    const startRes = await webauthnLoginStart(email)
+    const { sessionId, challenge } = startRes
+
+    const credential = await startAuthentication({ optionsJSON: challenge })
+    const finishRes = await webauthnLoginFinish({ sessionId, credential })
+
+    const { redirect } = route.query
+    const path = (redirect || HOME_URL) as string
+
+    globalStore.setTokens(finishRes.access_token, finishRes.refresh_token)
+    ElMessage.success('Touch ID login successful!')
+    router.push(path)
+  } catch (error: any) {
+    if (error?.name === 'NotAllowedError') {
+      return
+    }
+    console.error('Touch ID login error:', error)
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      'Touch ID login failed'
+    ElMessage.error(msg)
+  } finally {
+    touchIdLoading.value = false
+  }
+}
+
 onMounted(() => {
   fetchConfig()
   fetchCaptcha()
+  if (browserSupportsWebAuthn()) {
+    platformAuthenticatorIsAvailable()
+      .then((supported) => {
+        supportsTouchId.value = supported
+      })
+      .catch(() => {
+        supportsTouchId.value = false
+      })
+  }
 })
 
 onUnmounted(() => {
@@ -380,6 +430,9 @@ defineExpose({
   loading,
   login,
   mode,
+  supportsTouchId,
+  touchIdLoading,
+  handleTouchIdLogin,
   registerForm,
   forgotForm,
   switchMode,
@@ -433,6 +486,41 @@ defineExpose({
           @click="login(loginFormRef)"
         >
           Sign in
+        </el-button>
+      </div>
+
+      <div v-if="supportsTouchId" class="touch-id-wrapper">
+        <div class="touch-id-divider">
+          <span>or</span>
+        </div>
+        <el-button
+          class="touch-id-btn"
+          round
+          size="large"
+          :disabled="loading || touchIdLoading"
+          :loading="touchIdLoading"
+          @click="handleTouchIdLogin"
+        >
+          <svg
+            class="touch-id-icon"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 2a10 10 0 0 0-10 10c0 3.5 1.8 6.6 4.6 8.4" />
+            <path d="M12 6a6 6 0 0 0-6 6c0 1.8.8 3.4 2 4.5" />
+            <path d="M12 10a2 2 0 0 0-2 2c0 .6.3 1.1.7 1.5" />
+            <path d="M12 14v.01" />
+            <path d="M16 12a4 4 0 0 0-1.2-2.8" />
+            <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
+            <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
+          </svg>
+          <span>Touch ID / 指纹快速登录</span>
         </el-button>
       </div>
 
@@ -815,6 +903,54 @@ defineExpose({
 
       .login {
         width: 100%;
+      }
+    }
+
+    .touch-id-wrapper {
+      margin-top: 14px;
+
+      .touch-id-divider {
+        display: flex;
+        align-items: center;
+        margin-bottom: 14px;
+        color: #94a3b8;
+        font-size: 12px;
+
+        &::before,
+        &::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: #e2e8f0;
+        }
+
+        span {
+          padding: 0 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+      }
+
+      .touch-id-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-color: #cbd5e1;
+        color: #334155;
+        font-weight: 500;
+        transition: all 0.2s ease;
+
+        &:hover {
+          border-color: var(--el-color-primary, #008ffd);
+          color: var(--el-color-primary, #008ffd);
+          background-color: #f8fafc;
+        }
+
+        .touch-id-icon {
+          color: inherit;
+        }
       }
     }
 

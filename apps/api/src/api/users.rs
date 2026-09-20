@@ -25,14 +25,14 @@ fn invalid_token() -> AppError {
     AppError::Unauthorized("Invalid token".to_string())
 }
 
-struct IssuedTokens {
-    access_token: String,
-    refresh_token: String,
-    refresh_jti: String,
-    refresh_expires_at: mongodb::bson::DateTime,
+pub(crate) struct IssuedTokens {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub refresh_jti: String,
+    pub refresh_expires_at: mongodb::bson::DateTime,
 }
 
-fn issue_auth_tokens(
+pub(crate) fn issue_auth_tokens(
     secret: &str,
     user_id: &str,
     token_version: i32,
@@ -554,6 +554,7 @@ pub async fn create_user(
         avatar: None,
         roles: vec!["user".to_string()],
         token_version: 0,
+        passkeys: Vec::new(),
         created_at: Some(Utc::now()),
         updated_at: Some(Utc::now()),
     };

@@ -49,3 +49,51 @@ export const updateProfile = (params: User.UpdateProfileParams) => {
 export const updatePassword = (params: User.UpdatePasswordParams) => {
   return http.post<void>(`${PORT}/users/password`, params)
 }
+
+// WebAuthn / Touch ID login start
+export const webauthnLoginStart = (email?: string) => {
+  return http.post<{ sessionId: string; challenge: any }>(
+    `${PORT}/auth/webauthn/login-start`,
+    { email: email || null },
+  )
+}
+
+// WebAuthn / Touch ID login finish
+export const webauthnLoginFinish = (params: {
+  sessionId: string
+  credential: any
+}) => {
+  return http.post<Login.ResLogin>(`${PORT}/auth/webauthn/login-finish`, params)
+}
+
+// List registered passkeys
+export const getPasskeys = () => {
+  return http.get<Array<{ id: string; name: string; createdAt?: string }>>(
+    `${PORT}/auth/webauthn/passkeys`,
+  )
+}
+
+// Start passkey registration ceremony
+export const webauthnRegisterStart = () => {
+  return http.post<{ sessionId: string; challenge: any }>(
+    `${PORT}/auth/webauthn/register-start`,
+    {},
+  )
+}
+
+// Finish passkey registration ceremony
+export const webauthnRegisterFinish = (params: {
+  sessionId: string
+  credential: any
+  name?: string
+}) => {
+  return http.post<{ id: string; name: string; createdAt?: string }>(
+    `${PORT}/auth/webauthn/register-finish`,
+    params,
+  )
+}
+
+// Delete a passkey
+export const deletePasskey = (id: string) => {
+  return http.delete<void>(`${PORT}/auth/webauthn/passkeys/${id}`)
+}

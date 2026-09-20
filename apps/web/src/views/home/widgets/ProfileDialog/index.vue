@@ -11,11 +11,23 @@ import {
   User,
   UserFilled,
 } from '@element-plus/icons-vue'
+import {
+  browserSupportsWebAuthn,
+  startRegistration,
+} from '@simplewebauthn/browser'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { Storage, User as UserType } from '@/api/interface'
 import { getStorageUsage } from '@/api/modules/storage'
-import { getProfile, updatePassword, updateProfile } from '@/api/modules/user'
+import {
+  deletePasskey,
+  getPasskeys,
+  getProfile,
+  updatePassword,
+  updateProfile,
+  webauthnRegisterFinish,
+  webauthnRegisterStart,
+} from '@/api/modules/user'
 import AvatarCropper from '@/components/AvatarCropper/index.vue'
 import { GlobalStore } from '@/store'
 
@@ -187,6 +199,98 @@ const handleChangePassword = async () => {
     ElMessage.error(msg)
   } finally {
     savingPassword.value = false
+  }
+}
+
+// Passkey / Touch ID state & actions
+interface PasskeyItem {
+  id: string
+  name: string
+  createdAt?: string
+}
+const supportsWebAuthn = ref(false)
+const passkeys = ref<PasskeyItem[]>([])
+const loadingPasskeys = ref(false)
+const registeringPasskey = ref(false)
+
+onMounted(() => {
+  supportsWebAuthn.value = browserSupportsWebAuthn()
+})
+
+const loadPasskeys = async () => {
+  loadingPasskeys.value = true
+  try {
+    const res = await getPasskeys()
+    passkeys.value = res || []
+  } catch (error) {
+    console.error('Failed to load passkeys:', error)
+  } finally {
+    loadingPasskeys.value = false
+  }
+}
+
+watch(
+  () => activeTab.value,
+  (tab) => {
+    if (tab === 'security' && props.visible) {
+      loadPasskeys()
+    }
+  },
+)
+
+const handleRegisterPasskey = async () => {
+  registeringPasskey.value = true
+  try {
+    const { sessionId, challenge } = await webauthnRegisterStart()
+    const credential = await startRegistration({ optionsJSON: challenge })
+    const isMac = /Macintosh|Mac OS X/i.test(navigator.userAgent)
+    const defaultName = isMac ? 'Mac Touch ID' : '设备通行密钥'
+    await webauthnRegisterFinish({
+      sessionId,
+      credential,
+      name: defaultName,
+    })
+    ElMessage.success(
+      'Touch ID 凭据绑定成功！您现在可以使用 Touch ID 快速登录了。',
+    )
+    await loadPasskeys()
+  } catch (error: any) {
+    if (error?.name === 'NotAllowedError') {
+      return
+    }
+    console.error('Passkey registration failed:', error)
+    const msg =
+      error?.response?.data?.message || error?.message || '绑定失败，请稍后重试'
+    ElMessage.error(msg)
+  } finally {
+    registeringPasskey.value = false
+  }
+}
+
+const handleDeletePasskey = async (id: string) => {
+  try {
+    await deletePasskey(id)
+    ElMessage.success('已移除该凭据')
+    await loadPasskeys()
+  } catch (error: any) {
+    console.error('Delete passkey error:', error)
+    ElMessage.error('移除失败，请稍后重试')
+  }
+}
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '未知时间'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return dateStr
   }
 }
 </script>
@@ -381,49 +485,159 @@ const handleChangePassword = async () => {
           <template #label>
             <span class="tab-label">
               <el-icon><Key /></el-icon>
-              <span>修改密码</span>
+              <span>安全设置</span>
             </span>
           </template>
 
-          <el-form :model="passwordForm" label-position="top" class="security-form">
-            <el-form-item label="当前密码">
-              <el-input
-                v-model="passwordForm.oldPassword"
-                type="password"
-                show-password
-                placeholder="请输入当前正在使用的密码"
-              />
-            </el-form-item>
-
-            <el-form-item label="新密码">
-              <el-input
-                v-model="passwordForm.password"
-                type="password"
-                show-password
-                placeholder="请输入不少于 6 位的新密码"
-              />
-            </el-form-item>
-
-            <el-form-item label="确认新密码">
-              <el-input
-                v-model="passwordForm.confirmPassword"
-                type="password"
-                show-password
-                placeholder="请再次输入新密码"
-              />
-            </el-form-item>
-
-            <div class="form-actions">
-              <el-button
-                type="primary"
-                :icon="CircleCheck"
-                :loading="savingPassword"
-                @click="handleChangePassword"
-              >
-                确认修改密码
-              </el-button>
+          <div class="security-pane">
+            <div class="security-sub-header">
+              <span class="sub-title">修改登录密码</span>
             </div>
-          </el-form>
+
+            <el-form :model="passwordForm" label-position="top" class="security-form">
+              <el-form-item label="当前密码">
+                <el-input
+                  v-model="passwordForm.oldPassword"
+                  type="password"
+                  show-password
+                  placeholder="请输入当前正在使用的密码"
+                />
+              </el-form-item>
+
+              <div class="form-row">
+                <el-form-item label="新密码">
+                  <el-input
+                    v-model="passwordForm.password"
+                    type="password"
+                    show-password
+                    placeholder="请输入不少于 6 位的新密码"
+                  />
+                </el-form-item>
+
+                <el-form-item label="确认新密码">
+                  <el-input
+                    v-model="passwordForm.confirmPassword"
+                    type="password"
+                    show-password
+                    placeholder="请再次输入新密码"
+                  />
+                </el-form-item>
+              </div>
+
+              <div class="form-actions">
+                <el-button
+                  type="primary"
+                  :icon="CircleCheck"
+                  :loading="savingPassword"
+                  @click="handleChangePassword"
+                >
+                  确认修改密码
+                </el-button>
+              </div>
+            </el-form>
+
+            <el-divider class="security-divider" />
+
+            <!-- Touch ID / Passkey Section -->
+            <div class="passkey-section">
+              <div class="passkey-header">
+                <div class="passkey-header-text">
+                  <span class="sub-title">Touch ID / 通行密钥</span>
+                  <span class="sub-desc">
+                    绑定此设备的 Touch ID 或生物识别，下次登录时可一键指纹免密进入。
+                  </span>
+                </div>
+                <el-button
+                  v-if="supportsWebAuthn"
+                  type="primary"
+                  plain
+                  :loading="registeringPasskey"
+                  class="bind-passkey-btn"
+                  @click="handleRegisterPasskey"
+                >
+                  <svg
+                    class="touch-id-btn-icon"
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 2a10 10 0 0 0-10 10c0 3.5 1.8 6.6 4.6 8.4" />
+                    <path d="M12 6a6 6 0 0 0-6 6c0 1.8.8 3.4 2 4.5" />
+                    <path d="M12 10a2 2 0 0 0-2 2c0 .6.3 1.1.7 1.5" />
+                    <path d="M12 14v.01" />
+                    <path d="M16 12a4 4 0 0 0-1.2-2.8" />
+                    <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
+                    <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
+                  </svg>
+                  <span>绑定此设备</span>
+                </el-button>
+              </div>
+
+              <div v-if="!supportsWebAuthn" class="passkey-unsupported">
+                当前浏览器或环境暂不支持 WebAuthn / Touch ID。请在支持的浏览器（如 Safari, Chrome）并启用 HTTPS 或 localhost 环境下使用。
+              </div>
+
+              <div v-loading="loadingPasskeys" class="passkey-list">
+                <div v-if="passkeys.length === 0" class="passkey-empty">
+                  <span>暂无已绑定的 Touch ID / 设备凭据</span>
+                </div>
+                <div
+                  v-for="item in passkeys"
+                  :key="item.id"
+                  class="passkey-item"
+                >
+                  <div class="passkey-item-left">
+                    <div class="passkey-icon-badge">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M12 2a10 10 0 0 0-10 10c0 3.5 1.8 6.6 4.6 8.4" />
+                        <path d="M12 6a6 6 0 0 0-6 6c0 1.8.8 3.4 2 4.5" />
+                        <path d="M12 10a2 2 0 0 0-2 2c0 .6.3 1.1.7 1.5" />
+                        <path d="M12 14v.01" />
+                        <path d="M16 12a4 4 0 0 0-1.2-2.8" />
+                        <path d="M19.4 12a7.4 7.4 0 0 0-2.2-5.2" />
+                        <path d="M22 12c0-2.8-1.1-5.3-3-7.1" />
+                      </svg>
+                    </div>
+                    <div class="passkey-info">
+                      <div class="passkey-name">{{ item.name || 'Touch ID 凭据' }}</div>
+                      <div class="passkey-date">绑定时间: {{ formatDate(item.createdAt) }}</div>
+                    </div>
+                  </div>
+                  <el-popconfirm
+                    title="确定移除该 Touch ID 凭据吗？移除后将无法使用该设备指纹登录。"
+                    confirm-button-text="确定"
+                    cancel-button-text="取消"
+                    @confirm="handleDeletePasskey(item.id)"
+                  >
+                    <template #reference>
+                      <el-button
+                        type="danger"
+                        text
+                        :icon="Delete"
+                        size="small"
+                      >
+                        移除
+                      </el-button>
+                    </template>
+                  </el-popconfirm>
+                </div>
+              </div>
+            </div>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -762,6 +976,142 @@ const handleChangePassword = async () => {
     display: flex;
     justify-content: flex-end;
     padding-top: 12px;
+  }
+}
+
+.security-pane {
+  padding-top: 12px;
+
+  .security-sub-header {
+    margin-bottom: 12px;
+  }
+
+  .sub-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-color, #1e293b);
+  }
+
+  .sub-desc {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .security-divider {
+    margin: 24px 0;
+    border-color: var(--border-color, rgba(0, 0, 0, 0.08));
+  }
+
+  .passkey-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    .passkey-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+
+      @media (max-width: 540px) {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .passkey-header-text {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .bind-passkey-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+
+        .touch-id-btn-icon {
+          color: var(--c-primary, #008ffd);
+        }
+      }
+    }
+
+    .passkey-unsupported {
+      font-size: 12px;
+      color: #e6a23c;
+      background: rgba(230, 162, 60, 0.08);
+      border: 1px solid rgba(230, 162, 60, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .passkey-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 48px;
+
+      .passkey-empty {
+        text-align: center;
+        padding: 24px 0;
+        color: #999;
+        font-size: 13px;
+        background: rgba(0, 0, 0, 0.02);
+        border: 1px dashed var(--border-color, rgba(0, 0, 0, 0.1));
+        border-radius: 10px;
+      }
+
+      .passkey-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+        border-radius: 10px;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.04);
+        }
+
+        .passkey-item-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
+          .passkey-icon-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(0, 143, 253, 0.1);
+            color: var(--c-primary, #008ffd);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+          }
+
+          .passkey-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+
+            .passkey-name {
+              font-size: 14px;
+              font-weight: 500;
+              color: var(--text-color, #1e293b);
+            }
+
+            .passkey-date {
+              font-size: 12px;
+              color: #888;
+            }
+          }
+        }
+      }
+    }
   }
 }
 </style>

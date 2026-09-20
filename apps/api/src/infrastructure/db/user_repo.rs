@@ -70,6 +70,59 @@ impl UserRepository {
         Ok(())
     }
 
+    pub async fn add_passkey(
+        &self,
+        id: ObjectId,
+        passkey: crate::domain::user::StoredPasskey,
+    ) -> Result<(), mongodb::error::Error> {
+        let passkey_doc = mongodb::bson::to_document(&passkey)?;
+        self.collection
+            .update_one(
+                doc! { "_id": id },
+                doc! { "$push": { "passkeys": passkey_doc } },
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_passkey(
+        &self,
+        id: ObjectId,
+        passkey_id: &str,
+    ) -> Result<(), mongodb::error::Error> {
+        self.collection
+            .update_one(
+                doc! { "_id": id },
+                doc! { "$pull": { "passkeys": { "id": passkey_id } } },
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn find_by_passkey_id(
+        &self,
+        passkey_id: &str,
+    ) -> Result<Option<User>, mongodb::error::Error> {
+        self.collection
+            .find_one(doc! { "passkeys.id": passkey_id })
+            .await
+    }
+
+    pub async fn update_passkey(
+        &self,
+        id: ObjectId,
+        passkey_id: &str,
+        updated_passkey_json: &str,
+    ) -> Result<(), mongodb::error::Error> {
+        self.collection
+            .update_one(
+                doc! { "_id": id, "passkeys.id": passkey_id },
+                doc! { "$set": { "passkeys.$.passkeyJson": updated_passkey_json } },
+            )
+            .await?;
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub async fn delete_all(&self) -> Result<u64, mongodb::error::Error> {
         let result = self.collection.delete_many(doc! {}).await?;

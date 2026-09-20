@@ -4,6 +4,7 @@ pub mod middleware;
 pub mod rate_limit;
 pub mod storage;
 pub mod users;
+pub mod webauthn;
 
 use crate::config::Config;
 use axum::{Router, extract::State};
@@ -19,6 +20,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub local_storage: crate::infrastructure::storage::local::LocalStorage,
     pub auth_security: Arc<auth_security::AuthSecurityManager>,
+    pub webauthn: Arc<crate::service::webauthn::WebauthnService>,
 }
 
 #[derive(OpenApi)]
@@ -96,12 +98,17 @@ pub fn router(db: Database, config: Config) -> Router {
     .expect("Failed to initialize local storage");
 
     let auth_security = Arc::new(auth_security::AuthSecurityManager::new());
+    let webauthn = Arc::new(
+        crate::service::webauthn::WebauthnService::new(&config)
+            .expect("Failed to initialize WebAuthn service"),
+    );
 
     let state = AppState {
         db,
         config: Arc::new(config),
         local_storage,
         auth_security,
+        webauthn,
     };
 
     let login_limiter = rate_limit::RateLimiter::new(10, std::time::Duration::from_secs(60));
@@ -130,8 +137,50 @@ pub fn router(db: Database, config: Config) -> Router {
         .route(
             "/login",
             axum::routing::post(users::login).layer(axum::middleware::from_fn_with_state(
+                login_limiter.clone(),
+                rate_limit::rate_limit_middleware,
+            )),
+        )
+        .route(
+            "/webauthn/login-start",
+            axum::routing::post(webauthn::login_start).layer(axum::middleware::from_fn_with_state(
+                login_limiter.clone(),
+                rate_limit::rate_limit_middleware,
+            )),
+        )
+        .route(
+            "/webauthn/login-finish",
+            axum::routing::post(webauthn::login_finish).layer(axum::middleware::from_fn_with_state(
                 login_limiter,
                 rate_limit::rate_limit_middleware,
+            )),
+        )
+        .route(
+            "/webauthn/passkeys",
+            axum::routing::get(webauthn::list_passkeys).layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                middleware::auth_guard,
+            )),
+        )
+        .route(
+            "/webauthn/register-start",
+            axum::routing::post(webauthn::register_start).layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                middleware::auth_guard,
+            )),
+        )
+        .route(
+            "/webauthn/register-finish",
+            axum::routing::post(webauthn::register_finish).layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                middleware::auth_guard,
+            )),
+        )
+        .route(
+            "/webauthn/passkeys/{id}",
+            axum::routing::delete(webauthn::delete_passkey).layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                middleware::auth_guard,
             )),
         )
         .route("/refresh", axum::routing::post(users::refresh))

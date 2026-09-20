@@ -428,6 +428,7 @@ async fn download_url_rejects_unowned_file() {
         avatar: None,
         roles: vec!["user".to_string()],
         token_version: 0,
+        passkeys: Vec::new(),
         created_at: Some(chrono::Utc::now()),
         updated_at: Some(chrono::Utc::now()),
     };
