@@ -39,7 +39,7 @@ Watch the [Introduction Video](https://www.youtube.com/embed/Uzeur9v44LE) to see
 ## Requirements
 
 - Node.js 22 or higher
-- pnpm 11.23.0 (Enabling via Corepack is recommended)
+- pnpm 12.5.1 (Enabling via Corepack is recommended)
 - Rust toolchain (for backend development)
 - FFmpeg (required for local backend video thumbnailing & transcoding)
 - Docker & Docker Compose (for production deployment)
