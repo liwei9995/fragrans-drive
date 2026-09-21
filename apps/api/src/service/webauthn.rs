@@ -97,6 +97,11 @@ impl WebauthnService {
         {
             let mut lock = self.reg_states.write().await;
             lock.retain(|_, (_, _, time)| time.elapsed() < Duration::from_secs(300));
+            if lock.len() >= 10_000 {
+                return Err(AppError::TooManyRequests(
+                    "Too many concurrent registration requests".to_string(),
+                ));
+            }
             lock.insert(
                 session_id.clone(),
                 (user_id.to_hex(), reg_state, Instant::now()),
@@ -190,6 +195,11 @@ impl WebauthnService {
         {
             let mut lock = self.auth_states.write().await;
             lock.retain(|_, (_, time)| time.elapsed() < Duration::from_secs(300));
+            if lock.len() >= 10_000 {
+                return Err(AppError::TooManyRequests(
+                    "Too many concurrent authentication requests".to_string(),
+                ));
+            }
             lock.insert(session_id.clone(), (auth_state, Instant::now()));
         }
 

@@ -225,10 +225,14 @@ pub async fn login(
         .check(&email)
         .map_err(|_| AppError::TooManyRequests("Too many login attempts".to_string()))?;
 
+    const DUMMY_BCRYPT_HASH: &str =
+        "$2b$12$Wn1DCRs8jwSUTYfcUpZLxuPzSpMjTQFHT87B5cH4eNahkfwtbrH3u";
+
     let repo = UserRepository::new(&state.db);
     let user = match repo.find_by_email(&email).await? {
         Some(u) => u,
         None => {
+            let _ = verify_password(&payload.password, DUMMY_BCRYPT_HASH);
             return Err(AppError::Unauthorized(
                 "Invalid email or password".to_string(),
             ));

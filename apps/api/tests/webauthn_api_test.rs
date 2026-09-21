@@ -133,3 +133,52 @@ async fn test_webauthn_api_flow() {
 
     ctx.teardown().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn test_passkey_duplicate_prevention_and_unique_index() {
+    let ctx = setup().await;
+    let repo = fragrans::infrastructure::db::user_repo::UserRepository::new(&ctx.db);
+    let user_id = mongodb::bson::oid::ObjectId::parse_str(&ctx.user_id).unwrap();
+
+    let pk = fragrans::domain::user::StoredPasskey {
+        id: "unique-passkey-123".to_string(),
+        name: "Test 1".to_string(),
+        passkey_json: "{}".to_string(),
+        created_at: Some(chrono::Utc::now()),
+    };
+
+    // 1. Add first passkey
+    repo.add_passkey(user_id, pk.clone()).await.unwrap();
+
+    // 2. Find by passkey id should find the user
+    let found = repo.find_by_passkey_id("unique-passkey-123").await.unwrap();
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().id, Some(user_id));
+
+    // 3. Trying to add same passkey to another user should fail at DB index level
+    let another_user = fragrans::domain::user::User {
+        id: None,
+        email: "another@example.com".to_string(),
+        password: "hash".to_string(),
+        first_name: "A".to_string(),
+        last_name: "B".to_string(),
+        gender: None,
+        age: None,
+        avatar: None,
+        roles: vec!["user".to_string()],
+        token_version: 0,
+        passkeys: Vec::new(),
+        created_at: Some(chrono::Utc::now()),
+        updated_at: Some(chrono::Utc::now()),
+    };
+    let another_id = repo.create(another_user).await.unwrap();
+
+    let duplicate_result = repo.add_passkey(another_id, pk).await;
+    assert!(
+        duplicate_result.is_err(),
+        "Expected duplicate key error on passkeys.id unique index"
+    );
+
+    ctx.teardown().await;
+}

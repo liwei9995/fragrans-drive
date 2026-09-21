@@ -47,6 +47,18 @@ pub async fn ensure_indexes(db: &Database) -> Result<(), mongodb::error::Error> 
         .build();
     users.create_index(email_index).await?;
 
+    let passkey_index = IndexModel::builder()
+        .keys(doc! { "passkeys.id": 1 })
+        .options(
+            IndexOptions::builder()
+                .name("users_passkeys_id_unique".to_string())
+                .unique(true)
+                .sparse(true)
+                .build(),
+        )
+        .build();
+    users.create_index(passkey_index).await?;
+
     let refresh_jti_index = IndexModel::builder()
         .keys(doc! { "jtiHash": 1 })
         .options(

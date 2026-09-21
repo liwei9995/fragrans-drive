@@ -278,6 +278,15 @@ pub async fn register_finish(
         )
         .await?;
 
+    if let Some(existing_user) = repo.find_by_passkey_id(&stored_passkey.id).await? {
+        let msg = if existing_user.id == Some(id) {
+            "This passkey is already registered on your account"
+        } else {
+            "This passkey is already registered on another account"
+        };
+        return Err(AppError::BadRequest(msg.to_string()));
+    }
+
     let info = PasskeyInfo::from(&stored_passkey);
     repo.add_passkey(id, stored_passkey).await?;
 
