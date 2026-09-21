@@ -97,8 +97,8 @@ export namespace Storage {
 
   export interface ReqStorageUpdateFileName {
     name: string
-    parentId: string
-    type: string
+    parentId?: string
+    type?: string
   }
 
   export interface ReqSetPublicStatus {

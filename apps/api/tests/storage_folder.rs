@@ -85,9 +85,11 @@ async fn test_folder_creation_and_listing() {
     assert_eq!(list_data["docs"][0]["id"].as_str().unwrap(), root_folder_id);
     assert_eq!(list_data["docs"][0]["type"].as_str().unwrap(), "folder");
 
-    // 4. Rename folder
+    // 4. Rename folder (including legacy/frontend parentId and type fields)
     let rename_payload = serde_json::json!({
-        "name": "Documents"
+        "name": "Documents",
+        "parentId": "root",
+        "type": "folder"
     });
     let rename_res = ctx
         .app

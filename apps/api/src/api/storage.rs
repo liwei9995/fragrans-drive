@@ -35,9 +35,12 @@ pub struct StorageQueryDto {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct UpdateStorageDto {
     pub name: String,
+    #[serde(rename = "parentId", default)]
+    pub parent_id: Option<String>,
+    #[serde(rename = "type", default)]
+    pub r#type: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
