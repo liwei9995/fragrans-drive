@@ -725,7 +725,8 @@ pub async fn update_profile(
                                 return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save avatar").into_response();
                             }
                         }
-                        let avatar_url = format!("/v1/users/{}/avatar", user_ctx.user_id);
+                        let timestamp = chrono::Utc::now().timestamp_millis();
+                        let avatar_url = format!("/v1/users/{}/avatar?t={}", user_ctx.user_id, timestamp);
                         update.insert("avatar", avatar_url);
                     }
                     Err(_) => {

@@ -27,6 +27,32 @@ async fn main() {
         fragrans::service::storage::backfill_video_thumbnails(&db_bg, &config_bg).await;
     });
 
+    let local_storage = infrastructure::storage::local::LocalStorage::new(
+        config.storage_destination.clone(),
+        config.storage_master_key,
+    )
+    .expect("Failed to initialize storage for cleanup task");
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(12 * 3600));
+        loop {
+            interval.tick().await;
+            tracing::info!("Starting periodic cleanup of stale temporary uploads...");
+            match local_storage
+                .cleanup_stale_temp_uploads(std::time::Duration::from_secs(24 * 3600))
+                .await
+            {
+                Ok(count) => {
+                    if count > 0 {
+                        tracing::info!("Cleaned up {} stale temp upload directories", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Error during temp upload cleanup: {}", e);
+                }
+            }
+        }
+    });
+
     let port = config.port;
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("listening on {}", addr);

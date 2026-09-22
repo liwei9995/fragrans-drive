@@ -132,6 +132,50 @@ impl LocalStorage {
         Ok(path)
     }
 
+    /// Scans the `temp_uploads` directory and removes any upload directories that haven't
+    /// been modified for longer than `max_age`.
+    pub async fn cleanup_stale_temp_uploads(
+        &self,
+        max_age: std::time::Duration,
+    ) -> Result<usize, StorageIoError> {
+        let temp_dir = self.root_path.join("temp_uploads");
+        if !temp_dir.exists() {
+            return Ok(0);
+        }
+        let mut read_dir = fs::read_dir(&temp_dir).await?;
+        let mut count = 0;
+        let now = std::time::SystemTime::now();
+
+        while let Some(entry) = read_dir.next_entry().await? {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Ok(metadata) = entry.metadata().await {
+                    let modified = metadata
+                        .modified()
+                        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                    if let Ok(elapsed) = now.duration_since(modified) {
+                        if elapsed >= max_age {
+                            tracing::info!(
+                                path = %path.display(),
+                                "Removing stale temporary upload directory"
+                            );
+                            if let Err(e) = fs::remove_dir_all(&path).await {
+                                tracing::warn!(
+                                    error = %e,
+                                    path = %path.display(),
+                                    "Failed to remove stale upload directory"
+                                );
+                            } else {
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(count)
+    }
+
     pub fn get_avatar_path(&self, user_id: &str) -> Result<PathBuf, StorageIoError> {
         if mongodb::bson::oid::ObjectId::parse_str(user_id).is_err() {
             return Err(StorageIoError::Format("Invalid user id".into()));
@@ -1069,5 +1113,39 @@ pub mod legacy {
 
             Ok(Some((total_len, range_len, stream)))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_cleanup_stale_temp_uploads() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let storage = LocalStorage::new(temp_dir.path().to_path_buf(), [0u8; 32]).unwrap();
+
+        let upload_path_1 = storage.get_temp_upload_path("upload-1").unwrap();
+        tokio::fs::create_dir_all(&upload_path_1).await.unwrap();
+        tokio::fs::write(upload_path_1.join("0.part"), b"chunk0").await.unwrap();
+
+        let upload_path_2 = storage.get_temp_upload_path("upload-2").unwrap();
+        tokio::fs::create_dir_all(&upload_path_2).await.unwrap();
+
+        // With max_age = 0, all temp upload dirs should be cleaned up
+        let count = storage
+            .cleanup_stale_temp_uploads(std::time::Duration::from_secs(0))
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+        assert!(!upload_path_1.exists());
+        assert!(!upload_path_2.exists());
+
+        // Subsequent run should clean up 0
+        let count2 = storage
+            .cleanup_stale_temp_uploads(std::time::Duration::from_secs(0))
+            .await
+            .unwrap();
+        assert_eq!(count2, 0);
     }
 }

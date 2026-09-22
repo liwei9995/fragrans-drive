@@ -103,31 +103,61 @@ const customUploadRequest = async (options: UploadRequestOptions) => {
     const { uploadId, uploadedChunks } = initRes
     const uploadedSet = new Set(uploadedChunks || [])
 
+    const CONCURRENCY = 3
+    const chunksToUpload: number[] = []
+    const chunkProgress = new Array(totalChunks).fill(0)
+
     for (let i = 0; i < totalChunks; i++) {
       if (uploadedSet.has(i)) {
-        const percent = 10 + Math.round(((i + 1) / totalChunks) * 85)
-        onProgress({ percent } as any)
-        continue
+        chunkProgress[i] = 1
+      } else {
+        chunksToUpload.push(i)
       }
+    }
 
-      const start = i * CHUNK_SIZE
-      const end = Math.min(file.size, (i + 1) * CHUNK_SIZE)
-      const chunkBlob = file.slice(start, end)
+    const updateOverallProgress = () => {
+      const sum = chunkProgress.reduce((acc, p) => acc + p, 0)
+      const percent = 10 + Math.round((sum / totalChunks) * 85)
+      onProgress({ percent } as any)
+    }
 
-      const chunkFormData = new FormData()
-      chunkFormData.append('uploadId', uploadId)
-      chunkFormData.append('chunkIndex', i.toString())
-      chunkFormData.append('chunk', chunkBlob, `${i}.part`)
+    // Report initial progress for resumed uploads
+    if (uploadedSet.size > 0) {
+      updateOverallProgress()
+    }
 
-      await uploadChunk(chunkFormData, (progressEvent) => {
-        const { loaded, total } = progressEvent
-        if (total) {
-          const chunkFraction = loaded / total
-          const overallProgress = (i + chunkFraction) / totalChunks
-          const percent = 10 + Math.round(overallProgress * 85)
-          onProgress({ percent } as any)
-        }
-      })
+    let nextIndex = 0
+    const uploadWorker = async () => {
+      while (nextIndex < chunksToUpload.length) {
+        const currentIndex = nextIndex++
+        const chunkIndex = chunksToUpload[currentIndex]
+        const start = chunkIndex * CHUNK_SIZE
+        const end = Math.min(file.size, (chunkIndex + 1) * CHUNK_SIZE)
+        const chunkBlob = file.slice(start, end)
+
+        const chunkFormData = new FormData()
+        chunkFormData.append('uploadId', uploadId)
+        chunkFormData.append('chunkIndex', chunkIndex.toString())
+        chunkFormData.append('chunk', chunkBlob, `${chunkIndex}.part`)
+
+        await uploadChunk(chunkFormData, (progressEvent) => {
+          const { loaded, total } = progressEvent
+          if (total) {
+            chunkProgress[chunkIndex] = loaded / total
+            updateOverallProgress()
+          }
+        })
+
+        chunkProgress[chunkIndex] = 1
+        updateOverallProgress()
+      }
+    }
+
+    const workerCount = Math.min(CONCURRENCY, chunksToUpload.length)
+    if (workerCount > 0) {
+      await Promise.all(
+        Array.from({ length: workerCount }, () => uploadWorker()),
+      )
     }
 
     const completeRes = await uploadComplete({ uploadId })
