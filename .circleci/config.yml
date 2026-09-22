@@ -40,17 +40,18 @@ jobs:
             docker push ${WEB_IMAGE}:${SEMVER_TAG}
             docker push ${WEB_IMAGE}:${LATEST_TAG}
 
-            echo "Building API Image..."
-            API_IMAGE="${ALIYUN_REGISTRY_URL}/fragrans-api"
-            docker build -f apps/api/Dockerfile $BUILD_ARGS -t ${API_IMAGE}:${UNIQUE_TAG} apps/api
-            docker tag ${API_IMAGE}:${UNIQUE_TAG} ${API_IMAGE}:${SEMVER_TAG}
-            docker tag ${API_IMAGE}:${UNIQUE_TAG} ${API_IMAGE}:${LATEST_TAG}
-            docker push ${API_IMAGE}:${UNIQUE_TAG}
-            docker push ${API_IMAGE}:${SEMVER_TAG}
-            docker push ${API_IMAGE}:${LATEST_TAG}
+            echo "Building API Binary..."
+            docker build --target builder -f apps/api/Dockerfile $BUILD_ARGS -t api-builder apps/api
+            CONTAINER_ID=$(docker create api-builder)
+            docker cp $CONTAINER_ID:/usr/src/fragrans/target/release/fragrans ./fragrans
+            docker rm $CONTAINER_ID
+            gzip -9 -f ./fragrans
 
-            # Write UNIQUE_TAG to BASH_ENV for subsequent steps
+            # Write variables to BASH_ENV for subsequent steps
             echo "export UNIQUE_TAG=${UNIQUE_TAG}" >> $BASH_ENV
+            echo "export SEMVER_TAG=${SEMVER_TAG}" >> $BASH_ENV
+            echo "export LATEST_TAG=${LATEST_TAG}" >> $BASH_ENV
+            echo "export APP_VERSION=${APP_VERSION}" >> $BASH_ENV
 
       # 2. Setup SSH key to connect to Aliyun server
       - run:
@@ -88,19 +89,29 @@ jobs:
             SMTP_FROM=$SMTP_FROM
             EOF
 
-            echo "Deploying config files to Aliyun..."
+            echo "Deploying config files and artifacts to Aliyun..."
             SSH_OPTS="-i ~/.ssh/aliyun_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o BatchMode=yes"
             ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "mkdir -p $ALIYUN_DEPLOY_PATH"
 
-            # Only upload docker-compose.yaml and .env without source code
-            scp $SSH_OPTS docker-compose.yaml .env $ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/
+            # Upload docker-compose.yaml, .env, Dockerfile.runtime, and compressed fragrans binary
+            scp $SSH_OPTS docker-compose.yaml .env apps/api/Dockerfile.runtime fragrans.gz $ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/
 
-            # Login to ACR on remote host -> pull latest images -> start services -> prune dangling images
+            # On remote host: decompress binary, build & tag API image, push to ACR domestically, pull web, restart services
             ssh $SSH_OPTS $ALIYUN_USER@$ALIYUN_HOST "cd $ALIYUN_DEPLOY_PATH && \
+              gzip -d -f fragrans.gz && \
+              chmod +x fragrans && \
+              docker build -f Dockerfile.runtime --build-arg VERSION=${APP_VERSION} --build-arg GIT_REVISION=${CIRCLE_SHA1} \
+                -t ${ALIYUN_REGISTRY_URL}/fragrans-api:${UNIQUE_TAG} \
+                -t ${ALIYUN_REGISTRY_URL}/fragrans-api:${SEMVER_TAG} \
+                -t ${ALIYUN_REGISTRY_URL}/fragrans-api:${LATEST_TAG} . && \
               docker login --username '$ALIYUN_REGISTRY_USER' --password '$ALIYUN_REGISTRY_PASSWORD' '$ALIYUN_REGISTRY_URL' && \
-              docker-compose pull && \
+              docker push ${ALIYUN_REGISTRY_URL}/fragrans-api:${UNIQUE_TAG} && \
+              docker push ${ALIYUN_REGISTRY_URL}/fragrans-api:${SEMVER_TAG} && \
+              docker push ${ALIYUN_REGISTRY_URL}/fragrans-api:${LATEST_TAG} && \
+              docker-compose pull web && \
               docker-compose up -d --remove-orphans && \
-              docker image prune -f"
+              docker image prune -f && \
+              rm -f fragrans"
 
 workflows:
   version: 2
