@@ -1,0 +1,7 @@
+FROM alpine:3.21
+
+RUN apk add --no-cache libgcc ffmpeg openssl ca-certificates \
+    && addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && mkdir -p /app/bucket && chown -R appuser:appgroup /app
+
+WORKDIR /app
