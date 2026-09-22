@@ -118,14 +118,39 @@ impl LocalStorage {
         Ok(path)
     }
 
-    pub async fn store_from_async_read<R: tokio::io::AsyncRead + Unpin>(
+    pub fn get_temp_upload_path(&self, upload_id: &str) -> Result<PathBuf, StorageIoError> {
+        if upload_id.is_empty()
+            || upload_id.contains('/')
+            || upload_id.contains('\\')
+            || upload_id.contains("..")
+        {
+            return Err(StorageIoError::Format("Invalid upload id".into()));
+        }
+        let mut path = (*self.root_path).clone();
+        path.push("temp_uploads");
+        path.push(upload_id);
+        Ok(path)
+    }
+
+    pub fn get_avatar_path(&self, user_id: &str) -> Result<PathBuf, StorageIoError> {
+        if mongodb::bson::oid::ObjectId::parse_str(user_id).is_err() {
+            return Err(StorageIoError::Format("Invalid user id".into()));
+        }
+        let mut path = (*self.root_path).clone();
+        path.push("avatars");
+        path.push(format!("{}.png", user_id));
+        Ok(path)
+    }
+
+    async fn store_to_path_internal<R: tokio::io::AsyncRead + Unpin>(
         &self,
+        path: &Path,
         user_id: &str,
-        content_hash: &str,
+        aad_tag: &str,
         mut in_reader: R,
         plaintext_size: u64,
+        expected_hash: Option<&str>,
     ) -> Result<(), StorageIoError> {
-        let path = self.get_path(user_id, content_hash)?;
         if path.exists() {
             return Ok(());
         }
@@ -178,7 +203,7 @@ impl LocalStorage {
                 }
                 let nonce = Nonce::from(nonce_bytes);
 
-                let mut aad = Vec::with_capacity(33 + user_id.len() + 1 + content_hash.len() + 8);
+                let mut aad = Vec::with_capacity(33 + user_id.len() + 1 + aad_tag.len() + 8);
                 aad.extend_from_slice(MAGIC);
                 aad.push(VERSION);
                 aad.extend_from_slice(&CHUNK_SIZE.to_be_bytes());
@@ -186,7 +211,7 @@ impl LocalStorage {
                 aad.extend_from_slice(&base_nonce);
                 aad.extend_from_slice(user_id.as_bytes());
                 aad.push(0x00);
-                aad.extend_from_slice(content_hash.as_bytes());
+                aad.extend_from_slice(aad_tag.as_bytes());
                 aad.extend_from_slice(&chunk_index.to_be_bytes());
                 aad.extend_from_slice(&(chunk_bytes as u32).to_be_bytes());
 
@@ -217,12 +242,14 @@ impl LocalStorage {
                 }
             }
 
-            let hash_result = hex::encode(hasher.finalize());
-            if hash_result != content_hash {
-                return Err(StorageIoError::HashMismatch {
-                    expected: content_hash.to_string(),
-                    actual: hash_result,
-                });
+            if let Some(expected) = expected_hash {
+                let hash_result = hex::encode(hasher.finalize());
+                if hash_result != expected {
+                    return Err(StorageIoError::HashMismatch {
+                        expected: expected.to_string(),
+                        actual: hash_result,
+                    });
+                }
             }
 
             if total_read != plaintext_size {
@@ -234,7 +261,7 @@ impl LocalStorage {
 
             out_file.sync_all().await?;
             drop(out_file);
-            fs::rename(&temp_path, &path).await?;
+            fs::rename(&temp_path, path).await?;
             Ok(())
         }
         .await;
@@ -253,6 +280,25 @@ impl LocalStorage {
         result
     }
 
+    pub async fn store_from_async_read<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+        in_reader: R,
+        plaintext_size: u64,
+    ) -> Result<(), StorageIoError> {
+        let path = self.get_path(user_id, content_hash)?;
+        self.store_to_path_internal(
+            &path,
+            user_id,
+            content_hash,
+            in_reader,
+            plaintext_size,
+            Some(content_hash),
+        )
+        .await
+    }
+
     pub async fn store_from_file(
         &self,
         user_id: &str,
@@ -265,12 +311,12 @@ impl LocalStorage {
             .await
     }
 
-    pub async fn read_all(
+    async fn read_all_from_path(
         &self,
+        path: &Path,
         user_id: &str,
-        content_hash: &str,
+        aad_tag: &str,
     ) -> Result<Vec<u8>, StorageIoError> {
-        let path = self.get_path(user_id, content_hash)?;
         if !path.exists() {
             return Err(StorageIoError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -344,7 +390,7 @@ impl LocalStorage {
             }
             let nonce = Nonce::from(nonce_bytes);
 
-            let mut aad = Vec::with_capacity(33 + user_id.len() + 1 + content_hash.len() + 8);
+            let mut aad = Vec::with_capacity(33 + user_id.len() + 1 + aad_tag.len() + 8);
             aad.extend_from_slice(MAGIC);
             aad.push(VERSION);
             aad.extend_from_slice(&CHUNK_SIZE.to_be_bytes());
@@ -352,7 +398,7 @@ impl LocalStorage {
             aad.extend_from_slice(&base_nonce);
             aad.extend_from_slice(user_id.as_bytes());
             aad.push(0x00);
-            aad.extend_from_slice(content_hash.as_bytes());
+            aad.extend_from_slice(aad_tag.as_bytes());
             aad.extend_from_slice(&chunk_index.to_be_bytes());
             aad.extend_from_slice(&expected_plaintext_len.to_be_bytes());
 
@@ -388,6 +434,15 @@ impl LocalStorage {
         }
 
         Ok(result)
+    }
+
+    pub async fn read_all(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+    ) -> Result<Vec<u8>, StorageIoError> {
+        let path = self.get_path(user_id, content_hash)?;
+        self.read_all_from_path(&path, user_id, content_hash).await
     }
 
     pub async fn remove(&self, user_id: &str, content_hash: &str) -> Result<(), StorageIoError> {
@@ -448,14 +503,14 @@ impl LocalStorage {
         Ok(plaintext_size)
     }
 
-    pub async fn stream_content(
+    async fn stream_from_path(
         &self,
+        path: &Path,
         user_id: String,
-        content_hash: String,
+        aad_tag: String,
         range_start: u64,
         range_end: Option<u64>,
     ) -> Result<(u64, u64, StorageStream), StorageIoError> {
-        let path = self.get_path(&user_id, &content_hash)?;
         if !path.exists() {
             return Err(StorageIoError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -530,7 +585,7 @@ impl LocalStorage {
             in_file: fs::File,
             master_key: Arc<[u8; 32]>,
             user_id: String,
-            content_hash: String,
+            aad_tag: String,
             plaintext_size: u64,
             base_nonce: [u8; 12],
             chunk_index: u32,
@@ -544,7 +599,7 @@ impl LocalStorage {
             in_file,
             master_key,
             user_id,
-            content_hash,
+            aad_tag,
             plaintext_size,
             base_nonce,
             chunk_index: start_chunk,
@@ -628,7 +683,7 @@ impl LocalStorage {
             }
             let nonce = Nonce::from(nonce_bytes);
 
-            let mut aad = Vec::with_capacity(33 + s.user_id.len() + 1 + s.content_hash.len() + 8);
+            let mut aad = Vec::with_capacity(33 + s.user_id.len() + 1 + s.aad_tag.len() + 8);
             aad.extend_from_slice(MAGIC);
             aad.push(VERSION);
             aad.extend_from_slice(&CHUNK_SIZE.to_be_bytes());
@@ -636,7 +691,7 @@ impl LocalStorage {
             aad.extend_from_slice(&s.base_nonce);
             aad.extend_from_slice(s.user_id.as_bytes());
             aad.push(0x00);
-            aad.extend_from_slice(s.content_hash.as_bytes());
+            aad.extend_from_slice(s.aad_tag.as_bytes());
             aad.extend_from_slice(&s.chunk_index.to_be_bytes());
             aad.extend_from_slice(&expected_plaintext_len.to_be_bytes());
 
@@ -702,6 +757,68 @@ impl LocalStorage {
         .buffered(4);
 
         Ok((plaintext_size, range_len, Box::pin(stream)))
+    }
+
+    pub async fn stream_content(
+        &self,
+        user_id: String,
+        content_hash: String,
+        range_start: u64,
+        range_end: Option<u64>,
+    ) -> Result<(u64, u64, StorageStream), StorageIoError> {
+        let path = self.get_path(&user_id, &content_hash)?;
+        self.stream_from_path(&path, user_id, content_hash, range_start, range_end)
+            .await
+    }
+
+    pub async fn store_preview_encrypted(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+        data: &[u8],
+    ) -> Result<(), StorageIoError> {
+        let path = self.get_preview_path(user_id, content_hash)?;
+        let aad_tag = format!("{}.preview", content_hash);
+        let cursor = std::io::Cursor::new(data.to_vec());
+        self.store_to_path_internal(&path, user_id, &aad_tag, cursor, data.len() as u64, None)
+            .await
+    }
+
+    pub async fn read_preview_encrypted(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+    ) -> Result<Vec<u8>, StorageIoError> {
+        let path = self.get_preview_path(user_id, content_hash)?;
+        let aad_tag = format!("{}.preview", content_hash);
+        self.read_all_from_path(&path, user_id, &aad_tag).await
+    }
+
+    pub async fn store_video_preview_encrypted(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+        source: &Path,
+    ) -> Result<(), StorageIoError> {
+        let path = self.get_video_preview_path(user_id, content_hash)?;
+        let aad_tag = format!("{}.preview.mp4", content_hash);
+        let plaintext_size = fs::metadata(source).await?.len();
+        let in_file = fs::File::open(source).await?;
+        self.store_to_path_internal(&path, user_id, &aad_tag, in_file, plaintext_size, None)
+            .await
+    }
+
+    pub async fn stream_video_preview_encrypted(
+        &self,
+        user_id: &str,
+        content_hash: &str,
+        range_start: u64,
+        range_end: Option<u64>,
+    ) -> Result<(u64, u64, StorageStream), StorageIoError> {
+        let path = self.get_video_preview_path(user_id, content_hash)?;
+        let aad_tag = format!("{}.preview.mp4", content_hash);
+        self.stream_from_path(&path, user_id.to_string(), aad_tag, range_start, range_end)
+            .await
     }
 
     pub async fn stream_plain_file(

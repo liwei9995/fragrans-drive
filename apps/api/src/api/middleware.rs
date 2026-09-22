@@ -108,6 +108,30 @@ pub fn create_token_with_jti(
     })
 }
 
+use std::sync::LazyLock;
+use std::time::Duration;
+use moka::future::Cache;
+
+pub static USER_VERSION_CACHE: LazyLock<Cache<String, i32>> = LazyLock::new(|| {
+    Cache::builder()
+        .max_capacity(50_000)
+        .time_to_live(Duration::from_secs(60))
+        .build()
+});
+
+pub static SESSION_VALID_CACHE: LazyLock<Cache<String, bool>> = LazyLock::new(|| {
+    Cache::builder()
+        .max_capacity(100_000)
+        .time_to_live(Duration::from_secs(60))
+        .build()
+});
+
+pub async fn invalidate_auth_cache_for_user(user_id: &str) {
+    USER_VERSION_CACHE.invalidate(user_id).await;
+    let prefix = format!("{}:", user_id);
+    let _ = SESSION_VALID_CACHE.invalidate_entries_if(move |k, _| k.starts_with(&prefix));
+}
+
 pub async fn auth_guard(
     State(state): State<AppState>,
     mut req: Request,
@@ -138,19 +162,47 @@ pub async fn auth_guard(
 
     let token_version = claims.token_version.ok_or(StatusCode::UNAUTHORIZED)?;
     let jti = claims.jti.as_deref().ok_or(StatusCode::UNAUTHORIZED)?;
-    let repo = crate::infrastructure::db::user_repo::UserRepository::new(&state.db);
-    let id = mongodb::bson::oid::ObjectId::parse_str(&claims.user_id)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    match repo.find_by_id(id).await {
-        Ok(Some(u)) if u.token_version == token_version => {}
-        _ => return Err(StatusCode::UNAUTHORIZED),
+
+    // 1. Check user token_version with cache
+    let db_version = if let Some(v) = USER_VERSION_CACHE.get(&claims.user_id).await {
+        v
+    } else {
+        let repo = crate::infrastructure::db::user_repo::UserRepository::new(&state.db);
+        let id = mongodb::bson::oid::ObjectId::parse_str(&claims.user_id)
+            .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        match repo.find_by_id(id).await {
+            Ok(Some(u)) => {
+                USER_VERSION_CACHE
+                    .insert(claims.user_id.clone(), u.token_version)
+                    .await;
+                u.token_version
+            }
+            _ => return Err(StatusCode::UNAUTHORIZED),
+        }
+    };
+
+    if db_version != token_version {
+        return Err(StatusCode::UNAUTHORIZED);
     }
-    let sessions =
-        crate::infrastructure::db::refresh_session_repo::RefreshSessionRepository::new(&state.db);
-    if !matches!(
-        sessions.exists(&claims.user_id, jti, token_version).await,
-        Ok(true)
-    ) {
+
+    // 2. Check session validity with cache
+    let session_key = format!("{}:{}:{}", claims.user_id, jti, token_version);
+    let session_valid = if let Some(valid) = SESSION_VALID_CACHE.get(&session_key).await {
+        valid
+    } else {
+        let sessions =
+            crate::infrastructure::db::refresh_session_repo::RefreshSessionRepository::new(&state.db);
+        let valid = matches!(
+            sessions.exists(&claims.user_id, jti, token_version).await,
+            Ok(true)
+        );
+        if valid {
+            SESSION_VALID_CACHE.insert(session_key, true).await;
+        }
+        valid
+    };
+
+    if !session_valid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 

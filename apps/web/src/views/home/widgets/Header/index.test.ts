@@ -2,10 +2,14 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import Header from './index.vue'
 
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-  useRoute: () => ({ params: { id: 'root' }, query: {}, path: '/' }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+    useRoute: () => ({ params: { id: 'root' }, query: {}, path: '/' }),
+  }
+})
 
 describe('Header', () => {
   it('renders correctly', () => {

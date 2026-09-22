@@ -60,114 +60,20 @@ const fetchMarkdown = async () => {
   }
 }
 
-// Lightweight, safe, zero-dependency Markdown to HTML parser
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
+
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+})
+
 const renderedHtml = computed(() => {
   if (!markdownText.value) return ''
-
-  let text = markdownText.value
-
-  // 1. Escape HTML text and attribute delimiters before adding markup.
-  text = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-
-  // 2. Fenced Code blocks ```lang\ncode\n```
-  text = text.replace(
-    /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g,
-    (_, lang, code) => {
-      return `<div class="md-code-block"><div class="code-header"><span class="lang">${lang || 'code'}</span></div><pre class="code-body"><code>${code.trim()}</code></pre></div>`
-    },
-  )
-
-  // 3. Inline code `code`
-  text = text.replace(/`([^`\n]+)`/g, '<code class="md-inline-code">$1</code>')
-
-  // 4. Headings (# H1 to ###### H6)
-  text = text.replace(/^######\s+(.*$)/gim, '<h6 class="md-h6">$1</h6>')
-  text = text.replace(/^#####\s+(.*$)/gim, '<h5 class="md-h5">$1</h5>')
-  text = text.replace(/^####\s+(.*$)/gim, '<h4 class="md-h4">$1</h4>')
-  text = text.replace(/^###\s+(.*$)/gim, '<h3 class="md-h3">$1</h3>')
-  text = text.replace(/^##\s+(.*$)/gim, '<h2 class="md-h2">$1</h2>')
-  text = text.replace(/^#\s+(.*$)/gim, '<h1 class="md-h1">$1</h1>')
-
-  // 5. Horizontal rule
-  text = text.replace(/^---$/gim, '<hr class="md-hr" />')
-
-  // 6. Blockquote
-  text = text.replace(
-    /^&gt;\s+(.*$)/gim,
-    '<blockquote class="md-quote">$1</blockquote>',
-  )
-
-  // 7. Checkboxes
-  text = text.replace(
-    /^- \[x\]\s+(.*$)/gim,
-    '<div class="md-task-item"><span class="check-box checked">☑</span> $1</div>',
-  )
-  text = text.replace(
-    /^- \[ \]\s+(.*$)/gim,
-    '<div class="md-task-item"><span class="check-box">☐</span> $1</div>',
-  )
-
-  // 8. Lists (- item or * item)
-  text = text.replace(/^\s*[-*]\s+(.*$)/gim, '<li class="md-li">$1</li>')
-
-  // 9. Bold & Italic
-  text = text.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
-  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>')
-  text = text.replace(/~~(.*?)~~/g, '<del>$1</del>')
-
-  // 10. Links [title](url)
-  text = text.replace(
-    /\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>',
-  )
-
-  // 11. Tables (| col1 | col2 |\n|---|---|\n| val1 | val2 |)
-  text = text.replace(
-    /(?:^|\n)(\|.+?\|\r?\n\|[-:\s|]+?\|\r?\n(?:\|.+?\|\r?\n?)+)/g,
-    (match) => {
-      const lines = match.trim().split(/\r?\n/)
-      if (lines.length < 3) return match
-      const headerCells = lines[0]
-        .split('|')
-        .slice(1, -1)
-        .map((c) => c.trim())
-      const bodyRows = lines.slice(2).map((line) =>
-        line
-          .split('|')
-          .slice(1, -1)
-          .map((c) => c.trim()),
-      )
-      const headerHtml = `<thead><tr>${headerCells.map((c) => `<th>${c}</th>`).join('')}</tr></thead>`
-      const bodyHtml = `<tbody>${bodyRows.map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>`
-      return `\n<div class="md-table-wrapper"><table class="md-table">${headerHtml}${bodyHtml}</table></div>\n`
-    },
-  )
-
-  // 12. Paragraphs (split by double newlines)
-  const paragraphs = text.split(/\n\n+/)
-  return paragraphs
-    .map((p) => {
-      const trimmed = p.trim()
-      if (!trimmed) return ''
-      if (
-        trimmed.startsWith('<h') ||
-        trimmed.startsWith('<div') ||
-        trimmed.startsWith('<blockquote') ||
-        trimmed.startsWith('<hr') ||
-        trimmed.startsWith('<li') ||
-        trimmed.startsWith('<table')
-      ) {
-        return trimmed
-      }
-      return `<p class="md-p">${trimmed.replace(/\n/g, '<br/>')}</p>`
-    })
-    .join('\n')
+  const parsed = marked.parse(markdownText.value) as string
+  return DOMPurify.sanitize(parsed, {
+    ADD_ATTR: ['target', 'rel'],
+  })
 })
 
 const handleCopy = async () => {
@@ -436,7 +342,7 @@ onMounted(fetchMarkdown)
 
 // Markdown Rendered Typography Styles
 :deep(.markdown-body) {
-  .md-h1 {
+  h1, .md-h1 {
     font-size: 28px;
     font-weight: 700;
     color: #f8fafc;
@@ -444,7 +350,7 @@ onMounted(fetchMarkdown)
     padding-bottom: 8px;
     margin: 28px 0 16px;
   }
-  .md-h2 {
+  h2, .md-h2 {
     font-size: 22px;
     font-weight: 600;
     color: #f1f5f9;
@@ -452,27 +358,27 @@ onMounted(fetchMarkdown)
     padding-bottom: 6px;
     margin: 24px 0 14px;
   }
-  .md-h3 {
+  h3, .md-h3 {
     font-size: 18px;
     font-weight: 600;
     color: #e2e8f0;
     margin: 20px 0 12px;
   }
-  .md-h4, .md-h5, .md-h6 {
+  h4, .md-h4, h5, .md-h5, h6, .md-h6 {
     font-size: 15px;
     font-weight: 600;
     color: #cbd5e1;
     margin: 16px 0 10px;
   }
-  .md-p {
+  p, .md-p {
     margin: 0 0 14px;
   }
-  .md-hr {
+  hr, .md-hr {
     border: none;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     margin: 24px 0;
   }
-  .md-quote {
+  blockquote, .md-quote {
     border-left: 4px solid var(--c-primary, #008ffd);
     background: rgba(0, 143, 253, 0.08);
     padding: 8px 16px;
@@ -480,8 +386,11 @@ onMounted(fetchMarkdown)
     color: #cbd5e1;
     border-radius: 0 4px 4px 0;
   }
-  .md-li {
-    margin-left: 20px;
+  ul, ol {
+    margin: 0 0 14px;
+    padding-left: 24px;
+  }
+  li, .md-li {
     margin-bottom: 6px;
   }
   .md-task-item {
@@ -497,7 +406,7 @@ onMounted(fetchMarkdown)
       }
     }
   }
-  .md-link {
+  a, .md-link {
     color: var(--c-primary-light, #33a5fd);
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -505,7 +414,7 @@ onMounted(fetchMarkdown)
       color: #66bdfe;
     }
   }
-  .md-inline-code {
+  code:not(pre code), .md-inline-code {
     background: rgba(255, 255, 255, 0.1);
     color: #f472b6;
     padding: 2px 6px;
@@ -513,12 +422,24 @@ onMounted(fetchMarkdown)
     font-size: 13px;
     font-family: monospace;
   }
-  .md-code-block {
+  pre, .md-code-block {
     margin: 16px 0;
+    padding: 14px 16px;
     border-radius: 8px;
     background: #090d16;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    overflow: hidden;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #e2e8f0;
+    font-family: monospace;
+
+    code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
 
     .code-header {
       padding: 6px 14px;
@@ -532,12 +453,53 @@ onMounted(fetchMarkdown)
 
     .code-body {
       margin: 0;
-      padding: 14px 16px;
+      padding: 0;
       overflow-x: auto;
       font-size: 13px;
       line-height: 1.6;
       color: #e2e8f0;
       font-family: monospace;
+    }
+  }
+
+  table, .md-table {
+    width: 100%;
+    margin: 18px 0;
+    border-collapse: collapse;
+    font-size: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+
+    thead {
+      background: rgba(255, 255, 255, 0.06);
+
+      th {
+        padding: 10px 14px;
+        text-align: left;
+        font-weight: 600;
+        color: #f8fafc;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+      }
+    }
+
+    tbody {
+      tr {
+        &:nth-child(even) {
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        &:hover {
+          background: rgba(0, 143, 253, 0.08);
+        }
+
+        td {
+          padding: 8px 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          border-right: 1px solid rgba(255, 255, 255, 0.05);
+        }
+      }
     }
   }
 

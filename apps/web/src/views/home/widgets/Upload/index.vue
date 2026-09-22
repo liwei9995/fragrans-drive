@@ -1,5 +1,4 @@
 <script setup lang="ts" name="upload">
-import axios from 'axios'
 import type {
   UploadInstance,
   UploadProps,
@@ -8,6 +7,7 @@ import type {
 import { ElMessage } from 'element-plus'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { uploadChunk, uploadComplete, uploadInit } from '@/api/modules/storage'
 import { GlobalStore } from '@/store'
 import { calculateFileHash } from '@/utils/fileHash'
 
@@ -82,24 +82,57 @@ const customUploadRequest = async (options: UploadRequestOptions) => {
       onProgress({ percent: percent * 0.1 } as any)
     })
 
-    const formData = new FormData()
-    formData.append('parentId', uploadPayload.value.parentId)
-    formData.append('hash', fileHash)
-    formData.append('size', file.size.toString())
-    formData.append(options.filename || 'file', file)
+    const CHUNK_SIZE = 5 * 1024 * 1024
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE) || 1
 
-    const response = await axios.post(storageAction.value, formData, {
-      headers: uploadHeaders.value,
-      onUploadProgress: (progressEvent) => {
-        const { loaded, total } = progressEvent
-        if (total) {
-          const percent = 10 + Math.round((loaded / total) * 90)
-          onProgress({ percent } as any)
-        }
-      },
+    const initRes = await uploadInit({
+      parentId: uploadPayload.value.parentId,
+      name: file.name,
+      hash: fileHash,
+      size: file.size,
+      chunkSize: CHUNK_SIZE,
+      totalChunks,
     })
 
-    onSuccess(response.data)
+    if (initRes.completed) {
+      onProgress({ percent: 100 } as any)
+      onSuccess(initRes)
+      return
+    }
+
+    const { uploadId, uploadedChunks } = initRes
+    const uploadedSet = new Set(uploadedChunks || [])
+
+    for (let i = 0; i < totalChunks; i++) {
+      if (uploadedSet.has(i)) {
+        const percent = 10 + Math.round(((i + 1) / totalChunks) * 85)
+        onProgress({ percent } as any)
+        continue
+      }
+
+      const start = i * CHUNK_SIZE
+      const end = Math.min(file.size, (i + 1) * CHUNK_SIZE)
+      const chunkBlob = file.slice(start, end)
+
+      const chunkFormData = new FormData()
+      chunkFormData.append('uploadId', uploadId)
+      chunkFormData.append('chunkIndex', i.toString())
+      chunkFormData.append('chunk', chunkBlob, `${i}.part`)
+
+      await uploadChunk(chunkFormData, (progressEvent) => {
+        const { loaded, total } = progressEvent
+        if (total) {
+          const chunkFraction = loaded / total
+          const overallProgress = (i + chunkFraction) / totalChunks
+          const percent = 10 + Math.round(overallProgress * 85)
+          onProgress({ percent } as any)
+        }
+      })
+    }
+
+    const completeRes = await uploadComplete({ uploadId })
+    onProgress({ percent: 100 } as any)
+    onSuccess(completeRes)
   } catch (error) {
     onError(error as any)
   }

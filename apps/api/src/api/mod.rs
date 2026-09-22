@@ -39,7 +39,11 @@ pub struct AppState {
         users::update_password,
         users::update_profile,
         users::get_profile,
+        users::get_avatar,
         storage::upload_file,
+        storage::upload_init,
+        storage::upload_chunk,
+        storage::upload_complete,
         storage::create_folder,
         storage::get_files,
         storage::get_trashed_files,
@@ -63,6 +67,7 @@ pub struct AppState {
             users::AuthConfigResponse, users::CaptchaResponse, users::SendEmailCodeDto, users::ResetPasswordDto,
             users::CreateUserDto, users::UpdateUserDto, users::UpdatePasswordDto, users::LoginDto, users::LoginResponse, users::CreateUserResponse,
             storage::CreateFolderDto, storage::GetFilesDto, storage::GetPathDto, storage::MoveFileDto, storage::RestoreTrashDto, storage::DeleteTrashDto, storage::SetPublicStatusDto, storage::PublicStatusResponse, storage::StorageUsageResponse,
+            storage::UploadInitDto, storage::UploadInitResponse, storage::ChunkUploadResponse, storage::UploadCompleteDto, storage::UploadCompleteResponse,
             crate::domain::user::User, crate::domain::user::UserResponse, crate::domain::storage::Storage, crate::domain::storage::StorageListResponse, crate::domain::storage::StorageListPaginatedResponse, crate::domain::storage::StoragePathNode, crate::domain::storage::CreateFolderResponse, crate::domain::storage::UpdateStorageResponse, crate::domain::storage::TrashCleanupResponse, crate::domain::storage::TrashRestoreResponse,
             middleware::UserContext
         )
@@ -254,6 +259,7 @@ pub fn router_with_auth_security(
                 rate_limit::rate_limit_middleware,
             )),
         )
+        .route("/{id}/avatar", axum::routing::get(users::get_avatar))
         .with_state(state.clone());
 
     let user_routes_protected = Router::new()
@@ -271,6 +277,10 @@ pub fn router_with_auth_security(
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.max_upload_bytes,
         ))
+        .route("/upload/init", axum::routing::post(storage::upload_init))
+        .route("/upload/chunk", axum::routing::post(storage::upload_chunk))
+        .layer(axum::extract::DefaultBodyLimit::max(100 * 1024 * 1024))
+        .route("/upload/complete", axum::routing::post(storage::upload_complete))
         .route("/folder", axum::routing::post(storage::create_folder))
         .route("/list", axum::routing::post(storage::get_files))
         .route(

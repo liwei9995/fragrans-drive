@@ -16,7 +16,7 @@ use crate::domain::user::PasskeyInfo;
 use crate::infrastructure::db::{
     refresh_session_repo::RefreshSessionRepository, user_repo::UserRepository,
 };
-use crate::utils::crypto::verify_password;
+use crate::utils::crypto::verify_password_async;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct WebauthnLoginStartDto {
@@ -232,7 +232,7 @@ pub async fn register_start(
         .find_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
-    if !verify_password(&payload.password, &user.password) {
+    if !verify_password_async(payload.password, user.password.clone()).await {
         return Err(AppError::Unauthorized("Incorrect password".to_string()));
     }
 
@@ -320,7 +320,7 @@ pub async fn delete_passkey(
         .find_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
-    if !verify_password(&payload.password, &user.password) {
+    if !verify_password_async(payload.password, user.password).await {
         return Err(AppError::Unauthorized("Incorrect password".to_string()));
     }
     if !repo.delete_passkey(id, &passkey_id).await? {
@@ -329,6 +329,7 @@ pub async fn delete_passkey(
     RefreshSessionRepository::new(&state.db)
         .delete_all_for_user(&user_ctx.user_id)
         .await?;
+    crate::api::middleware::invalidate_auth_cache_for_user(&user_ctx.user_id).await;
 
     Ok(StatusCode::NO_CONTENT)
 }

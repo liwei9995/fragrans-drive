@@ -2,8 +2,8 @@ use crate::api::AppState;
 use crate::api::error::AppError;
 use crate::api::middleware::{Claims, TokenPurpose, UserContext};
 use crate::domain::storage::{
-    CreateFolderResponse, StorageListPaginatedResponse, StorageListResponse, StoragePathNode,
-    TrashCleanupResponse, TrashRestoreResponse, UpdateStorageResponse,
+    CreateFolderResponse, Storage, StorageListPaginatedResponse, StorageListResponse,
+    StoragePathNode, StorageType, TrashCleanupResponse, TrashRestoreResponse, UpdateStorageResponse,
 };
 use crate::infrastructure::db::storage_repo::StorageRepository;
 use crate::service::storage::StorageService;
@@ -35,6 +35,7 @@ pub struct StorageQueryDto {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateStorageDto {
     pub name: String,
     #[serde(rename = "parentId", default)]
@@ -510,6 +511,413 @@ pub async fn upload_file(
     }
 
     Ok(Json(uploaded_ids))
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UploadInitDto {
+    #[serde(rename = "parentId")]
+    pub parent_id: String,
+    pub name: String,
+    pub hash: String,
+    pub size: i64,
+    #[serde(rename = "chunkSize", default = "default_chunk_size")]
+    pub chunk_size: usize,
+    #[serde(rename = "totalChunks")]
+    pub total_chunks: usize,
+}
+
+fn default_chunk_size() -> usize {
+    5 * 1024 * 1024
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UploadInitResponse {
+    #[serde(rename = "uploadId")]
+    pub upload_id: String,
+    #[serde(rename = "uploadedChunks")]
+    pub uploaded_chunks: Vec<usize>,
+    pub completed: bool,
+    #[serde(rename = "fileId", skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UploadMeta {
+    pub user_id: String,
+    pub parent_id: String,
+    pub name: String,
+    pub hash: String,
+    pub size: i64,
+    pub chunk_size: usize,
+    pub total_chunks: usize,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ChunkUploadResponse {
+    pub success: bool,
+    #[serde(rename = "chunkIndex")]
+    pub chunk_index: usize,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UploadCompleteDto {
+    #[serde(rename = "uploadId")]
+    pub upload_id: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UploadCompleteResponse {
+    pub id: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/upload/init",
+    request_body = UploadInitDto,
+    responses(
+        (status = 200, description = "Upload initialized", body = UploadInitResponse)
+    ),
+    tag = "storage",
+    security(("bearer_auth" = []))
+)]
+#[axum::debug_handler(state = AppState)]
+pub async fn upload_init(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Json(dto): Json<UploadInitDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let service = StorageService::new(repo.clone(), state.local_storage.clone());
+
+    let name = service.validate_name(&dto.name)?;
+    service.validate_parent(&dto.parent_id, &user_ctx.user_id, None).await?;
+
+    if dto.size > state.config.max_upload_bytes as i64 {
+        return Err(AppError::PayloadTooLarge(format!(
+            "File exceeds limit of {} bytes",
+            state.config.max_upload_bytes
+        )));
+    }
+
+    if dto.hash.len() != 64 || !dto.hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(AppError::BadRequest("Invalid SHA-256 hash".into()));
+    }
+
+    if dto.total_chunks == 0 {
+        return Err(AppError::BadRequest("totalChunks must be greater than 0".into()));
+    }
+
+    // 1. Check if file already exists in same parent folder
+    let existing = repo
+        .find_one(doc! {
+            "contentHash": &dto.hash,
+            "userId": &user_ctx.user_id,
+            "parentId": &dto.parent_id,
+            "type": "file",
+            "trashed": false,
+        })
+        .await?;
+
+    if let Some(doc) = existing && let Some(id) = doc.id {
+        return Ok(Json(UploadInitResponse {
+            upload_id: String::new(),
+            uploaded_chunks: Vec::new(),
+            completed: true,
+            file_id: Some(id.to_hex()),
+        }));
+    }
+
+    // 2. Check if content already exists in storage for this user (instant upload / 秒传)
+    if state.local_storage.exists(&user_ctx.user_id, &dto.hash).await.unwrap_or(false) {
+        let mut thumbnail = None;
+        if let Ok(Some(first_file)) = repo.find_one(doc! { "contentHash": &dto.hash, "thumbnail": { "$ne": null } }).await {
+            thumbnail = first_file.thumbnail;
+        }
+
+        let storage_item = Storage {
+            id: None,
+            name: name.clone(),
+            base_name: Some(
+                std::path::Path::new(&name)
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
+            ext_name: Some(
+                std::path::Path::new(&name)
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+            mime_type: None,
+            encoding: None,
+            size: Some(dto.size),
+            md5_hash: None,
+            iv: None,
+            content_hash: Some(dto.hash.clone()),
+            hash_algorithm: Some("sha256".to_string()),
+            encryption_format: Some(1),
+            share_version: 0,
+            is_public: false,
+            public_slug: None,
+            public_expires_at: None,
+            public_access_count: Some(0),
+            last_public_accessed_at: None,
+            parent_id: dto.parent_id.clone(),
+            r#type: StorageType::File,
+            user_id: user_ctx.user_id.clone(),
+            thumbnail,
+            trashed: false,
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
+        };
+
+        let file_id = repo.create(storage_item).await?;
+        return Ok(Json(UploadInitResponse {
+            upload_id: String::new(),
+            uploaded_chunks: Vec::new(),
+            completed: true,
+            file_id: Some(file_id.to_hex()),
+        }));
+    }
+
+    // 3. Resumable upload session
+    let upload_id = format!("{}_{}", user_ctx.user_id, dto.hash);
+    let temp_upload_path = state
+        .local_storage
+        .get_temp_upload_path(&upload_id)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+    tokio::fs::create_dir_all(&temp_upload_path)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    let meta = UploadMeta {
+        user_id: user_ctx.user_id.clone(),
+        parent_id: dto.parent_id.clone(),
+        name: name.clone(),
+        hash: dto.hash.clone(),
+        size: dto.size,
+        chunk_size: dto.chunk_size,
+        total_chunks: dto.total_chunks,
+    };
+
+    let meta_json = serde_json::to_string(&meta)
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+    tokio::fs::write(temp_upload_path.join("meta.json"), meta_json)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    let mut uploaded_chunks = Vec::new();
+    for i in 0..dto.total_chunks {
+        let chunk_path = temp_upload_path.join(format!("{}.part", i));
+        if chunk_path.exists() {
+            uploaded_chunks.push(i);
+        }
+    }
+
+    Ok(Json(UploadInitResponse {
+        upload_id,
+        uploaded_chunks,
+        completed: false,
+        file_id: None,
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/upload/chunk",
+    request_body(content = Vec<u8>, content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Chunk uploaded successfully", body = ChunkUploadResponse)
+    ),
+    tag = "storage",
+    security(("bearer_auth" = []))
+)]
+#[axum::debug_handler(state = AppState)]
+pub async fn upload_chunk(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    multipart_res: Result<Multipart, axum::extract::multipart::MultipartRejection>,
+) -> Result<impl IntoResponse, AppError> {
+    let mut multipart = multipart_res.map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let mut upload_id = None;
+    let mut chunk_index = None;
+    let mut chunk_data = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?
+    {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "uploadId" {
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
+            upload_id = Some(String::from_utf8_lossy(&bytes).trim().to_string());
+        } else if name == "chunkIndex" {
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let idx_str = String::from_utf8_lossy(&bytes);
+            chunk_index = idx_str.trim().parse::<usize>().ok();
+        } else if name == "chunk" || name == "file" {
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
+            chunk_data = Some(bytes);
+        }
+    }
+
+    let upload_id = upload_id.ok_or_else(|| AppError::BadRequest("Missing uploadId".into()))?;
+    let chunk_index = chunk_index.ok_or_else(|| AppError::BadRequest("Missing chunkIndex".into()))?;
+    let chunk_data = chunk_data.ok_or_else(|| AppError::BadRequest("Missing chunk data".into()))?;
+
+    let temp_upload_path = state
+        .local_storage
+        .get_temp_upload_path(&upload_id)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+    if !temp_upload_path.exists() {
+        return Err(AppError::NotFound("Upload session not found".into()));
+    }
+
+    let meta_path = temp_upload_path.join("meta.json");
+    let meta_content = tokio::fs::read_to_string(&meta_path)
+        .await
+        .map_err(|_| AppError::NotFound("Upload session meta not found".into()))?;
+    let meta: UploadMeta = serde_json::from_str(&meta_content)
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    if meta.user_id != user_ctx.user_id {
+        return Err(AppError::Unauthorized(
+            "Access denied to upload session".into(),
+        ));
+    }
+
+    if chunk_index >= meta.total_chunks {
+        return Err(AppError::BadRequest("chunkIndex out of range".into()));
+    }
+
+    let chunk_file_path = temp_upload_path.join(format!("{}.part", chunk_index));
+    tokio::fs::write(&chunk_file_path, &chunk_data)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    Ok(Json(ChunkUploadResponse {
+        success: true,
+        chunk_index,
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/storage/upload/complete",
+    request_body = UploadCompleteDto,
+    responses(
+        (status = 200, description = "Upload completed and merged", body = UploadCompleteResponse)
+    ),
+    tag = "storage",
+    security(("bearer_auth" = []))
+)]
+#[axum::debug_handler(state = AppState)]
+pub async fn upload_complete(
+    State(state): State<AppState>,
+    user_ctx: UserContext,
+    Json(dto): Json<UploadCompleteDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let repo = StorageRepository::new(&state.db);
+    let service = StorageService::new(repo.clone(), state.local_storage.clone());
+
+    let temp_upload_path = state
+        .local_storage
+        .get_temp_upload_path(&dto.upload_id)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+    if !temp_upload_path.exists() {
+        return Err(AppError::NotFound("Upload session not found".into()));
+    }
+
+    let meta_path = temp_upload_path.join("meta.json");
+    let meta_content = tokio::fs::read_to_string(&meta_path)
+        .await
+        .map_err(|_| AppError::NotFound("Upload session meta not found".into()))?;
+    let meta: UploadMeta = serde_json::from_str(&meta_content)
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    if meta.user_id != user_ctx.user_id {
+        return Err(AppError::Unauthorized(
+            "Access denied to upload session".into(),
+        ));
+    }
+
+    for i in 0..meta.total_chunks {
+        let chunk_file = temp_upload_path.join(format!("{}.part", i));
+        if !chunk_file.exists() {
+            return Err(AppError::BadRequest(format!("Missing chunk {}", i)));
+        }
+    }
+
+    let temp_merged_file = tempfile::NamedTempFile::new()
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+    let std_file = temp_merged_file
+        .as_file()
+        .try_clone()
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+    let mut async_file = tokio::fs::File::from_std(std_file);
+
+    let mut hasher = sha2::Sha256::new();
+    use sha2::Digest;
+    let mut total_bytes = 0i64;
+
+    for i in 0..meta.total_chunks {
+        let chunk_file = temp_upload_path.join(format!("{}.part", i));
+        let chunk_bytes = tokio::fs::read(&chunk_file)
+            .await
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+        hasher.update(&chunk_bytes);
+        tokio::io::AsyncWriteExt::write_all(&mut async_file, &chunk_bytes)
+            .await
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+        total_bytes += chunk_bytes.len() as i64;
+    }
+
+    tokio::io::AsyncWriteExt::flush(&mut async_file)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    let actual_hash = hex::encode(hasher.finalize());
+    if actual_hash != meta.hash {
+        return Err(AppError::BadRequest(format!(
+            "Hash mismatch: expected {}, got {}",
+            meta.hash, actual_hash
+        )));
+    }
+
+    let id = service
+        .upload_file_chunk(
+            &user_ctx.user_id,
+            &meta.parent_id,
+            &meta.name,
+            "application/octet-stream",
+            &temp_merged_file.path().to_path_buf(),
+            &meta.hash,
+            total_bytes,
+        )
+        .await?;
+
+    let _ = tokio::fs::remove_dir_all(&temp_upload_path).await;
+
+    Ok(Json(UploadCompleteResponse { id }))
 }
 
 #[utoipa::path(

@@ -18,6 +18,13 @@ export const authLogout = () =>
     { withCredentials: true },
   )
 
+export const authRefresh = () =>
+  axios.post<Login.ResLogin>(
+    `${import.meta.env.VITE_API_URL}/${PORT}/auth/refresh`,
+    {},
+    { withCredentials: true },
+  )
+
 // Get auth configuration (registration allowed, email verification, captcha required, etc.)
 export const getAuthConfig = () => {
   return http.get<Auth.AuthConfig>(`${PORT}/auth/config`)

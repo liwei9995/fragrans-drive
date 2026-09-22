@@ -56,6 +56,21 @@ pub async fn ensure_video_preview(
         return Ok(());
     }
 
+    // Skip transcoding for files larger than 2GB to protect disk and CPU
+    if let Some(hash) = content_hash {
+        if let Ok(size) = local_storage.get_plaintext_size(user_id, hash).await {
+            if size > 2 * 1024 * 1024 * 1024 {
+                tracing::info!(
+                    user_id = %user_id,
+                    content_hash = %hash,
+                    size = %size,
+                    "Video exceeds 2GB, skipping background 720p transcode"
+                );
+                return Ok(());
+            }
+        }
+    }
+
     {
         let mut in_progress = IN_PROGRESS_TRANSCODES
             .lock()
@@ -125,7 +140,7 @@ pub async fn ensure_video_preview(
         preview_path.with_extension(format!("tmp_{}.mp4", uuid::Uuid::new_v4()));
     let _output_guard = TempFileGuard(temp_output_path.clone());
 
-    let output = tokio::process::Command::new("ffmpeg")
+    let ffmpeg_fut = tokio::process::Command::new("ffmpeg")
         .arg("-y")
         .arg("-v")
         .arg("error")
@@ -152,20 +167,30 @@ pub async fn ensure_video_preview(
         .arg("-movflags")
         .arg("+faststart")
         .arg(&temp_output_path)
-        .output()
-        .await;
+        .output();
+
+    let output = tokio::time::timeout(std::time::Duration::from_secs(600), ffmpeg_fut)
+        .await
+        .map_err(|_| "ffmpeg transcode timed out after 600 seconds".to_string())?;
 
     match output {
         Ok(out) if out.status.success() => {
-            if let Some(parent) = preview_path.parent() {
-                let _ = tokio::fs::create_dir_all(parent).await;
+            if let Some(hash) = content_hash {
+                local_storage
+                    .store_video_preview_encrypted(user_id, hash, &temp_output_path)
+                    .await
+                    .map_err(|e| format!("Failed to encrypt preview file: {}", e))?;
+            } else {
+                if let Some(parent) = preview_path.parent() {
+                    let _ = tokio::fs::create_dir_all(parent).await;
+                }
+                tokio::fs::rename(&temp_output_path, &preview_path)
+                    .await
+                    .map_err(|e| format!("Failed to rename preview file: {}", e))?;
             }
-            tokio::fs::rename(&temp_output_path, &preview_path)
-                .await
-                .map_err(|e| format!("Failed to rename preview file: {}", e))?;
             tracing::info!(
                 path = %preview_path.display(),
-                "Video preview generated successfully"
+                "Video preview generated and stored successfully"
             );
             Ok(())
         }

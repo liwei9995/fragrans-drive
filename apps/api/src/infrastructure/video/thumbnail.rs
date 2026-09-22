@@ -29,7 +29,7 @@ async fn run_ffmpeg_thumbnail(video_path: &Path, timestamp: &str) -> Result<Vec<
         std::env::temp_dir().join(format!("fragrans_vthumb_{}.jpg", uuid::Uuid::new_v4()));
     let _guard = TempFileGuard(temp_thumb_path.clone());
 
-    let status = tokio::process::Command::new("ffmpeg")
+    let cmd = tokio::process::Command::new("ffmpeg")
         .arg("-y")
         .arg("-v")
         .arg("error")
@@ -44,8 +44,11 @@ async fn run_ffmpeg_thumbnail(video_path: &Path, timestamp: &str) -> Result<Vec<
         .arg("-q:v")
         .arg("2")
         .arg(&temp_thumb_path)
-        .status()
+        .status();
+
+    let status = tokio::time::timeout(std::time::Duration::from_secs(30), cmd)
         .await
+        .map_err(|_| AppError::InternalError("ffmpeg thumbnail timed out".into()))?
         .map_err(|e| AppError::InternalError(format!("Failed to execute ffmpeg: {}", e)))?;
 
     if !status.success() || !temp_thumb_path.exists() {

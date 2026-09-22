@@ -4,9 +4,9 @@ use crate::api::middleware::{Claims, TokenPurpose, UserContext, create_token_wit
 use crate::domain::user::{User, UserResponse};
 use crate::infrastructure::db::refresh_session_repo::RefreshSessionRepository;
 use crate::infrastructure::db::user_repo::UserRepository;
-use crate::utils::crypto::{hash_password, verify_password};
+use crate::utils::crypto::{hash_password_async, verify_password_async};
 use axum::{
-    extract::{Json, State},
+    extract::{Json, Path, State},
     http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
 };
@@ -232,14 +232,14 @@ pub async fn login(
     let user = match repo.find_by_email(&email).await? {
         Some(u) => u,
         None => {
-            let _ = verify_password(&payload.password, DUMMY_BCRYPT_HASH);
+            let _ = verify_password_async(payload.password, DUMMY_BCRYPT_HASH.to_string()).await;
             return Err(AppError::Unauthorized(
                 "Invalid email or password".to_string(),
             ));
         }
     };
 
-    if !verify_password(&payload.password, &user.password) {
+    if !verify_password_async(payload.password, user.password).await {
         return Err(AppError::Unauthorized(
             "Invalid email or password".to_string(),
         ));
@@ -352,6 +352,7 @@ pub async fn logout(
         RefreshSessionRepository::new(&state.db)
             .consume(&data.claims.user_id, jti, version)
             .await?;
+        crate::api::middleware::invalidate_auth_cache_for_user(&data.claims.user_id).await;
     }
     Ok((
         StatusCode::NO_CONTENT,
@@ -513,13 +514,14 @@ pub async fn reset_password(
         .id
         .ok_or_else(|| AppError::BadRequest("User ID missing".to_string()))?;
 
-    let hashed = hash_password(&payload.password);
+    let hashed = hash_password_async(payload.password).await;
     repo.update_password(user_id, &hashed).await?;
 
     // Invalidate and delete all refresh sessions for this user
     RefreshSessionRepository::new(&state.db)
         .delete_all_for_user(&user_id.to_hex())
         .await?;
+    crate::api::middleware::invalidate_auth_cache_for_user(&user_id.to_hex()).await;
 
     Ok((
         StatusCode::OK,
@@ -623,7 +625,7 @@ pub async fn create_user(
     let user = User {
         id: None,
         email,
-        password: hash_password(&payload.password),
+        password: hash_password_async(payload.password).await,
         first_name: first_name.to_string(),
         last_name: last_name.to_string(),
         gender: None,
@@ -700,10 +702,41 @@ pub async fn update_profile(
         if av.len() > 1024 * 1024 {
             return (StatusCode::BAD_REQUEST, "Invalid avatar").into_response();
         }
-        if av.trim().is_empty() {
+        let av_trimmed = av.trim();
+        if av_trimmed.is_empty() {
+            if let Ok(p) = state.local_storage.get_avatar_path(&user_ctx.user_id) {
+                let _ = tokio::fs::remove_file(p).await;
+            }
             update.insert("avatar", Bson::Null);
+        } else if let Some(base64_data) = av_trimmed.strip_prefix("data:image/") {
+            if let Some((_, encoded)) = base64_data.split_once(";base64,") {
+                use base64::Engine;
+                match base64::engine::general_purpose::STANDARD.decode(encoded) {
+                    Ok(bytes) => {
+                        if bytes.len() > 1024 * 1024 {
+                            return (StatusCode::BAD_REQUEST, "Avatar image exceeds 1MB").into_response();
+                        }
+                        if let Ok(p) = state.local_storage.get_avatar_path(&user_ctx.user_id) {
+                            if let Some(parent) = p.parent() {
+                                let _ = tokio::fs::create_dir_all(parent).await;
+                            }
+                            if let Err(e) = tokio::fs::write(&p, &bytes).await {
+                                tracing::error!("Failed to save avatar file: {}", e);
+                                return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save avatar").into_response();
+                            }
+                        }
+                        let avatar_url = format!("/v1/users/{}/avatar", user_ctx.user_id);
+                        update.insert("avatar", avatar_url);
+                    }
+                    Err(_) => {
+                        return (StatusCode::BAD_REQUEST, "Invalid base64 avatar data").into_response();
+                    }
+                }
+            } else {
+                update.insert("avatar", av_trimmed);
+            }
         } else {
-            update.insert("avatar", av);
+            update.insert("avatar", av_trimmed);
         }
         has_update = true;
     }
@@ -721,6 +754,48 @@ pub async fn update_profile(
             (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
         }
     }
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/users/{id}/avatar",
+    responses(
+        (status = 200, description = "Avatar image", content_type = "image/png"),
+        (status = 404, description = "Avatar not found")
+    ),
+    tag = "users"
+)]
+pub async fn get_avatar(
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let path = state
+        .local_storage
+        .get_avatar_path(&user_id)
+        .map_err(|_| AppError::BadRequest("Invalid user ID".into()))?;
+
+    if !path.exists() {
+        return Err(AppError::NotFound("Avatar not found".into()));
+    }
+
+    let bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    let mime_type = infer::get(&bytes)
+        .map(|t| t.mime_type())
+        .unwrap_or("image/png");
+
+    let response = axum::response::Response::builder()
+        .header(axum::http::header::CONTENT_TYPE, mime_type)
+        .header(
+            axum::http::header::CACHE_CONTROL,
+            "public, max-age=86400, stale-while-revalidate=3600",
+        )
+        .body(axum::body::Body::from(bytes))
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    Ok(response)
 }
 
 #[utoipa::path(
@@ -768,19 +843,20 @@ pub async fn update_password(
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    if !verify_password(&payload.old_password, &user.password) {
+    if !verify_password_async(payload.old_password, user.password).await {
         return Err(AppError::BadRequest(
             "Incorrect current password".to_string(),
         ));
     }
 
-    let hashed = hash_password(&payload.password);
+    let hashed = hash_password_async(payload.password).await;
     repo.update_password(id, &hashed).await?;
 
     // Invalidate and delete all refresh sessions for this user
     RefreshSessionRepository::new(&state.db)
         .delete_all_for_user(&user_ctx.user_id)
         .await?;
+    crate::api::middleware::invalidate_auth_cache_for_user(&user_ctx.user_id).await;
 
     Ok((StatusCode::OK, "Password updated"))
 }

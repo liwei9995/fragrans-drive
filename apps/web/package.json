@@ -15,8 +15,10 @@
     "@element-plus/icons-vue": "^2.3.2",
     "@simplewebauthn/browser": "^14.0.0",
     "axios": "^1.20.0",
+    "dompurify": "^3.4.15",
     "element-plus": "^2.14.6",
     "hash-wasm": "^4.12.0",
+    "marked": "^18.0.13",
     "pinia": "^4.0.3",
     "pinia-plugin-persistedstate": "^4.7.1",
     "vue": "^3.5.43",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@pinia/testing": "^2.0.1",
     "@playwright/test": "^1.63.0",
+    "@types/dompurify": "^3.2.0",
     "@vitejs/plugin-vue": "^6.0.9",
     "@vue/test-utils": "^2.5.1",
     "vite": "^8.3.0",

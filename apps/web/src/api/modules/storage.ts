@@ -103,3 +103,57 @@ export const deleteTrash = (params: Storage.TrashDeleteParams) => {
 export const getStorageUsage = () => {
   return http.get<Storage.StorageUsage>(`${PORT}/storage/usage`)
 }
+
+export interface UploadInitParams {
+  parentId: string
+  name: string
+  hash: string
+  size: number
+  chunkSize?: number
+  totalChunks: number
+}
+
+export interface UploadInitResult {
+  uploadId: string
+  uploadedChunks: number[]
+  completed: boolean
+  fileId?: string
+}
+
+export interface UploadChunkResult {
+  success: boolean
+  chunkIndex: number
+}
+
+export interface UploadCompleteParams {
+  uploadId: string
+}
+
+export interface UploadCompleteResult {
+  id: string
+}
+
+export const uploadInit = (params: UploadInitParams) => {
+  return http.post<UploadInitResult>(`${PORT}/storage/upload/init`, params)
+}
+
+export const uploadChunk = (
+  formData: FormData,
+  onUploadProgress?: (progressEvent: any) => void,
+) => {
+  return http.post<UploadChunkResult>(
+    `${PORT}/storage/upload/chunk`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
+    },
+  )
+}
+
+export const uploadComplete = (params: UploadCompleteParams) => {
+  return http.post<UploadCompleteResult>(
+    `${PORT}/storage/upload/complete`,
+    params,
+  )
+}

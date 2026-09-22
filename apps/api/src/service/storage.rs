@@ -24,7 +24,7 @@ impl StorageService {
         }
     }
 
-    fn validate_name(&self, name: &str) -> Result<String, AppError> {
+    pub fn validate_name(&self, name: &str) -> Result<String, AppError> {
         let name = name.trim();
         if name.is_empty()
             || name.chars().count() > 255
@@ -37,7 +37,7 @@ impl StorageService {
         Ok(name.to_string())
     }
 
-    async fn validate_parent(
+    pub async fn validate_parent(
         &self,
         parent_id: &str,
         user_id: &str,
@@ -433,6 +433,28 @@ impl StorageService {
             size
         };
 
+        let mut detected_mime_type = content_type.to_string();
+        let mut is_valid_image = false;
+        if let Ok(mut file) = tokio::fs::File::open(temp_file_path).await {
+            let mut buffer = [0u8; 512];
+            use tokio::io::AsyncReadExt;
+            if let Ok(n) = file.read(&mut buffer).await && n > 0 {
+                if let Some(inferred) = infer::get(&buffer[..n]) {
+                    let inf_mime = inferred.mime_type();
+                    if content_type == "application/octet-stream"
+                        || content_type.is_empty()
+                        || (content_type.starts_with("image/") && !inf_mime.starts_with("image/"))
+                        || (!content_type.starts_with("image/") && inf_mime.starts_with("image/"))
+                    {
+                        detected_mime_type = inf_mime.to_string();
+                    }
+                }
+                if infer::is_image(&buffer[..n]) {
+                    is_valid_image = true;
+                }
+            }
+        }
+
         let mut storage_item = Storage {
             id: None,
             name: name.clone(),
@@ -451,7 +473,7 @@ impl StorageService {
                     .unwrap_or("")
                     .to_string(),
             ),
-            mime_type: Some(content_type.to_string()),
+            mime_type: Some(detected_mime_type.clone()),
             encoding: None,
             size: Some(actual_size),
             md5_hash: None,
@@ -474,24 +496,11 @@ impl StorageService {
             updated_at: Some(Utc::now()),
         };
 
-        let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
-        let is_video = content_type.starts_with("video/");
+        let is_raster_image = detected_mime_type.starts_with("image/") && !detected_mime_type.contains("svg");
+        let is_video = detected_mime_type.starts_with("video/");
         let mut thumbnail_id = None;
 
-        let mut is_valid_image = false;
-        if is_raster_image {
-            let mut file = tokio::fs::File::open(temp_file_path).await?;
-            let mut buffer = [0; 512];
-            use tokio::io::AsyncReadExt;
-            if let Ok(n) = file.read(&mut buffer).await
-                && n > 0
-                && infer::is_image(&buffer[..n])
-            {
-                is_valid_image = true;
-            }
-        }
-
-        if is_valid_image {
+        if is_valid_image && is_raster_image {
             let data = tokio::fs::read(temp_file_path).await?;
             let thumb_data = tokio::task::spawn_blocking(move || generate_thumbnail(&data))
                 .await
@@ -526,7 +535,7 @@ impl StorageService {
                 .map_err(|error| AppError::InternalError(error.to_string()))?;
         }
 
-        if content_type.starts_with("video/") {
+        if detected_mime_type.starts_with("video/") {
             let local_storage = self.local_storage.clone();
             let u_id = user_id.to_string();
             let c_hash = hash.to_string();
@@ -578,6 +587,25 @@ impl StorageService {
             .await
             .map_err(|error| AppError::InternalError(error.to_string()))?;
 
+        use tokio::io::AsyncReadExt;
+        let mut header_buf = [0u8; 512];
+        let mut reader = reader;
+        let n = reader.read(&mut header_buf).await.unwrap_or(0);
+        let mut detected_mime_type = content_type.to_string();
+        if n > 0 {
+            if let Some(inferred) = infer::get(&header_buf[..n]) {
+                let inf_mime = inferred.mime_type();
+                if content_type == "application/octet-stream"
+                    || content_type.is_empty()
+                    || (content_type.starts_with("image/") && !inf_mime.starts_with("image/"))
+                    || (!content_type.starts_with("image/") && inf_mime.starts_with("image/"))
+                {
+                    detected_mime_type = inf_mime.to_string();
+                }
+            }
+        }
+        let reader = std::io::Cursor::new(header_buf[..n].to_vec()).chain(reader);
+
         let actual_size = if need_store {
             self.local_storage
                 .store_from_async_read(user_id, hash, reader, size as u64)
@@ -594,7 +622,7 @@ impl StorageService {
                 .unwrap_or(size)
         };
 
-        if content_type.starts_with("video/") {
+        if detected_mime_type.starts_with("video/") {
             let local_storage = self.local_storage.clone();
             let u_id = user_id.to_string();
             let c_hash = hash.to_string();
@@ -628,7 +656,7 @@ impl StorageService {
                     .unwrap_or("")
                     .to_string(),
             ),
-            mime_type: Some(content_type.to_string()),
+            mime_type: Some(detected_mime_type.clone()),
             encoding: None,
             size: Some(actual_size),
             md5_hash: None,
@@ -651,8 +679,8 @@ impl StorageService {
             updated_at: Some(Utc::now()),
         };
 
-        let is_raster_image = content_type.starts_with("image/") && !content_type.contains("svg");
-        let is_video = content_type.starts_with("video/");
+        let is_raster_image = detected_mime_type.starts_with("image/") && !detected_mime_type.contains("svg");
+        let is_video = detected_mime_type.starts_with("video/");
         let mut thumbnail_id = None;
 
         if is_raster_image {
@@ -838,10 +866,9 @@ impl StorageService {
                 .map_err(|e| AppError::InternalError(e.to_string()))?;
 
             if preview_path.exists() {
-                let bytes = tokio::fs::read(&preview_path)
-                    .await
-                    .map_err(|e| AppError::InternalError(e.to_string()))?;
-                return Ok((bytes, "image/jpeg".to_string()));
+                if let Ok(bytes) = self.local_storage.read_preview_encrypted(user_id, hash).await {
+                    return Ok((bytes, "image/jpeg".to_string()));
+                }
             }
 
             let orig_bytes = self
@@ -855,8 +882,12 @@ impl StorageService {
                     .await
                     .map_err(|e| AppError::InternalError(e.to_string()))??;
 
-            if let Err(e) = tokio::fs::write(&preview_path, &preview_bytes).await {
-                tracing::warn!(error = %e, "Failed to cache preview to disk");
+            if let Err(e) = self
+                .local_storage
+                .store_preview_encrypted(user_id, hash, &preview_bytes)
+                .await
+            {
+                tracing::warn!(error = %e, "Failed to cache encrypted preview to disk");
             }
 
             Ok((preview_bytes, preview_mime.to_string()))
@@ -919,35 +950,50 @@ impl StorageService {
             return Ok(None);
         }
 
-        let preview_path = if let Some(ref hash) = item.content_hash {
-            self.local_storage
+        if let Some(ref hash) = item.content_hash {
+            let preview_path = self
+                .local_storage
                 .get_video_preview_path(user_id, hash)
-                .map_err(|e| AppError::InternalError(e.to_string()))?
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+            if preview_path.exists()
+                && let Ok((total_len, range_len, stream)) = self
+                    .local_storage
+                    .stream_video_preview_encrypted(user_id, hash, range_start, range_end)
+                    .await
+            {
+                return Ok(Some((
+                    item.name,
+                    "video/mp4".to_string(),
+                    total_len,
+                    range_len,
+                    stream,
+                )));
+            }
         } else if let Some(ref md5_hash) = item.md5_hash {
-            LegacyReader::new(&self.local_storage)
+            let preview_path = LegacyReader::new(&self.local_storage)
                 .get_legacy_video_preview_path(md5_hash)
+                .map_err(|e| AppError::InternalError(e.to_string()))?;
+            if preview_path.exists()
+                && let Some((total_len, range_len, stream)) = LocalStorage::stream_plain_file(
+                    preview_path,
+                    range_start,
+                    range_end,
+                )
+                .await
                 .map_err(|e| AppError::InternalError(e.to_string()))?
+            {
+                return Ok(Some((
+                    item.name,
+                    "video/mp4".to_string(),
+                    total_len,
+                    range_len,
+                    stream,
+                )));
+            }
         } else {
             return Ok(None);
         };
-
-        if preview_path.exists()
-            && let Some((total_len, range_len, stream)) = LocalStorage::stream_plain_file(
-                preview_path,
-                range_start,
-                range_end,
-            )
-            .await
-            .map_err(|e| AppError::InternalError(e.to_string()))?
-        {
-            return Ok(Some((
-                item.name,
-                "video/mp4".to_string(),
-                total_len,
-                range_len,
-                stream,
-            )));
-        }
 
         // Preview not ready yet: trigger background transcode
         let local_storage = self.local_storage.clone();

@@ -12,6 +12,8 @@ it('renders a quoted Markdown URL without creating an event handler', async () =
   const link = wrapper.find('.markdown-body a')
   expect(link.exists()).toBe(true)
   expect(link.attributes('onmouseover')).toBeUndefined()
-  expect(link.attributes('href')).toContain('"onmouseover="')
+  expect(decodeURIComponent(link.attributes('href') || '')).toContain(
+    '"onmouseover="',
+  )
   vi.restoreAllMocks()
 })
