@@ -18,6 +18,8 @@ interface Props {
   name?: string
   thumb?: string
   originalSrc?: string
+  hasPrev?: boolean
+  hasNext?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,9 +27,15 @@ const props = withDefaults(defineProps<Props>(), {
   name: '',
   thumb: '',
   originalSrc: '',
+  hasPrev: false,
+  hasNext: false,
 })
 
-const emit = defineEmits<(e: 'loaded') => void>()
+const emit = defineEmits<{
+  (e: 'loaded'): void
+  (e: 'prev'): void
+  (e: 'next'): void
+}>()
 
 const scale = ref(1)
 const rotate = ref(0)
@@ -44,6 +52,22 @@ const loadError = ref(false)
 const imageSrc = ref(props.src)
 const isShowingOriginal = ref(false)
 const loadingOriginal = ref(false)
+
+// Touch swipe & gestures (Mobile)
+const touchDeltaX = ref(0)
+const touchDeltaY = ref(0)
+const touchStartX = ref(0)
+const touchStartY = ref(0)
+const touchStartTime = ref(0)
+const isTouching = ref(false)
+const isSwiping = ref(false)
+const swipeDirection = ref<'horizontal' | 'vertical' | null>(null)
+let lastTouchTime = 0
+
+// Pinch to zoom state (Mobile)
+const isPinching = ref(false)
+const initialPinchDist = ref(0)
+const initialPinchScale = ref(1)
 
 const aspectRatio = ref<number | null>(null)
 
@@ -76,11 +100,27 @@ const handleThumbLoaded = (e: Event) => {
 const stageStyle = computed(() => {
   const sx = flipH.value ? -1 : 1
   const sy = flipV.value ? -1 : 1
+  const currentX =
+    scale.value > 1
+      ? position.value.x
+      : position.value.x + touchDeltaX.value
+  const currentY = position.value.y
+
   const style: Record<string, string> = {
-    transform: `translate(${position.value.x}px, ${position.value.y}px) scale(${scale.value}) rotate(${rotate.value}deg) scale(${sx}, ${sy})`,
+    transform: `translate(${currentX}px, ${currentY}px) scale(${scale.value}) rotate(${rotate.value}deg) scale(${sx}, ${sy})`,
     cursor:
       scale.value > 1 ? (isDragging.value ? 'grabbing' : 'grab') : 'default',
   }
+
+  // Disable transition for instantaneous 60fps tracking during touch/drag/pinch
+  if (
+    (isTouching.value && swipeDirection.value === 'horizontal') ||
+    isDragging.value ||
+    isPinching.value
+  ) {
+    style.transition = 'none'
+  }
+
   const ar = aspectRatio.value
   if (ar) {
     style.aspectRatio = `${ar}`
@@ -101,6 +141,8 @@ const resetTransform = () => {
   flipH.value = false
   flipV.value = false
   position.value = { x: 0, y: 0 }
+  touchDeltaX.value = 0
+  touchDeltaY.value = 0
 }
 
 watch(
@@ -178,6 +220,7 @@ const handleWheel = (e: WheelEvent) => {
 }
 
 const handleMouseDown = (e: MouseEvent) => {
+  if (Date.now() - lastTouchTime < 500) return
   if (scale.value <= 1) return
   isDragging.value = true
   dragStart.value = {
@@ -196,6 +239,167 @@ const handleMouseMove = (e: MouseEvent) => {
 
 const handleMouseUp = () => {
   isDragging.value = false
+}
+
+const handleTouchStart = (e: TouchEvent) => {
+  lastTouchTime = Date.now()
+
+  // 2-finger pinch to zoom
+  if (e.touches.length === 2) {
+    isPinching.value = true
+    isSwiping.value = false
+    isDragging.value = false
+    swipeDirection.value = null
+    initialPinchDist.value = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY,
+    )
+    initialPinchScale.value = scale.value
+    return
+  }
+
+  // 1-finger swipe / pan
+  if (e.touches.length === 1) {
+    const touch = e.touches[0]
+    touchStartTime.value = Date.now()
+    touchStartX.value = touch.clientX
+    touchStartY.value = touch.clientY
+    touchDeltaX.value = 0
+    touchDeltaY.value = 0
+    isTouching.value = true
+
+    if (scale.value > 1) {
+      isDragging.value = true
+      dragStart.value = {
+        x: touch.clientX - position.value.x,
+        y: touch.clientY - position.value.y,
+      }
+    } else {
+      isSwiping.value = true
+      swipeDirection.value = null
+    }
+  }
+}
+
+const handleTouchMove = (e: TouchEvent) => {
+  // Handle 2-finger pinch zoom
+  if (isPinching.value && e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY,
+    )
+    if (initialPinchDist.value > 0) {
+      const factor = dist / initialPinchDist.value
+      scale.value = Math.min(
+        5,
+        Math.max(0.5, Number((initialPinchScale.value * factor).toFixed(2))),
+      )
+    }
+    if (e.cancelable) e.preventDefault()
+    return
+  }
+
+  if (e.touches.length !== 1) return
+  const touch = e.touches[0]
+
+  // Zoomed-in pan
+  if (scale.value > 1 && isDragging.value) {
+    position.value = {
+      x: touch.clientX - dragStart.value.x,
+      y: touch.clientY - dragStart.value.y,
+    }
+    if (e.cancelable) e.preventDefault()
+    return
+  }
+
+  // Swipe navigation when scale <= 1
+  if (isSwiping.value && scale.value <= 1) {
+    const dx = touch.clientX - touchStartX.value
+    const dy = touch.clientY - touchStartY.value
+
+    if (swipeDirection.value === null) {
+      if (Math.hypot(dx, dy) > 8) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          swipeDirection.value = 'horizontal'
+        } else {
+          swipeDirection.value = 'vertical'
+          isSwiping.value = false
+          return
+        }
+      }
+    }
+
+    if (swipeDirection.value === 'horizontal') {
+      if (e.cancelable) e.preventDefault()
+
+      let offset = dx
+      if (dx > 0 && !props.hasPrev) {
+        // Rubberband resistance when at the first image
+        offset = dx * 0.25
+      } else if (dx < 0 && !props.hasNext) {
+        // Rubberband resistance when at the last image
+        offset = dx * 0.25
+      }
+      touchDeltaX.value = offset
+      touchDeltaY.value = dy
+    }
+  }
+}
+
+const handleTouchEnd = () => {
+  if (isPinching.value) {
+    isPinching.value = false
+    if (scale.value < 1) {
+      resetTransform()
+    }
+    isTouching.value = false
+    return
+  }
+
+  if (scale.value > 1) {
+    isDragging.value = false
+    isTouching.value = false
+    return
+  }
+
+  if (isSwiping.value && swipeDirection.value === 'horizontal') {
+    const duration = Date.now() - touchStartTime.value
+    const dx = touchDeltaX.value
+    const absDx = Math.abs(dx)
+    const velocity = absDx / Math.max(duration, 1)
+
+    // Trigger condition: quick flick (>0.25 px/ms and >25px) or drag distance >= 50px
+    const isFlick = velocity > 0.25 && absDx > 25
+    const isDragPastThreshold = absDx >= 50
+
+    if (isFlick || isDragPastThreshold) {
+      if (dx < 0 && props.hasNext) {
+        touchDeltaX.value = 0
+        emit('next')
+      } else if (dx > 0 && props.hasPrev) {
+        touchDeltaX.value = 0
+        emit('prev')
+      } else {
+        touchDeltaX.value = 0
+      }
+    } else {
+      touchDeltaX.value = 0
+    }
+  }
+
+  isSwiping.value = false
+  swipeDirection.value = null
+  isTouching.value = false
+}
+
+const handleTouchCancel = () => {
+  isPinching.value = false
+  isSwiping.value = false
+  swipeDirection.value = null
+  isDragging.value = false
+  isTouching.value = false
+  touchDeltaX.value = 0
+  touchDeltaY.value = 0
 }
 
 const handleImageLoaded = (e: Event) => {
@@ -248,7 +452,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="image-viewer" @wheel="handleWheel">
-    <div class="image-viewport" @mousedown="handleMouseDown">
+    <div
+      class="image-viewport"
+      @mousedown="handleMouseDown"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+      @touchcancel="handleTouchCancel"
+    >
       <!-- Full blocking spinner fallback ONLY when no LQIP thumbnail is available -->
       <div v-if="loading && !hasRealThumb && !loadError" class="image-loading">
         <el-icon class="is-loading" :size="32"><Refresh /></el-icon>
@@ -375,6 +586,7 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    touch-action: none;
 
     .image-stage {
       position: relative;

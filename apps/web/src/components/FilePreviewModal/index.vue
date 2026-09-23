@@ -425,7 +425,11 @@ onBeforeUnmount(() => {
             :original-src="activeImageOriginalSrc"
             :name="activeFile.name"
             :thumb="activeImageThumb"
+            :has-prev="hasPrev"
+            :has-next="hasNext"
             @loaded="handleActiveImageLoaded"
+            @prev="handlePrev"
+            @next="handleNext"
           />
 
           <!-- Video -->

@@ -233,4 +233,184 @@ describe('ImageViewer', () => {
     expect(switchedStyle).not.toContain('width: auto')
     expect(switchedStyle).not.toContain('max-width: 90%')
   })
+
+  describe('Mobile Touch Swipe Navigation', () => {
+    it('swipes left to navigate to next image when hasNext is true', async () => {
+      const wrapper = mount(ImageViewer, {
+        props: {
+          src: '/api/v1/storage/photo_1.jpg',
+          name: 'photo_1.jpg',
+          hasNext: true,
+          hasPrev: false,
+        },
+        global: {
+          stubs: commonStubs,
+        },
+      })
+
+      const viewport = wrapper.find('.image-viewport')
+
+      // Touch start at clientX = 200
+      await viewport.trigger('touchstart', {
+        touches: [{ clientX: 200, clientY: 100 }],
+      })
+
+      // Drag left to clientX = 120 (deltaX = -80px)
+      await viewport.trigger('touchmove', {
+        touches: [{ clientX: 120, clientY: 100 }],
+      })
+
+      // Touch end
+      await viewport.trigger('touchend')
+
+      expect(wrapper.emitted('next')).toBeTruthy()
+      expect(wrapper.emitted('prev')).toBeFalsy()
+    })
+
+    it('swipes right to navigate to previous image when hasPrev is true', async () => {
+      const wrapper = mount(ImageViewer, {
+        props: {
+          src: '/api/v1/storage/photo_2.jpg',
+          name: 'photo_2.jpg',
+          hasNext: true,
+          hasPrev: true,
+        },
+        global: {
+          stubs: commonStubs,
+        },
+      })
+
+      const viewport = wrapper.find('.image-viewport')
+
+      // Touch start at clientX = 100
+      await viewport.trigger('touchstart', {
+        touches: [{ clientX: 100, clientY: 100 }],
+      })
+
+      // Drag right to clientX = 180 (deltaX = +80px)
+      await viewport.trigger('touchmove', {
+        touches: [{ clientX: 180, clientY: 100 }],
+      })
+
+      // Touch end
+      await viewport.trigger('touchend')
+
+      expect(wrapper.emitted('prev')).toBeTruthy()
+      expect(wrapper.emitted('next')).toBeFalsy()
+    })
+
+    it('does not emit next when hasNext is false (at the end of gallery)', async () => {
+      const wrapper = mount(ImageViewer, {
+        props: {
+          src: '/api/v1/storage/photo_last.jpg',
+          name: 'photo_last.jpg',
+          hasNext: false,
+          hasPrev: true,
+        },
+        global: {
+          stubs: commonStubs,
+        },
+      })
+
+      const viewport = wrapper.find('.image-viewport')
+
+      await viewport.trigger('touchstart', {
+        touches: [{ clientX: 200, clientY: 100 }],
+      })
+      await viewport.trigger('touchmove', {
+        touches: [{ clientX: 100, clientY: 100 }],
+      })
+      await viewport.trigger('touchend')
+
+      expect(wrapper.emitted('next')).toBeFalsy()
+    })
+
+    it('does not emit prev when hasPrev is false (at the start of gallery)', async () => {
+      const wrapper = mount(ImageViewer, {
+        props: {
+          src: '/api/v1/storage/photo_first.jpg',
+          name: 'photo_first.jpg',
+          hasNext: true,
+          hasPrev: false,
+        },
+        global: {
+          stubs: commonStubs,
+        },
+      })
+
+      const viewport = wrapper.find('.image-viewport')
+
+      await viewport.trigger('touchstart', {
+        touches: [{ clientX: 100, clientY: 100 }],
+      })
+      await viewport.trigger('touchmove', {
+        touches: [{ clientX: 190, clientY: 100 }],
+      })
+      await viewport.trigger('touchend')
+
+      expect(wrapper.emitted('prev')).toBeFalsy()
+    })
+
+    it('does not emit next or prev if swipe distance is below threshold', async () => {
+      const wrapper = mount(ImageViewer, {
+        props: {
+          src: '/api/v1/storage/photo_1.jpg',
+          name: 'photo_1.jpg',
+          hasNext: true,
+          hasPrev: true,
+        },
+        global: {
+          stubs: commonStubs,
+        },
+      })
+
+      const viewport = wrapper.find('.image-viewport')
+
+      await viewport.trigger('touchstart', {
+        touches: [{ clientX: 200, clientY: 100 }],
+      })
+      // Small displacement of only 15px
+      await viewport.trigger('touchmove', {
+        touches: [{ clientX: 185, clientY: 100 }],
+      })
+      await viewport.trigger('touchend')
+
+      expect(wrapper.emitted('next')).toBeFalsy()
+      expect(wrapper.emitted('prev')).toBeFalsy()
+    })
+
+    it('does not navigate on swipe when zoomed in (scale > 1), pans instead', async () => {
+      const wrapper = mount(ImageViewer, {
+        props: {
+          src: '/api/v1/storage/photo_1.jpg',
+          name: 'photo_1.jpg',
+          hasNext: true,
+          hasPrev: true,
+        },
+        global: {
+          stubs: commonStubs,
+        },
+      })
+
+      // Zoom in
+      const buttons = wrapper.findAll('.tool-btn')
+      const zoomInBtn = buttons[2]
+      await zoomInBtn.trigger('click')
+      expect(wrapper.find('.scale-tag').text()).toBe('125%')
+
+      const viewport = wrapper.find('.image-viewport')
+
+      await viewport.trigger('touchstart', {
+        touches: [{ clientX: 200, clientY: 100 }],
+      })
+      await viewport.trigger('touchmove', {
+        touches: [{ clientX: 100, clientY: 100 }],
+      })
+      await viewport.trigger('touchend')
+
+      // Should NOT emit next/prev when zoomed in
+      expect(wrapper.emitted('next')).toBeFalsy()
+      expect(wrapper.emitted('prev')).toBeFalsy()
+    })
+  })
 })

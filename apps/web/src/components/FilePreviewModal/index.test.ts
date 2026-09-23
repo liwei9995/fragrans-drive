@@ -232,4 +232,47 @@ describe('FilePreviewModal', () => {
     expect(viewer.attributes('data-src')).toBe(`${mockFile.url}?preview=1`)
     expect(viewer.attributes('data-orig')).toBe(mockFile.url)
   })
+
+  it('binds hasPrev, hasNext and changes file on prev/next emitted from ImageViewer', async () => {
+    const wrapper = mount(FilePreviewModal, {
+      props: {
+        visible: true,
+        file: mockFile,
+        fileList: mockFileList,
+      },
+      global: {
+        stubs: {
+          ...commonStubs,
+          ImageViewer: {
+            props: [
+              'src',
+              'name',
+              'thumb',
+              'originalSrc',
+              'hasPrev',
+              'hasNext',
+            ],
+            emits: ['prev', 'next'],
+            template: `
+              <div class="stub-image-viewer" :data-has-prev="hasPrev" :data-has-next="hasNext">
+                <button class="mock-swipe-prev" @click="$emit('prev')">Prev</button>
+                <button class="mock-swipe-next" @click="$emit('next')">Next</button>
+              </div>
+            `,
+          },
+        },
+      },
+    })
+
+    const viewer = wrapper.find('.stub-image-viewer')
+    expect(viewer.exists()).toBe(true)
+    // Initially on first file (mockFile): hasPrev is false, hasNext is true
+    expect(viewer.attributes('data-has-prev')).toBe('false')
+    expect(viewer.attributes('data-has-next')).toBe('true')
+
+    // Trigger next (swiped left)
+    await wrapper.find('.mock-swipe-next').trigger('click')
+    expect(wrapper.emitted('change-file')).toBeTruthy()
+    expect(wrapper.emitted('change-file')?.[0]).toEqual([mockFileList[1]])
+  })
 })
