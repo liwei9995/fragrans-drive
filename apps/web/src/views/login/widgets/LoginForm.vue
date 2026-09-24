@@ -7,7 +7,15 @@ import {
 } from '@simplewebauthn/browser'
 import type { ElForm, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  watch,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { Auth, Login } from '@/api/interface'
@@ -81,6 +89,98 @@ const fetchConfig = async () => {
     // ignore
   }
 }
+
+// Cloudflare Turnstile state
+const turnstileToken = ref<string>('')
+const turnstileContainerRegisterRef = ref<HTMLElement | null>(null)
+const turnstileContainerForgotRef = ref<HTMLElement | null>(null)
+const turnstileWidgetId = ref<string | null>(null)
+
+const loadTurnstileScript = (): Promise<void> => {
+  return new Promise((resolve) => {
+    if (window.turnstile) {
+      resolve()
+      return
+    }
+    const existing = document.getElementById('cf-turnstile-script')
+    if (existing) {
+      existing.addEventListener('load', () => resolve())
+      return
+    }
+    const script = document.createElement('script')
+    script.id = 'cf-turnstile-script'
+    script.src =
+      'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    document.head.appendChild(script)
+  })
+}
+
+const renderTurnstile = async (container: HTMLElement | null) => {
+  if (!container || !authConfig.value.turnstileSiteKey) return
+  await loadTurnstileScript()
+  if (!window.turnstile) return
+
+  if (turnstileWidgetId.value) {
+    try {
+      window.turnstile.remove(turnstileWidgetId.value)
+    } catch {
+      // ignore
+    }
+    turnstileWidgetId.value = null
+  }
+  turnstileToken.value = ''
+  container.innerHTML = ''
+
+  try {
+    turnstileWidgetId.value = window.turnstile.render(container, {
+      sitekey: authConfig.value.turnstileSiteKey,
+      theme: 'auto',
+      callback: (token: string) => {
+        turnstileToken.value = token
+      },
+      'expired-callback': () => {
+        turnstileToken.value = ''
+      },
+      'error-callback': () => {
+        turnstileToken.value = ''
+      },
+    })
+  } catch (err) {
+    console.error('Failed to render Turnstile:', err)
+  }
+}
+
+const resetTurnstile = () => {
+  if (
+    authConfig.value.turnstileSiteKey &&
+    turnstileWidgetId.value &&
+    window.turnstile
+  ) {
+    try {
+      window.turnstile.reset(turnstileWidgetId.value)
+    } catch {
+      // ignore
+    }
+    turnstileToken.value = ''
+  }
+}
+
+watch(
+  [mode, () => authConfig.value.turnstileSiteKey],
+  async ([newMode, siteKey]) => {
+    if (!siteKey) return
+    await nextTick()
+    if (newMode === 'register' && turnstileContainerRegisterRef.value) {
+      renderTurnstile(turnstileContainerRegisterRef.value)
+    } else if (newMode === 'forgot' && turnstileContainerForgotRef.value) {
+      renderTurnstile(turnstileContainerForgotRef.value)
+    }
+  },
+  { flush: 'post' },
+)
 
 // Login form
 const loginFormRef = ref<FormInstance>()
@@ -165,13 +265,15 @@ const registerRules = computed<FormRules>(() => ({
       trigger: 'blur',
     },
   ],
-  captchaCode: [
-    {
-      required: true,
-      message: t('login.captchaRequired'),
-      trigger: 'blur',
-    },
-  ],
+  captchaCode: authConfig.value.turnstileSiteKey
+    ? []
+    : [
+        {
+          required: true,
+          message: t('login.captchaRequired'),
+          trigger: 'blur',
+        },
+      ],
   emailCode: [
     {
       required: true,
@@ -199,13 +301,15 @@ const forgotRules = computed<FormRules>(() => ({
       trigger: 'blur',
     },
   ],
-  captchaCode: [
-    {
-      required: true,
-      message: t('login.captchaRequired'),
-      trigger: 'blur',
-    },
-  ],
+  captchaCode: authConfig.value.turnstileSiteKey
+    ? []
+    : [
+        {
+          required: true,
+          message: t('login.captchaRequired'),
+          trigger: 'blur',
+        },
+      ],
   emailCode: [
     {
       required: true,
@@ -272,7 +376,12 @@ const handleSendCode = async (purpose: 'register' | 'reset_password') => {
     ElMessage.warning(t('login.emailInvalid'))
     return
   }
-  if (!targetCaptcha) {
+  if (authConfig.value.turnstileSiteKey) {
+    if (!turnstileToken.value) {
+      ElMessage.warning(t('login.turnstileRequired'))
+      return
+    }
+  } else if (!targetCaptcha) {
     ElMessage.warning(t('login.sendCodeFirstCaptcha'))
     return
   }
@@ -282,13 +391,24 @@ const handleSendCode = async (purpose: 'register' | 'reset_password') => {
     const res = await sendEmailCode({
       email: targetEmail.trim(),
       purpose,
-      captchaId: captchaId.value,
-      captchaCode: targetCaptcha.trim(),
+      captchaId: authConfig.value.turnstileSiteKey
+        ? undefined
+        : captchaId.value,
+      captchaCode: authConfig.value.turnstileSiteKey
+        ? undefined
+        : targetCaptcha.trim(),
+      turnstileToken: authConfig.value.turnstileSiteKey
+        ? turnstileToken.value
+        : undefined,
     })
     ElMessage.success(res?.message || t('login.codeSentSuccess'))
     startCountdown()
   } catch {
-    fetchCaptcha()
+    if (authConfig.value.turnstileSiteKey) {
+      resetTurnstile()
+    } else {
+      fetchCaptcha()
+    }
   } finally {
     sendingCode.value = false
   }
@@ -297,7 +417,11 @@ const handleSendCode = async (purpose: 'register' | 'reset_password') => {
 // Switch mode
 const switchMode = (target: Mode) => {
   mode.value = target
-  fetchCaptcha()
+  if (authConfig.value.turnstileSiteKey) {
+    resetTurnstile()
+  } else {
+    fetchCaptcha()
+  }
 }
 
 const getRedirectPath = () => {
@@ -344,6 +468,14 @@ const register = (formEl: FormInstance | undefined) => {
   if (!formEl) return
   formEl.validate(async (valid) => {
     if (!valid) return
+    if (
+      authConfig.value.turnstileSiteKey &&
+      !authConfig.value.emailVerificationRequired &&
+      !turnstileToken.value
+    ) {
+      ElMessage.warning(t('login.turnstileRequired'))
+      return
+    }
     loading.value = true
     try {
       await registerUser({
@@ -351,8 +483,15 @@ const register = (formEl: FormInstance | undefined) => {
         lastName: registerForm.lastName.trim(),
         email: registerForm.email.trim(),
         password: registerForm.password,
-        captchaId: captchaId.value || undefined,
-        captchaCode: registerForm.captchaCode || undefined,
+        captchaId: authConfig.value.turnstileSiteKey
+          ? undefined
+          : captchaId.value || undefined,
+        captchaCode: authConfig.value.turnstileSiteKey
+          ? undefined
+          : registerForm.captchaCode || undefined,
+        turnstileToken: authConfig.value.turnstileSiteKey
+          ? turnstileToken.value || undefined
+          : undefined,
         emailCode: registerForm.emailCode || undefined,
       })
       ElMessage.success(t('login.registerSuccess'))
@@ -360,7 +499,11 @@ const register = (formEl: FormInstance | undefined) => {
       loginForm.password = registerForm.password
       switchMode('login')
     } catch {
-      fetchCaptcha()
+      if (authConfig.value.turnstileSiteKey) {
+        resetTurnstile()
+      } else {
+        fetchCaptcha()
+      }
     } finally {
       loading.value = false
     }
@@ -428,9 +571,11 @@ const handleTouchIdLogin = async () => {
   }
 }
 
-onMounted(() => {
-  fetchConfig()
-  fetchCaptcha()
+onMounted(async () => {
+  await fetchConfig()
+  if (!authConfig.value.turnstileSiteKey) {
+    fetchCaptcha()
+  }
   if (browserSupportsWebAuthn()) {
     platformAuthenticatorIsAvailable()
       .then((supported) => {
@@ -444,6 +589,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (turnstileWidgetId.value && window.turnstile) {
+    try {
+      window.turnstile.remove(turnstileWidgetId.value)
+    } catch {
+      // ignore
+    }
+  }
 })
 
 defineExpose({
@@ -657,8 +809,13 @@ defineExpose({
             </el-input>
           </el-form-item>
 
+          <!-- Cloudflare Turnstile Verification -->
+          <div v-if="authConfig.turnstileSiteKey" class="turnstile-wrapper">
+            <div ref="turnstileContainerRegisterRef" class="turnstile-box"></div>
+          </div>
+
           <!-- Graphic Captcha -->
-          <el-form-item prop="captchaCode">
+          <el-form-item v-else-if="authConfig.captchaRequired" prop="captchaCode">
             <div class="captcha-row">
               <el-input
                 v-model="registerForm.captchaCode"
@@ -748,8 +905,13 @@ defineExpose({
           </el-input>
         </el-form-item>
 
+        <!-- Cloudflare Turnstile Verification -->
+        <div v-if="authConfig.turnstileSiteKey" class="turnstile-wrapper">
+          <div ref="turnstileContainerForgotRef" class="turnstile-box"></div>
+        </div>
+
         <!-- Graphic Captcha -->
-        <el-form-item prop="captchaCode">
+        <el-form-item v-else-if="authConfig.captchaRequired" prop="captchaCode">
           <div class="captcha-row">
             <el-input
               v-model="forgotForm.captchaCode"
@@ -914,6 +1076,21 @@ defineExpose({
 
       .half-item {
         flex: 1;
+      }
+    }
+
+    .turnstile-wrapper {
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 65px;
+      width: 100%;
+
+      .turnstile-box {
+        display: flex;
+        justify-content: center;
+        width: 100%;
       }
     }
 

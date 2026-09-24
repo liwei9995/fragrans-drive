@@ -50,6 +50,7 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1-rustl
 webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }
 moka = { version = "0.12", features = ["future"] }
 base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 assert_cmd = "2.2.2"

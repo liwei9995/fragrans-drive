@@ -3,6 +3,7 @@ pub mod error;
 pub mod middleware;
 pub mod rate_limit;
 pub mod storage;
+pub mod turnstile;
 pub mod users;
 pub mod webauthn;
 

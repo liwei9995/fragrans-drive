@@ -75,6 +75,7 @@ export default {
     backToLogin: 'Back to sign in',
     captchaRefreshTitle: 'Click to refresh captcha',
     sendCodeFirstCaptcha: 'Please enter the captcha code first',
+    turnstileRequired: 'Please complete the security verification first',
     codeSentSuccess: 'Verification code has been sent to your email',
   },
   home: {

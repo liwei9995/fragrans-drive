@@ -73,6 +73,7 @@ export default {
     backToLogin: '返回登录',
     captchaRefreshTitle: '点击刷新验证码',
     sendCodeFirstCaptcha: '请先输入图片验证码',
+    turnstileRequired: '请先完成人机安全验证',
     codeSentSuccess: '验证码已发送至您的邮箱',
   },
   home: {

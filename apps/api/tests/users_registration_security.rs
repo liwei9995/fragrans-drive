@@ -83,6 +83,8 @@ async fn test_registration_disabled_rejects_requests() {
         smtp_user: None,
         smtp_pass: None,
         smtp_from: None,
+        turnstile_secret_key: None,
+        turnstile_site_key: None,
     };
     let app =
         api::router_with_auth_security(ctx.db.clone(), custom_config, ctx.auth_security.clone());
@@ -164,6 +166,8 @@ async fn test_captcha_and_email_verification_flow() {
         smtp_user: None,
         smtp_pass: None,
         smtp_from: None,
+        turnstile_secret_key: None,
+        turnstile_site_key: None,
     };
     let app =
         api::router_with_auth_security(ctx.db.clone(), custom_config, ctx.auth_security.clone());
@@ -579,6 +583,166 @@ async fn test_input_validation_limits() {
         .await
         .expect("blank name");
     assert_eq!(res_blank_name.status(), StatusCode::BAD_REQUEST);
+
+    ctx.teardown().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_turnstile_verification_flow() {
+    let ctx = setup().await;
+
+    let custom_config = Config {
+        mongo_uri: "mongodb://localhost:27017".to_string(),
+        jwt_secret: "a-very-long-secret-key-that-is-at-least-32-chars".to_string(),
+        port: 3821,
+        domain: "http://localhost:3821".to_string(),
+        storage_destination: ctx.storage_dir.path().to_path_buf(),
+        storage_master_key: [0u8; 32],
+        max_upload_bytes: 10 * 1024 * 1024,
+        allow_registration: true,
+        email_verification_required: true,
+        captcha_required: true,
+        trust_proxy_headers: false,
+        smtp_host: None,
+        smtp_port: None,
+        smtp_user: None,
+        smtp_pass: None,
+        smtp_from: None,
+        turnstile_secret_key: Some("1x0000000000000000000000000000000AA".to_string()),
+        turnstile_site_key: Some("1x00000000000000000000AA".to_string()),
+    };
+    let app =
+        api::router_with_auth_security(ctx.db.clone(), custom_config, ctx.auth_security.clone());
+
+    // 1. Auth config returns turnstileSiteKey
+    let config_res = app
+        .clone()
+        .oneshot(json_auth_request(
+            "GET",
+            "/v1/auth/config",
+            "",
+            serde_json::Value::Null,
+        ))
+        .await
+        .expect("config request");
+    let config_data: serde_json::Value =
+        serde_json::from_slice(&response_bytes(config_res).await).expect("parse response");
+    assert_eq!(config_data["turnstileSiteKey"], "1x00000000000000000000AA");
+
+    let test_email = format!("turnstile-user-{}@example.com", uuid::Uuid::new_v4());
+
+    // 2. Requesting send-code without turnstile token fails
+    let missing_token_res = app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/auth/send-code",
+            "",
+            serde_json::json!({
+                "email": test_email,
+                "purpose": "register"
+            }),
+        ))
+        .await
+        .expect("send code without token");
+    assert_eq!(missing_token_res.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Requesting send-code with empty turnstile token fails
+    let empty_token_res = app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/auth/send-code",
+            "",
+            serde_json::json!({
+                "email": test_email,
+                "purpose": "register",
+                "turnstileToken": "   "
+            }),
+        ))
+        .await
+        .expect("send code with empty token");
+    assert_eq!(empty_token_res.status(), StatusCode::BAD_REQUEST);
+
+    // 4. Requesting send-code with valid dummy test turnstile token passes human verification
+    // (reaches mail delivery stage which returns 500 when SMTP is not configured)
+    let valid_token_res = app
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/auth/send-code",
+            "",
+            serde_json::json!({
+                "email": test_email,
+                "purpose": "register",
+                "turnstileToken": "dummy-pass-token"
+            }),
+        ))
+        .await
+        .expect("send code with valid token");
+    assert_eq!(valid_token_res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    // 5. Test direct registration when email verification is disabled
+    let no_email_config = Config {
+        mongo_uri: "mongodb://localhost:27017".to_string(),
+        jwt_secret: "a-very-long-secret-key-that-is-at-least-32-chars".to_string(),
+        port: 3821,
+        domain: "http://localhost:3821".to_string(),
+        storage_destination: ctx.storage_dir.path().to_path_buf(),
+        storage_master_key: [0u8; 32],
+        max_upload_bytes: 10 * 1024 * 1024,
+        allow_registration: true,
+        email_verification_required: false,
+        captcha_required: true,
+        trust_proxy_headers: false,
+        smtp_host: None,
+        smtp_port: None,
+        smtp_user: None,
+        smtp_pass: None,
+        smtp_from: None,
+        turnstile_secret_key: Some("1x0000000000000000000000000000000AA".to_string()),
+        turnstile_site_key: Some("1x00000000000000000000AA".to_string()),
+    };
+    let app2 =
+        api::router_with_auth_security(ctx.db.clone(), no_email_config, ctx.auth_security.clone());
+
+    // Register without turnstile token fails
+    let reg_no_token = app2
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/users",
+            "",
+            serde_json::json!({
+                "email": format!("no-token-{}@example.com", uuid::Uuid::new_v4()),
+                "password": "password123",
+                "firstName": "Turn",
+                "lastName": "Stile"
+            }),
+        ))
+        .await
+        .expect("register no token");
+    assert_eq!(reg_no_token.status(), StatusCode::BAD_REQUEST);
+
+    // Register with valid turnstile token succeeds
+    let reg_with_token = app2
+        .clone()
+        .oneshot(json_auth_request(
+            "POST",
+            "/v1/users",
+            "",
+            serde_json::json!({
+                "email": format!("with-token-{}@example.com", uuid::Uuid::new_v4()),
+                "password": "password123",
+                "firstName": "Turn",
+                "lastName": "Stile",
+                "turnstileToken": "dummy-pass-token"
+            }),
+        ))
+        .await
+        .expect("register with token");
+    assert_eq!(reg_with_token.status(), StatusCode::CREATED);
 
     ctx.teardown().await;
 }

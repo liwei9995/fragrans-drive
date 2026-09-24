@@ -41,9 +41,15 @@ pub struct Config {
     pub smtp_user: Option<String>,
     pub smtp_pass: Option<String>,
     pub smtp_from: Option<String>,
+    pub turnstile_secret_key: Option<String>,
+    pub turnstile_site_key: Option<String>,
 }
 
 impl Config {
+    pub fn is_turnstile_enabled(&self) -> bool {
+        self.turnstile_secret_key.is_some() && self.turnstile_site_key.is_some()
+    }
+
     pub fn from_env() -> Result<Self, ConfigError> {
         let mongo_uri =
             env::var("MONGO_URI").map_err(|_| ConfigError::MissingEnv("MONGO_URI".into()))?;
@@ -119,6 +125,14 @@ impl Config {
         let smtp_user = env::var("SMTP_USER").ok().filter(|s| !s.trim().is_empty());
         let smtp_pass = env::var("SMTP_PASS").ok().filter(|s| !s.trim().is_empty());
         let smtp_from = env::var("SMTP_FROM").ok().filter(|s| !s.trim().is_empty());
+        let turnstile_secret_key = env::var("TURNSTILE_SECRET_KEY")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let turnstile_site_key = env::var("TURNSTILE_SITE_KEY")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
 
         Ok(Self {
             mongo_uri,
@@ -137,6 +151,8 @@ impl Config {
             smtp_user,
             smtp_pass,
             smtp_from,
+            turnstile_secret_key,
+            turnstile_site_key,
         })
     }
 }
@@ -164,6 +180,8 @@ mod tests {
             env::remove_var("SMTP_USER");
             env::remove_var("SMTP_PASS");
             env::remove_var("SMTP_FROM");
+            env::remove_var("TURNSTILE_SECRET_KEY");
+            env::remove_var("TURNSTILE_SITE_KEY");
         }
     }
 

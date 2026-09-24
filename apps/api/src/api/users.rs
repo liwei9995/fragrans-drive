@@ -124,6 +124,8 @@ pub struct CreateUserDto {
     pub captcha_id: Option<String>,
     #[serde(rename = "captchaCode")]
     pub captcha_code: Option<String>,
+    #[serde(rename = "turnstileToken", default)]
+    pub turnstile_token: Option<String>,
     #[serde(rename = "emailCode")]
     pub email_code: Option<String>,
 }
@@ -136,6 +138,8 @@ pub struct AuthConfigResponse {
     pub email_verification_required: bool,
     #[serde(rename = "captchaRequired")]
     pub captcha_required: bool,
+    #[serde(rename = "turnstileSiteKey", skip_serializing_if = "Option::is_none")]
+    pub turnstile_site_key: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -148,10 +152,12 @@ pub struct CaptchaResponse {
 pub struct SendEmailCodeDto {
     pub email: String,
     pub purpose: String,
-    #[serde(rename = "captchaId")]
-    pub captcha_id: String,
-    #[serde(rename = "captchaCode")]
-    pub captcha_code: String,
+    #[serde(rename = "captchaId", default)]
+    pub captcha_id: Option<String>,
+    #[serde(rename = "captchaCode", default)]
+    pub captcha_code: Option<String>,
+    #[serde(rename = "turnstileToken", default)]
+    pub turnstile_token: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -373,6 +379,7 @@ pub async fn get_auth_config(State(state): State<AppState>) -> impl IntoResponse
         allow_registration: state.config.allow_registration,
         email_verification_required: state.config.email_verification_required,
         captcha_required: state.config.captcha_required,
+        turnstile_site_key: state.config.turnstile_site_key.clone(),
     })
 }
 
@@ -405,13 +412,34 @@ pub async fn send_email_code(
     State(state): State<AppState>,
     Json(payload): Json<SendEmailCodeDto>,
 ) -> Result<impl IntoResponse, AppError> {
-    if !state
-        .auth_security
-        .verify_and_consume_captcha(&payload.captcha_id, &payload.captcha_code)
-    {
-        return Err(AppError::BadRequest(
-            "Invalid or expired captcha".to_string(),
-        ));
+    if state.config.is_turnstile_enabled() {
+        let token = payload.turnstile_token.as_deref().unwrap_or_default();
+        if token.trim().is_empty() {
+            return Err(AppError::BadRequest(
+                "Turnstile verification token is required".to_string(),
+            ));
+        }
+        let secret = state.config.turnstile_secret_key.as_deref().unwrap();
+        let valid = crate::api::turnstile::verify_turnstile(secret, token, None)
+            .await
+            .map_err(AppError::BadRequest)?;
+        if !valid {
+            return Err(AppError::BadRequest(
+                "Invalid Turnstile verification token".to_string(),
+            ));
+        }
+    } else {
+        let (cid, ccode) = match (&payload.captcha_id, &payload.captcha_code) {
+            (Some(cid), Some(ccode)) if !cid.trim().is_empty() && !ccode.trim().is_empty() => {
+                (cid.as_str(), ccode.as_str())
+            }
+            _ => return Err(AppError::BadRequest("Captcha is required".to_string())),
+        };
+        if !state.auth_security.verify_and_consume_captcha(cid, ccode) {
+            return Err(AppError::BadRequest(
+                "Invalid or expired captcha".to_string(),
+            ));
+        }
     }
 
     let email = payload.email.trim().to_lowercase();
@@ -579,8 +607,8 @@ pub async fn create_user(
     }
 
     // 5. Verification logic:
-    // - If email verification is enabled, verify the email code (its issuance was guarded by captcha in /v1/auth/send-code).
-    // - If email verification is disabled, verify graphic captcha directly to prevent automated registrations.
+    // - If email verification is enabled, verify the email code (its issuance was guarded by captcha/turnstile in /v1/auth/send-code).
+    // - If email verification is disabled, verify turnstile or graphic captcha directly to prevent automated registrations.
     if state.config.email_verification_required {
         let code = match &payload.email_code {
             Some(c) if !c.trim().is_empty() => c.trim(),
@@ -596,6 +624,22 @@ pub async fn create_user(
         {
             return Err(AppError::BadRequest(
                 "Invalid or expired email verification code".to_string(),
+            ));
+        }
+    } else if state.config.is_turnstile_enabled() {
+        let token = payload.turnstile_token.as_deref().unwrap_or_default();
+        if token.trim().is_empty() {
+            return Err(AppError::BadRequest(
+                "Turnstile verification token is required".to_string(),
+            ));
+        }
+        let secret = state.config.turnstile_secret_key.as_deref().unwrap();
+        let valid = crate::api::turnstile::verify_turnstile(secret, token, None)
+            .await
+            .map_err(AppError::BadRequest)?;
+        if !valid {
+            return Err(AppError::BadRequest(
+                "Invalid Turnstile verification token".to_string(),
             ));
         }
     } else if state.config.captcha_required

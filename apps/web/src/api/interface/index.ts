@@ -191,6 +191,7 @@ export namespace Auth {
     allowRegistration: boolean
     emailVerificationRequired: boolean
     captchaRequired: boolean
+    turnstileSiteKey?: string
   }
 
   export interface CaptchaData {
@@ -201,8 +202,9 @@ export namespace Auth {
   export interface ReqSendEmailCode {
     email: string
     purpose: 'register' | 'reset_password'
-    captchaId: string
-    captchaCode: string
+    captchaId?: string
+    captchaCode?: string
+    turnstileToken?: string
   }
 
   export interface ReqRegister {
@@ -212,6 +214,7 @@ export namespace Auth {
     lastName: string
     captchaId?: string
     captchaCode?: string
+    turnstileToken?: string
     emailCode?: string
   }
 

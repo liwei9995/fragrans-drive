@@ -74,6 +74,8 @@ pub async fn setup() -> TestContext {
         smtp_user: None,
         smtp_pass: None,
         smtp_from: None,
+        turnstile_secret_key: None,
+        turnstile_site_key: None,
     };
     let auth_security = Arc::new(api::auth_security::AuthSecurityManager::new());
     let app = api::router_with_auth_security(db.clone(), config, auth_security.clone());
