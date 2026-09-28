@@ -612,34 +612,109 @@ onMounted(fetchMarkdown)
   }
 
   :deep(.markdown-body) {
-    .md-h1,
-    .md-h2,
-    .md-h3,
-    .md-h4,
-    .md-h5,
-    .md-h6 {
+    color: #334155;
+
+    h1,
+    .md-h1 {
       color: #0f172a;
-      border-bottom-color: rgba(0, 0, 0, 0.08);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
 
+    h2,
+    .md-h2 {
+      color: #0f172a;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    h3,
+    .md-h3 {
+      color: #1e293b;
+    }
+
+    h4,
+    .md-h4,
+    h5,
+    .md-h5,
+    h6,
+    .md-h6 {
+      color: #334155;
+    }
+
+    p,
+    .md-p {
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    hr,
     .md-hr {
-      border-top-color: rgba(0, 0, 0, 0.08);
+      border: none;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
     }
 
+    blockquote,
     .md-quote {
       border-left: 4px solid var(--c-primary, #008ffd);
       background: rgba(0, 143, 253, 0.06);
       color: #475569;
+
+      p {
+        color: #475569;
+      }
+
+      strong {
+        color: #0f172a;
+      }
     }
 
+    ul,
+    ol {
+      color: #334155;
+    }
+
+    li,
+    .md-li {
+      color: #334155;
+    }
+
+    .md-task-item {
+      .check-box {
+        color: #64748b;
+
+        &.checked {
+          color: #059669;
+        }
+      }
+    }
+
+    a,
+    .md-link {
+      color: var(--c-primary, #008ffd);
+
+      &:hover {
+        color: var(--c-primary-hover, #007ceb);
+      }
+    }
+
+    code:not(pre code),
     .md-inline-code {
       background: rgba(0, 0, 0, 0.06);
       color: #be185d;
     }
 
+    pre,
     .md-code-block {
       background: #f8fafc;
       border: 1px solid rgba(0, 0, 0, 0.08);
+      color: #1e293b;
+
+      code {
+        color: #1e293b;
+      }
 
       .code-header {
         background: rgba(0, 0, 0, 0.03);
@@ -649,6 +724,39 @@ onMounted(fetchMarkdown)
 
       .code-body {
         color: #1e293b;
+      }
+    }
+
+    table,
+    .md-table {
+      border: 1px solid rgba(0, 0, 0, 0.08);
+
+      thead {
+        background: #f1f5f9;
+
+        th {
+          color: #0f172a;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          border-right: 1px solid rgba(0, 0, 0, 0.06);
+        }
+      }
+
+      tbody {
+        tr {
+          &:nth-child(even) {
+            background: #f8fafc;
+          }
+
+          &:hover {
+            background: rgba(0, 143, 253, 0.06);
+          }
+
+          td {
+            color: #334155;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            border-right: 1px solid rgba(0, 0, 0, 0.05);
+          }
+        }
       }
     }
 
