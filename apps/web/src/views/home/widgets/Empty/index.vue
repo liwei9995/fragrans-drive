@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import EmptyItem from './Item/index.vue'
 
 interface EmptyProps {
+  parentId?: string
   limit?: number
   onUploadChange?: UploadProps['onChange']
   onUploadExceed?: UploadProps['onExceed']
@@ -50,6 +51,7 @@ const handleTapItem = (id: string) => props.tapItem && props.tapItem(id)
         v-for="item in items"
         :id="item.id"
         :key="item.id"
+        :parent-id="parentId"
         :description="item.description"
         :icon="item.icon"
         :limit="limit"

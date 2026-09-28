@@ -670,6 +670,7 @@ onUnmounted(() => {
       <div class="file-drag-zone">
         <div class="page-content">
           <Header
+            :parent-id="parentId"
             :avatar="globalStore.userInfo?.avatar"
             :breadcrumb-items="breadcrumbItems"
             :action-items="actionItems"
@@ -748,6 +749,7 @@ onUnmounted(() => {
           </div>
           <Empty
             v-else-if="!isFetching && listData?.docs.length === 0"
+            :parent-id="parentId"
             :on-upload-change="handleUploadChange"
             :on-upload-exceed="handleUploadExceed"
             :on-upload-progress="handleUploadProgress"
@@ -809,6 +811,7 @@ onUnmounted(() => {
             :on-close="handleCloseUploadStatus"
           />
           <GlobalDropzone
+            :parent-id="parentId"
             :show="isDragging"
             :on-upload-change="handleUploadChange"
             :on-upload-exceed="handleUploadExceed"

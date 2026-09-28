@@ -23,6 +23,7 @@ type ActionItem = {
 }
 
 interface HeaderProps {
+  parentId?: string
   avatar?: string
   breadcrumbItems?: Partial<BreadcrumbItem>[]
   actionItems?: Partial<ActionItem>[]
@@ -123,6 +124,7 @@ const errorHandler = () => true
           <div class="action">
             <ActionButton
               ref="uploadRef"
+              :parent-id="parentId"
               :action-items="actionItems"
               :upload-file-limit="uploadFileLimit"
               :tap-action-item="handleCommand"
@@ -154,6 +156,7 @@ const errorHandler = () => true
   </header>
   <div class="float-action">
     <ActionButton
+      :parent-id="parentId"
       :action-items="actionItems"
       :upload-file-limit="uploadFileLimit"
       :icon-size="24"

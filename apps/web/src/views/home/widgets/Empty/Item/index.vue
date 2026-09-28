@@ -3,6 +3,7 @@ import type { UploadProps } from 'element-plus'
 import Upload from '../../Upload/index.vue'
 
 interface ItemProps {
+  parentId?: string
   id: string
   description: string
   icon?: string
@@ -29,6 +30,7 @@ const handleTap = () => props.tapItem && props.tapItem(props.id)
 <template>
   <template v-if="isUpload">
     <Upload
+      :parent-id="parentId"
       multiple
       :show-file-list="false"
       :limit="limit"

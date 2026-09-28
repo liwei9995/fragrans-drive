@@ -14,19 +14,8 @@ import { calculateFileHash } from '@/utils/fileHash'
 const route = useRoute()
 const router = useRouter()
 
-const parentId = (route.params.id as string) || 'root'
-const uploadPayload = ref({ parentId })
-
-const uploadRef = ref<UploadInstance>()
-const storageAction = computed(
-  () => `${import.meta.env.VITE_API_URL}/v1/storage/upload`,
-)
-const globalStore = GlobalStore()
-const uploadHeaders = computed(() => ({
-  Authorization: `Bearer ${globalStore.accessToken}`,
-}))
-
 interface UploaderProps {
+  parentId?: string
   multiple?: boolean
   showFileList?: boolean
   limit?: number
@@ -43,6 +32,20 @@ const props = withDefaults(defineProps<UploaderProps>(), {
   showFileList: () => false,
   limit: () => 10,
 })
+
+const currentParentId = computed(
+  () => props.parentId || (route.params.id as string) || 'root',
+)
+const uploadPayload = computed(() => ({ parentId: currentParentId.value }))
+
+const uploadRef = ref<UploadInstance>()
+const storageAction = computed(
+  () => `${import.meta.env.VITE_API_URL}/v1/storage/upload`,
+)
+const globalStore = GlobalStore()
+const uploadHeaders = computed(() => ({
+  Authorization: `Bearer ${globalStore.accessToken}`,
+}))
 
 const handleSuccess: UploadProps['onSuccess'] = (
   response,
@@ -68,6 +71,8 @@ const handleError: UploadProps['onError'] = (
     )
   } else if (err?.response?.data?.message || err?.response?.data?.error) {
     ElMessage.error(err.response.data.message || err.response.data.error)
+  } else if (err?.message) {
+    ElMessage.error(err.message)
   }
   nextTick(() => {
     clearFiles(['fail'])
@@ -86,7 +91,7 @@ const customUploadRequest = async (options: UploadRequestOptions) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE) || 1
 
     const initRes = await uploadInit({
-      parentId: uploadPayload.value.parentId,
+      parentId: currentParentId.value,
       name: file.name,
       hash: fileHash,
       size: file.size,
@@ -173,15 +178,6 @@ const clearFiles = (
 ) => {
   uploadRef.value?.clearFiles(status)
 }
-
-watch(
-  () => router.currentRoute.value,
-  () => {
-    const parentId = (route.params.id as string) || 'root'
-
-    uploadPayload.value = { parentId }
-  },
-)
 
 onBeforeUnmount(() => {
   clearFiles()

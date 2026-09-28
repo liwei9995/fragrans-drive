@@ -15,6 +15,7 @@ type ActionItem = {
 }
 
 interface ActionButtonProps {
+  parentId?: string
   actionItems?: Partial<ActionItem>[]
   uploadFileLimit?: number
   iconSize?: number
@@ -52,6 +53,7 @@ const handleCommand = (command: string | number | object) =>
               <Upload
                 ref="uploadRef"
                 class="upload-zone"
+                :parent-id="parentId"
                 multiple
                 :show-file-list="false"
                 :limit="uploadFileLimit"

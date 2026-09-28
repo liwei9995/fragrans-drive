@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import Upload from '../Upload/index.vue'
 
 interface GlobalDropzoneProps {
+  parentId?: string
   show: boolean
   onUploadChange?: UploadProps['onChange']
   onUploadExceed?: UploadProps['onExceed']
@@ -20,6 +21,7 @@ const { t } = useI18n()
   <transition name="fade">
     <div v-show="show" class="global-dropzone">
       <Upload
+        :parent-id="parentId"
         drag
         multiple
         :show-file-list="false"
