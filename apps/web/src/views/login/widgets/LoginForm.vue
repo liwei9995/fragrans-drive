@@ -98,41 +98,27 @@ const turnstileWidgetId = ref<string | null>(null)
 
 const loadTurnstileScript = (): Promise<void> => {
   return new Promise((resolve) => {
-    if (window.turnstile) {
-      if (typeof window.turnstile.ready === 'function') {
-        window.turnstile.ready(() => resolve())
-      } else {
-        resolve()
-      }
+    if (window.turnstile?.render) {
+      resolve()
       return
     }
     const existing = document.getElementById(
       'cf-turnstile-script',
     ) as HTMLScriptElement | null
     if (existing) {
-      existing.addEventListener('load', () => {
-        if (window.turnstile?.ready) {
-          window.turnstile.ready(() => resolve())
-        } else {
-          resolve()
-        }
-      })
-      existing.addEventListener('error', () => resolve())
+      if (window.turnstile?.render) {
+        resolve()
+      } else {
+        existing.addEventListener('load', () => resolve())
+        existing.addEventListener('error', () => resolve())
+      }
       return
     }
     const script = document.createElement('script')
     script.id = 'cf-turnstile-script'
     script.src =
       'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      if (window.turnstile?.ready) {
-        window.turnstile.ready(() => resolve())
-      } else {
-        resolve()
-      }
-    }
+    script.onload = () => resolve()
     script.onerror = () => resolve()
     document.head.appendChild(script)
   })
@@ -141,7 +127,7 @@ const loadTurnstileScript = (): Promise<void> => {
 const renderTurnstile = async (container: HTMLElement | null) => {
   if (!container || !authConfig.value.turnstileSiteKey) return
   await loadTurnstileScript()
-  if (!window.turnstile) return
+  if (!window.turnstile?.render) return
 
   if (turnstileWidgetId.value) {
     try {
