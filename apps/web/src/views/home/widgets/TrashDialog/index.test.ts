@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import {
   deleteTrash,
@@ -85,5 +85,34 @@ describe('TrashDialog.vue', () => {
       dialog.vm.$emit('close')
       expect(wrapper.emitted('close')).toBeTruthy()
     }
+  })
+
+  it('renders trash table rows with action buttons and date', async () => {
+    const wrapper = mount(TrashDialog, {
+      props: { visible: true },
+      global: {
+        stubs: {
+          'el-dialog': {
+            template: '<div class="el-dialog"><slot /></div>',
+            props: ['modelValue'],
+          },
+          'el-button': {
+            template: '<button class="el-button"><slot /></button>',
+          },
+          'el-checkbox': true,
+          'el-scrollbar': { template: '<div><slot /></div>' },
+          'el-tooltip': { template: '<div><slot /></div>' },
+          'el-icon': true,
+        },
+      },
+    })
+    await flushPromises()
+    expect(wrapper.find('.trash-table-header .col-action').exists()).toBe(true)
+    expect(wrapper.find('.trash-row .col-date').exists()).toBe(true)
+    expect(wrapper.find('.trash-row .col-action').exists()).toBe(true)
+    const actionSpans = wrapper.findAll(
+      '.trash-row .col-action .action-btn-text',
+    )
+    expect(actionSpans.length).toBe(2)
   })
 })

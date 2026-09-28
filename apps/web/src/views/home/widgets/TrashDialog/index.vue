@@ -294,7 +294,7 @@ const handleEmptyTrash = () => {
   <el-dialog
     :model-value="visible"
     :title="t('trash.title')"
-    width="780px"
+    width="800px"
     destroy-on-close
     class="trash-dialog"
     @close="emit('close')"
@@ -434,7 +434,7 @@ const handleEmptyTrash = () => {
                     :disabled="actionLoading"
                     @click="handleRestoreSingle(item)"
                   >
-                    {{ t('trash.restore') }}
+                    <span class="action-btn-text">{{ t('trash.restore') }}</span>
                   </el-button>
                 </el-tooltip>
                 <el-tooltip :content="t('trash.permanentDeleteItemTooltip')" placement="top">
@@ -446,7 +446,7 @@ const handleEmptyTrash = () => {
                     :disabled="actionLoading"
                     @click="handleDeleteSingle(item)"
                   >
-                    {{ t('trash.permanentDelete') }}
+                    <span class="action-btn-text">{{ t('trash.deleteAction') }}</span>
                   </el-button>
                 </el-tooltip>
               </div>
@@ -676,7 +676,7 @@ const handleEmptyTrash = () => {
 }
 
 .col-date {
-  width: 140px;
+  width: 150px;
   font-size: 12px;
   color: #777;
   flex-shrink: 0;
@@ -687,17 +687,26 @@ const handleEmptyTrash = () => {
 }
 
 .col-action {
-  width: 140px;
+  width: 180px;
   text-align: right;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 8px;
+  white-space: nowrap;
+
+  .el-button {
+    margin-left: 0;
+  }
 
   @media (max-width: 640px) {
-    width: 130px;
-    gap: 2px;
+    width: 68px;
+    gap: 4px;
+
+    .action-btn-text {
+      display: none;
+    }
   }
 }
 </style>

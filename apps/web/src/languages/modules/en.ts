@@ -235,6 +235,7 @@ export default {
     colAction: 'Actions',
     restore: 'Restore',
     restoreItemTooltip: 'Restore this item',
+    deleteAction: 'Delete',
     permanentDelete: 'Permanently Delete',
     permanentDeleteItemTooltip: 'Permanently delete this item',
     restoreSingleSuccess: '"{name}" restored successfully',

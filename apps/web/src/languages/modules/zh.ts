@@ -228,6 +228,7 @@ export default {
     colAction: '操作',
     restore: '还原',
     restoreItemTooltip: '还原此项目',
+    deleteAction: '彻底删除',
     permanentDelete: '彻底删除',
     permanentDeleteItemTooltip: '彻底删除此项目',
     restoreSingleSuccess: '"{name}" 已成功还原',
