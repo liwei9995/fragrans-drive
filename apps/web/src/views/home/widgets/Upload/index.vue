@@ -71,6 +71,11 @@ const handleError: UploadProps['onError'] = (
     )
   } else if (err?.response?.data?.message || err?.response?.data?.error) {
     ElMessage.error(err.response.data.message || err.response.data.error)
+  } else if (
+    err?.message?.includes('timeout') ||
+    err?.code === 'ECONNABORTED'
+  ) {
+    ElMessage.error('上传超时，网络连接不稳定，请检查网络后重试')
   } else if (err?.message) {
     ElMessage.error(err.message)
   }
@@ -145,13 +150,23 @@ const customUploadRequest = async (options: UploadRequestOptions) => {
         chunkFormData.append('chunkIndex', chunkIndex.toString())
         chunkFormData.append('chunk', chunkBlob, `${chunkIndex}.part`)
 
-        await uploadChunk(chunkFormData, (progressEvent) => {
-          const { loaded, total } = progressEvent
-          if (total) {
-            chunkProgress[chunkIndex] = loaded / total
-            updateOverallProgress()
+        let retries = 3
+        while (retries > 0) {
+          try {
+            await uploadChunk(chunkFormData, (progressEvent) => {
+              const { loaded, total } = progressEvent
+              if (total) {
+                chunkProgress[chunkIndex] = loaded / total
+                updateOverallProgress()
+              }
+            })
+            break
+          } catch (chunkError) {
+            retries--
+            if (retries === 0) throw chunkError
+            await new Promise((resolve) => setTimeout(resolve, 1000))
           }
-        })
+        }
 
         chunkProgress[chunkIndex] = 1
         updateOverallProgress()

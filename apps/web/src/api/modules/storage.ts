@@ -134,7 +134,9 @@ export interface UploadCompleteResult {
 }
 
 export const uploadInit = (params: UploadInitParams) => {
-  return http.post<UploadInitResult>(`${PORT}/storage/upload/init`, params)
+  return http.post<UploadInitResult>(`${PORT}/storage/upload/init`, params, {
+    timeout: 60000,
+  })
 }
 
 export const uploadChunk = (
@@ -146,6 +148,8 @@ export const uploadChunk = (
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: ResultEnum.TIMEOUT_UPLOAD as number,
+      silent: true,
       onUploadProgress,
     },
   )
@@ -155,5 +159,8 @@ export const uploadComplete = (params: UploadCompleteParams) => {
   return http.post<UploadCompleteResult>(
     `${PORT}/storage/upload/complete`,
     params,
+    {
+      timeout: ResultEnum.TIMEOUT_UPLOAD as number,
+    },
   )
 }

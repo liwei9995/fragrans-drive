@@ -84,9 +84,10 @@ class RequestHttp {
       },
       async (error: AxiosError) => {
         const { response } = error
+        const isSilent = Boolean((error?.config as any)?.silent)
 
         // Check timeout separately, since timeout error has no response
-        if (error.message.indexOf('timeout') !== -1)
+        if (!isSilent && error.message.indexOf('timeout') !== -1)
           ElMessage.error('请求超时！请您稍后重试')
 
         if (response?.status === ResultEnum.UNAUTHORIZED) {
@@ -153,10 +154,12 @@ class RequestHttp {
           (response?.data as { error?: string; message?: string } | undefined)
             ?.message
 
-        if (backendMessage) {
-          ElMessage.error(backendMessage)
-        } else if (response) {
-          checkStatus(response.status)
+        if (!isSilent) {
+          if (backendMessage) {
+            ElMessage.error(backendMessage)
+          } else if (response) {
+            checkStatus(response.status)
+          }
         }
         // If no response returned (server error or client offline), handle offline navigation
         if (!window.navigator.onLine) router.replace({ path: '/500' })

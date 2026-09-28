@@ -18,6 +18,9 @@ import {
   restoreTrash,
   setPublicStatus,
   updateFile,
+  uploadChunk,
+  uploadComplete,
+  uploadInit,
 } from './storage'
 
 vi.mock('@/api', () => ({
@@ -125,5 +128,47 @@ describe('storage module api', () => {
   it('getStorageUsage', () => {
     getStorageUsage()
     expect(http.get).toHaveBeenCalledWith(`${PORT}/storage/usage`)
+  })
+
+  it('uploadInit', () => {
+    const params = {
+      parentId: '0',
+      name: 'test.apk',
+      hash: 'abc123',
+      size: 1024,
+      chunkSize: 512,
+      totalChunks: 2,
+    }
+    uploadInit(params)
+    expect(http.post).toHaveBeenCalledWith(
+      `${PORT}/storage/upload/init`,
+      params,
+      { timeout: 60000 },
+    )
+  })
+
+  it('uploadChunk', () => {
+    const formData = new FormData()
+    uploadChunk(formData)
+    expect(http.post).toHaveBeenCalledWith(
+      `${PORT}/storage/upload/chunk`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: ResultEnum.TIMEOUT_UPLOAD,
+        silent: true,
+        onUploadProgress: undefined,
+      },
+    )
+  })
+
+  it('uploadComplete', () => {
+    const params = { uploadId: 'upload_123' }
+    uploadComplete(params)
+    expect(http.post).toHaveBeenCalledWith(
+      `${PORT}/storage/upload/complete`,
+      params,
+      { timeout: ResultEnum.TIMEOUT_UPLOAD },
+    )
   })
 })
