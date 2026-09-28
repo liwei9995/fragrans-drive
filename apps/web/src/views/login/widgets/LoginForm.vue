@@ -99,12 +99,25 @@ const turnstileWidgetId = ref<string | null>(null)
 const loadTurnstileScript = (): Promise<void> => {
   return new Promise((resolve) => {
     if (window.turnstile) {
-      resolve()
+      if (typeof window.turnstile.ready === 'function') {
+        window.turnstile.ready(() => resolve())
+      } else {
+        resolve()
+      }
       return
     }
-    const existing = document.getElementById('cf-turnstile-script')
+    const existing = document.getElementById(
+      'cf-turnstile-script',
+    ) as HTMLScriptElement | null
     if (existing) {
-      existing.addEventListener('load', () => resolve())
+      existing.addEventListener('load', () => {
+        if (window.turnstile?.ready) {
+          window.turnstile.ready(() => resolve())
+        } else {
+          resolve()
+        }
+      })
+      existing.addEventListener('error', () => resolve())
       return
     }
     const script = document.createElement('script')
@@ -113,7 +126,14 @@ const loadTurnstileScript = (): Promise<void> => {
       'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
     script.async = true
     script.defer = true
-    script.onload = () => resolve()
+    script.onload = () => {
+      if (window.turnstile?.ready) {
+        window.turnstile.ready(() => resolve())
+      } else {
+        resolve()
+      }
+    }
+    script.onerror = () => resolve()
     document.head.appendChild(script)
   })
 }
@@ -137,6 +157,7 @@ const renderTurnstile = async (container: HTMLElement | null) => {
   try {
     turnstileWidgetId.value = window.turnstile.render(container, {
       sitekey: authConfig.value.turnstileSiteKey,
+      size: 'flexible',
       theme: 'auto',
       callback: (token: string) => {
         turnstileToken.value = token
@@ -1091,6 +1112,15 @@ defineExpose({
         display: flex;
         justify-content: center;
         width: 100%;
+
+        :deep(> div) {
+          width: 100% !important;
+        }
+
+        :deep(iframe) {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
       }
     }
 

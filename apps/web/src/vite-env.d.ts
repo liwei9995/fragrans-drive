@@ -13,10 +13,12 @@ declare module '*.vue' {
 
 interface Window {
   turnstile?: {
+    ready?: (callback: () => void) => void
     render: (
       container: string | HTMLElement,
       params: {
         sitekey: string
+        size?: 'normal' | 'compact' | 'flexible'
         theme?: 'auto' | 'light' | 'dark'
         callback?: (token: string) => void
         'expired-callback'?: () => void
